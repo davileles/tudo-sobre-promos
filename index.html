@@ -50,6 +50,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word}
 .copy-wrap{padding:0 1rem 1rem}
 .ok{text-align:center;font-size:12px;color:var(--accent);font-weight:700;margin-top:8px;height:16px}
+.ws-bar{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:12px;font-weight:600;color:var(--muted)}
+.ws-dot{width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:background .3s}
+.ws-dot.on{background:#4ade80}
+.ws-dot.off{background:var(--muted2)}
+.btn-send{background:var(--surface2);color:var(--text);border:1px solid var(--border2);margin-top:8px;font-weight:700;display:none}
+.btn-send.visible{display:flex}
+.btn-send:hover{background:var(--border)}
+.send-ok{text-align:center;font-size:12px;font-weight:700;margin-top:6px;height:14px;color:#4ade80}
+.send-err{color:#f87171}
+.img-upload{margin-top:10px;border-top:1px solid var(--border);padding-top:12px}
+.img-upload label.img-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px}
+.img-drop{border:1.5px dashed var(--border2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:border-color .15s;position:relative}
+.img-drop:hover{border-color:var(--accent)}
+.img-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.img-drop-text{font-size:12px;color:var(--muted);font-weight:500}
+.img-preview{margin-top:8px;display:none;position:relative}
+.img-preview img{width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:block}
+.img-clear{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 .sep{height:1px;background:var(--border);margin:16px 0}
 @media(max-width:480px){.g2{grid-template-columns:1fr}}
 </style>
@@ -64,6 +82,11 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
   </div>
   <p class="subtitle">Preencha os campos e copie a mensagem pronta para o WhatsApp.</p>
 </header>
+
+<div class="ws-bar" id="ws-bar">
+  <div class="ws-dot off" id="ws-dot"></div>
+  <span id="ws-label">Servidor local desconectado — inicie o baileys-server para envio automatico</span>
+</div>
 
 <div class="tabs">
   <button class="tab active" id="tab-cupom" onclick="switchTab('cupom')">&#127991; Cupom</button>
@@ -112,6 +135,10 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
         <input type="text" id="c-cupom" placeholder="Ex: PROMO10"/>
       </div>
     </div>
+    <div class="field" style="margin-top:12px">
+      <label>Importante <span class="tag">opcional</span></label>
+      <input type="text" id="c-importante" placeholder="Ex: Valido somente hoje!"/>
+    </div>
   </div>
   <button class="btn" onclick="gerarCupom()">Gerar mensagem</button>
   <div class="result-card" id="c-result">
@@ -119,7 +146,20 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     <pre class="out" id="c-msg"></pre>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('c-msg','c-ok')">Copiar para WhatsApp</button>
+      <button class="btn btn-send visible" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="c-ok"></p>
+      <p class="send-ok" id="c-send-ok"></p>
+      <div class="img-upload">
+        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+        <div class="img-drop" onclick="document.getElementById('c-img-input').click()">
+          <input type="file" id="c-img-input" accept="image/*" onchange="previewImg(this,'c-img-preview','c-img-el')" style="display:none"/>
+          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
+        </div>
+        <div class="img-preview" id="c-img-preview">
+          <img id="c-img-el" src="" alt="preview"/>
+          <button class="img-clear" onclick="limparImg('c')">&#10005;</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -168,6 +208,10 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
       </div>
     </div>
     <div class="sep"></div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Importante <span class="tag">opcional</span></label>
+      <input type="text" id="o-importante" placeholder="Ex: Estoque limitado!"/>
+    </div>
     <div class="g2">
       <div class="field">
         <label>Loja</label>
@@ -189,7 +233,20 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     <pre class="out" id="o-msg"></pre>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('o-msg','o-ok')">Copiar para WhatsApp</button>
+      <button class="btn btn-send visible" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="o-ok"></p>
+      <p class="send-ok" id="o-send-ok"></p>
+      <div class="img-upload">
+        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+        <div class="img-drop" onclick="document.getElementById('o-img-input').click()">
+          <input type="file" id="o-img-input" accept="image/*" onchange="previewImg(this,'o-img-preview','o-img-el')" style="display:none"/>
+          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
+        </div>
+        <div class="img-preview" id="o-img-preview">
+          <img id="o-img-el" src="" alt="preview"/>
+          <button class="img-clear" onclick="limparImg('o')">&#10005;</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -221,6 +278,10 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
         </select>
       </div>
     </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Importante <span class="tag">opcional</span></label>
+      <input type="text" id="l-importante" placeholder="Ex: Oferta por tempo limitado!"/>
+    </div>
     <div class="field">
       <label>Link <span class="tag">opcional</span></label>
       <input type="text" id="l-link" placeholder="https://..."/>
@@ -232,7 +293,20 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     <pre class="out" id="l-msg"></pre>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('l-msg','l-ok')">Copiar para WhatsApp</button>
+      <button class="btn btn-send visible" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="l-ok"></p>
+      <p class="send-ok" id="l-send-ok"></p>
+      <div class="img-upload">
+        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+        <div class="img-drop" onclick="document.getElementById('l-img-input').click()">
+          <input type="file" id="l-img-input" accept="image/*" onchange="previewImg(this,'l-img-preview','l-img-el')" style="display:none"/>
+          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
+        </div>
+        <div class="img-preview" id="l-img-preview">
+          <img id="l-img-el" src="" alt="preview"/>
+          <button class="img-clear" onclick="limparImg('l')">&#10005;</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -290,6 +364,8 @@ function gerarCupom() {
     msg += '\n\n\u26a0\ufe0f *IMPORTANTE* Ideal para compras de at\u00e9 R$ ' + ideal + '.\n\n';
   } else { msg += '\n\n'; }
   var url = loja === 'Amazon' ? linksMap['Amazon'] : loja === 'Mercado Livre' ? linksMap['Mercado Livre'] : (cupom ? linksMap['Shopee_com'] : linksMap['Shopee_sem']);
+  var cImportante = document.getElementById('c-importante').value.trim();
+  if (cImportante) msg += '\u26a0\ufe0f *IMPORTANTE* ' + cImportante + '\n\n';
   msg += '\ud83d\udd17 *RESGATE O CUPOM AQUI* ' + url;
   msg += '\n\n`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
   mostrar('c-msg','c-result','c-ok', msg);
@@ -338,6 +414,8 @@ function gerarOferta() {
   msg += 'De: ~R$ ' + fmt(original) + '~\n';
   msg += 'Por: R$ ' + fmt(preco) + '\n\n';
   if (cupom) msg += '\ud83c\udff7\ufe0f *CUPOM* ' + cupom.toUpperCase() + '\n\n';
+  var oImportante = document.getElementById('o-importante').value.trim();
+  if (oImportante) msg += '\u26a0\ufe0f *IMPORTANTE* ' + oImportante + '\n\n';
   msg += '\ud83d\uded2 *LOJA* ' + loja.toUpperCase() + '\n\n';
   msg += '\ud83d\udd17 *LINK* ' + link + '\n\n';
   msg += '`Convide seus amigos para entrar aqui no grupo:  https://chat.whatsapp.com/Ia5ZTqeTJdXHG5OT9LUwz8`';
@@ -355,6 +433,8 @@ function gerarLivre() {
   if (corpo)  msg += corpo + '\n\n';
   if (cupom)  msg += '\ud83c\udff7\ufe0f *CUPOM* ' + cupom.toUpperCase() + '\n\n';
   if (loja)   msg += '\ud83d\uded2 *LOJA* ' + loja.toUpperCase() + '\n\n';
+  var lImportante = document.getElementById('l-importante').value.trim();
+  if (lImportante) msg += '\u26a0\ufe0f *IMPORTANTE* ' + lImportante + '\n\n';
   if (link)   msg += '\ud83d\udd17 *LINK* ' + link + '\n\n';
   msg += '`Convide seus amigos para entrar aqui no grupo:  https://chat.whatsapp.com/Ia5ZTqeTJdXHG5OT9LUwz8`';
   mostrar('l-msg','l-result','l-ok', msg);
@@ -387,6 +467,91 @@ function okMsg(okId) {
   s.textContent = 'Copiado! Cole direto no WhatsApp.';
   setTimeout(function() { s.textContent = ''; }, 3000);
 }
+
+// ── BAILEYS ───────────────────────────────────────────
+var SERVER = 'http://localhost:3001';
+var wsConectado = false;
+
+function verificarServidor() {
+  fetch(SERVER + '/status', { signal: AbortSignal.timeout(2000) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      wsConectado = d.conectado;
+      document.getElementById('ws-dot').className = 'ws-dot ' + (d.conectado ? 'on' : 'off');
+      document.getElementById('ws-label').textContent = d.conectado
+        ? 'WhatsApp conectado — envio automatico ativo'
+        : 'Servidor encontrado mas WhatsApp nao conectado — escaneie o QR Code no terminal';
+    })
+    .catch(function(){
+      wsConectado = false;
+      document.getElementById('ws-dot').className = 'ws-dot off';
+      document.getElementById('ws-label').textContent = 'Servidor local desconectado — inicie o baileys-server para envio automatico';
+    });
+}
+
+function previewImg(input, previewId, imgId) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById(imgId).src = e.target.result;
+    document.getElementById(previewId).style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function limparImg(pid) {
+  document.getElementById(pid + '-img-input').value = '';
+  document.getElementById(pid + '-img-el').src = '';
+  document.getElementById(pid + '-img-preview').style.display = 'none';
+}
+
+async function enviarWA(msgId, statusId, imgInputId) {
+  var texto = document.getElementById(msgId).textContent;
+  var s = document.getElementById(statusId);
+  if (!wsConectado) {
+    s.className = 'send-ok send-err';
+    s.textContent = 'Servidor desconectado. Inicie o baileys-server.';
+    setTimeout(function(){ s.textContent = ''; }, 4000);
+    return;
+  }
+  s.className = 'send-ok';
+  s.textContent = 'Enviando...';
+  try {
+    var imgInput = imgInputId ? document.getElementById(imgInputId) : null;
+    var file = imgInput && imgInput.files[0] ? imgInput.files[0] : null;
+    var r;
+    if (file) {
+      var formData = new FormData();
+      formData.append('imagem', file);
+      formData.append('legenda', texto);
+      r = await fetch(SERVER + '/enviar-imagem', { method: 'POST', body: formData });
+    } else {
+      r = await fetch(SERVER + '/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensagem: texto })
+      });
+    }
+    var d = await r.json();
+    if (d.ok) {
+      s.textContent = '✓ Enviado no grupo!';
+      setTimeout(function(){ s.textContent = ''; }, 4000);
+    } else {
+      s.className = 'send-ok send-err';
+      s.textContent = 'Erro: ' + (d.erro || 'falha ao enviar');
+      setTimeout(function(){ s.textContent = ''; }, 5000);
+    }
+  } catch(e) {
+    s.className = 'send-ok send-err';
+    s.textContent = 'Sem resposta do servidor.';
+    setTimeout(function(){ s.textContent = ''; }, 4000);
+  }
+}
+
+// Verificar status a cada 5 segundos
+verificarServidor();
+setInterval(verificarServidor, 5000);
 </script>
 </body>
 </html>
