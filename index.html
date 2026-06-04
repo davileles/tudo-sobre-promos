@@ -58,18 +58,22 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
 .btn-send.visible{display:flex}
 .btn-send:hover{background:var(--border)}
 .send-ok{text-align:center;font-size:12px;font-weight:700;margin-top:6px;height:14px;color:#4ade80}
-.send-err{color:#f87171}
-.img-upload{margin-top:10px;border-top:1px solid var(--border);padding-top:12px}
-.img-upload label.img-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px}
-.img-drop{border:1.5px dashed var(--border2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:border-color .15s;position:relative}
-.img-drop:hover{border-color:var(--accent)}
-.img-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.img-drop-text{font-size:12px;color:var(--muted);font-weight:500}
-.img-preview{margin-top:8px;display:none;position:relative}
-.img-preview img{width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:block}
-.img-clear{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 .sep{height:1px;background:var(--border);margin:16px 0}
+.img-upload{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.5rem;margin-top:8px;margin-bottom:8px}
+.img-upload label.img-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;display:block;margin-bottom:10px}
+.img-drop{border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.img-drop:hover,.img-drop.dragover{border-color:var(--accent);background:rgba(255,165,0,.04)}
+.img-drop-text{font-size:12px;color:var(--muted);font-weight:500;pointer-events:none}
+.img-drop-sub{font-size:11px;color:var(--muted2);margin-top:4px;pointer-events:none}
+.img-preview{margin-top:10px;display:none;position:relative}
+.img-preview img{width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block}
+.img-clear{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
 @media(max-width:480px){.g2{grid-template-columns:1fr}}
+.presets-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin-bottom:8px;font-family:var(--font)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0}
+.preset-btn{padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--muted);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,color .15s;white-space:nowrap;letter-spacing:.2px}
+.preset-btn:hover{border-color:var(--accent);color:var(--text)}
+.preset-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
 </style>
 </head>
 <body>
@@ -97,7 +101,16 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
 <!-- CUPOM -->
 <div class="panel active" id="panel-cupom">
   <div class="card">
-    <p class="card-title">Configuracao</p>
+    <div style="margin-bottom:14px">
+      <p class="presets-label">Padroes rapidos</p>
+      <div class="presets" id="c-presets">
+        <button class="preset-btn" onclick="aplicarPreset(this,'ML-12')">ML 12%</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'ML-15')">ML 15%</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'ML-18')">ML 18%</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'SH-30')">Shopee R$30</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'SH-90')">Shopee R$90</button>
+      </div>
+    </div>
     <div class="g2" style="margin-bottom:12px">
       <div class="field">
         <label>Loja</label>
@@ -141,6 +154,18 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     </div>
   </div>
   <button class="btn" onclick="gerarCupom()">Gerar mensagem</button>
+  <div class="img-upload" id="c-img-upload">
+    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+    <div class="img-drop" id="c-img-drop" onclick="document.getElementById('c-img-input').click()">
+      <input type="file" id="c-img-input" accept="image/*" onchange="previewImg(this,'c-img-preview','c-img-el')" style="display:none"/>
+      <div class="img-drop-text">&#128247; Clique para selecionar ou arraste uma imagem</div>
+      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
+    </div>
+    <div class="img-preview" id="c-img-preview">
+      <img id="c-img-el" src="" alt="preview"/>
+      <button class="img-clear" onclick="limparImg('c')">&#10005;</button>
+    </div>
+  </div>
   <div class="result-card" id="c-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <pre class="out" id="c-msg"></pre>
@@ -149,17 +174,6 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
       <button class="btn btn-send visible" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="c-ok"></p>
       <p class="send-ok" id="c-send-ok"></p>
-      <div class="img-upload">
-        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
-        <div class="img-drop" onclick="document.getElementById('c-img-input').click()">
-          <input type="file" id="c-img-input" accept="image/*" onchange="previewImg(this,'c-img-preview','c-img-el')" style="display:none"/>
-          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
-        </div>
-        <div class="img-preview" id="c-img-preview">
-          <img id="c-img-el" src="" alt="preview"/>
-          <button class="img-clear" onclick="limparImg('c')">&#10005;</button>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -167,7 +181,10 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
 <!-- OFERTA -->
 <div class="panel" id="panel-oferta">
   <div class="card">
-    <p class="card-title">Produto</p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Gatilho <span class="tag">opcional</span></label>
+      <input type="text" id="o-gatilho" placeholder="Ex: Corre que e por tempo limitado!"/>
+    </div>
     <div class="field" style="margin-bottom:12px">
       <label>Nome do produto</label>
       <input type="text" id="o-nome" placeholder="Ex: Tenis Nike Air Max 90"/>
@@ -191,21 +208,15 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
       </div>
       <div class="field">
         <label>Tipo de desconto</label>
-        <select id="o-tipo" onchange="toggleLimiteDesconto()">
+        <select id="o-tipo">
           <option value="pct">Percentual (%)</option>
           <option value="reais">Valor fixo (R$)</option>
         </select>
       </div>
     </div>
-    <div class="g2" style="margin-bottom:0">
-      <div class="field disabled" id="o-cupomValorField">
-        <label>Valor do desconto do cupom</label>
-        <input type="number" id="o-cupomValor" placeholder="Ex: 10" min="0" step="0.01"/>
-      </div>
-      <div class="field disabled" id="o-limiteDescontoField">
-        <label>Limite de desconto (R$) <span class="tag">so para %</span></label>
-        <input type="number" id="o-limiteDesconto" placeholder="Ex: 50" min="0" step="0.01"/>
-      </div>
+    <div class="field disabled" id="o-cupomValorField">
+      <label>Valor do desconto do cupom</label>
+      <input type="number" id="o-cupomValor" placeholder="Ex: 10" min="0" step="0.01"/>
     </div>
     <div class="sep"></div>
     <div class="field" style="margin-bottom:12px">
@@ -228,6 +239,18 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     </div>
   </div>
   <button class="btn" onclick="gerarOferta()">Gerar mensagem</button>
+  <div class="img-upload" id="o-img-upload">
+    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+    <div class="img-drop" id="o-img-drop" onclick="document.getElementById('o-img-input').click()">
+      <input type="file" id="o-img-input" accept="image/*" onchange="previewImg(this,'o-img-preview','o-img-el')" style="display:none"/>
+      <div class="img-drop-text">&#128247; Clique para selecionar ou arraste uma imagem</div>
+      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
+    </div>
+    <div class="img-preview" id="o-img-preview">
+      <img id="o-img-el" src="" alt="preview"/>
+      <button class="img-clear" onclick="limparImg('o')">&#10005;</button>
+    </div>
+  </div>
   <div class="result-card" id="o-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <pre class="out" id="o-msg"></pre>
@@ -236,17 +259,6 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
       <button class="btn btn-send visible" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="o-ok"></p>
       <p class="send-ok" id="o-send-ok"></p>
-      <div class="img-upload">
-        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
-        <div class="img-drop" onclick="document.getElementById('o-img-input').click()">
-          <input type="file" id="o-img-input" accept="image/*" onchange="previewImg(this,'o-img-preview','o-img-el')" style="display:none"/>
-          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
-        </div>
-        <div class="img-preview" id="o-img-preview">
-          <img id="o-img-el" src="" alt="preview"/>
-          <button class="img-clear" onclick="limparImg('o')">&#10005;</button>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -254,7 +266,6 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
 <!-- LIVRE -->
 <div class="panel" id="panel-livre">
   <div class="card">
-    <p class="card-title">Mensagem</p>
     <div class="field" style="margin-bottom:12px">
       <label>Titulo</label>
       <input type="text" id="l-titulo" placeholder="Ex: Ofertas do dia!"/>
@@ -288,6 +299,18 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
     </div>
   </div>
   <button class="btn" onclick="gerarLivre()">Gerar mensagem</button>
+  <div class="img-upload" id="l-img-upload">
+    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+    <div class="img-drop" id="l-img-drop" onclick="document.getElementById('l-img-input').click()">
+      <input type="file" id="l-img-input" accept="image/*" onchange="previewImg(this,'l-img-preview','l-img-el')" style="display:none"/>
+      <div class="img-drop-text">&#128247; Clique para selecionar ou arraste uma imagem</div>
+      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
+    </div>
+    <div class="img-preview" id="l-img-preview">
+      <img id="l-img-el" src="" alt="preview"/>
+      <button class="img-clear" onclick="limparImg('l')">&#10005;</button>
+    </div>
+  </div>
   <div class="result-card" id="l-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <pre class="out" id="l-msg"></pre>
@@ -296,23 +319,45 @@ pre.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13p
       <button class="btn btn-send visible" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input')">&#9889; Enviar no WhatsApp</button>
       <p class="ok" id="l-ok"></p>
       <p class="send-ok" id="l-send-ok"></p>
-      <div class="img-upload">
-        <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
-        <div class="img-drop" onclick="document.getElementById('l-img-input').click()">
-          <input type="file" id="l-img-input" accept="image/*" onchange="previewImg(this,'l-img-preview','l-img-el')" style="display:none"/>
-          <span class="img-drop-text">&#128247; Clique para selecionar imagem</span>
-        </div>
-        <div class="img-preview" id="l-img-preview">
-          <img id="l-img-el" src="" alt="preview"/>
-          <button class="img-clear" onclick="limparImg('l')">&#10005;</button>
-        </div>
-      </div>
     </div>
   </div>
 </div>
 
 </div>
 <script>
+// ── PRESETS ──────────────────────────────────────────
+var PRESETS = {
+  'ML-12': { loja:'Mercado Livre', tipo:'pct', valor:'12', minimo:'79', limite:'60' },
+  'ML-15': { loja:'Mercado Livre', tipo:'pct', valor:'15', minimo:'79', limite:'60' },
+  'ML-18': { loja:'Mercado Livre', tipo:'pct', valor:'18', minimo:'79', limite:'60' },
+  'SH-30': { loja:'Shopee', tipo:'reais', valor:'30', minimo:'299', limite:'' },
+  'SH-90': { loja:'Shopee', tipo:'reais', valor:'90', minimo:'899', limite:'' }
+};
+
+function aplicarPreset(btn, key) {
+  var p = PRESETS[key];
+  if (!p) return;
+  var isActive = btn.classList.contains('active');
+  document.querySelectorAll('#c-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (isActive) {
+    document.getElementById('c-loja').value = 'Amazon';
+    document.getElementById('c-tipo').value = 'pct';
+    document.getElementById('c-valor').value = '';
+    document.getElementById('c-minimo').value = '';
+    document.getElementById('c-limite').value = '';
+    document.getElementById('c-cupom').value = '';
+    toggleLimite();
+    return;
+  }
+  btn.classList.add('active');
+  document.getElementById('c-loja').value = p.loja;
+  document.getElementById('c-tipo').value = p.tipo;
+  document.getElementById('c-valor').value = p.valor;
+  document.getElementById('c-minimo').value = p.minimo;
+  document.getElementById('c-limite').value = p.limite;
+  toggleLimite();
+}
+
 var TABS = ['cupom','oferta','livre'];
 
 function switchTab(name) {
@@ -374,16 +419,7 @@ function gerarCupom() {
 function toggleCupomValor() {
   var tem = document.getElementById('o-cupom').value.trim() !== '';
   var f = document.getElementById('o-cupomValorField');
-  var fl = document.getElementById('o-limiteDescontoField');
-  if (tem) { f.classList.remove('disabled'); } else { f.classList.add('disabled'); fl.classList.add('disabled'); }
-  toggleLimiteDesconto();
-}
-
-function toggleLimiteDesconto() {
-  var tem = document.getElementById('o-cupom').value.trim() !== '';
-  var isPct = document.getElementById('o-tipo').value === 'pct';
-  var fl = document.getElementById('o-limiteDescontoField');
-  if (tem && isPct) { fl.classList.remove('disabled'); } else { fl.classList.add('disabled'); if (!isPct) document.getElementById('o-limiteDesconto').value = ''; }
+  if (tem) { f.classList.remove('disabled'); } else { f.classList.add('disabled'); }
 }
 
 function fmt(n) {
@@ -399,18 +435,14 @@ function gerarOferta() {
   var cupomVal = parseFloat(document.getElementById('o-cupomValor').value) || 0;
   var loja     = document.getElementById('o-loja').value;
   var link     = document.getElementById('o-link').value.trim();
-  var limiteDesconto = parseFloat(document.getElementById('o-limiteDesconto').value) || 0;
   var preco = finalVal;
   if (cupom && cupomVal > 0) {
-    if (tipoCupom === 'pct') {
-      var desconto = original * cupomVal / 100;
-      if (limiteDesconto > 0 && desconto > limiteDesconto) desconto = limiteDesconto;
-      preco = original - desconto;
-    } else {
-      preco = original - cupomVal;
-    }
+    preco = tipoCupom === 'pct' ? original * (100 - cupomVal) / 100 : original - cupomVal;
   }
-  var msg = '*' + nome + '*\n\n';
+  var gatilho = document.getElementById('o-gatilho').value.trim();
+  var msg = '';
+  if (gatilho) msg += '`🚨 ' + gatilho + '`\n\n';
+  msg += '*' + nome + '*\n\n';
   msg += 'De: ~R$ ' + fmt(original) + '~\n';
   msg += 'Por: R$ ' + fmt(preco) + '\n\n';
   if (cupom) msg += '\ud83c\udff7\ufe0f *CUPOM* ' + cupom.toUpperCase() + '\n\n';
@@ -468,6 +500,70 @@ function okMsg(okId) {
   setTimeout(function() { s.textContent = ''; }, 3000);
 }
 
+// ── IMAGE UPLOAD ──────────────────────────────────────
+function showImgPreview(previewId, imgId, src) {
+  document.getElementById(imgId).src = src;
+  document.getElementById(previewId).style.display = 'block';
+}
+
+function previewImg(input, previewId, imgId) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) { showImgPreview(previewId, imgId, e.target.result); };
+  reader.readAsDataURL(file);
+}
+
+function limparImg(pid) {
+  document.getElementById(pid + '-img-input').value = '';
+  document.getElementById(pid + '-img-el').src = '';
+  document.getElementById(pid + '-img-preview').style.display = 'none';
+  if (window._pastedFiles) window._pastedFiles[pid] = null;
+}
+
+var PIDS = ['c','o','l'];
+var PANEL_NAMES = { c:'cupom', o:'oferta', l:'livre' };
+
+document.addEventListener('DOMContentLoaded', function() {
+  PIDS.forEach(function(pid) {
+    var drop = document.getElementById(pid + '-img-drop');
+    if (!drop) return;
+    drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', function() { drop.classList.remove('dragover'); });
+    drop.addEventListener('drop', function(e) {
+      e.preventDefault(); drop.classList.remove('dragover');
+      var file = e.dataTransfer.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      setImgFile(pid, file);
+    });
+  });
+});
+
+window._pastedFiles = {};
+document.addEventListener('paste', function(e) {
+  var items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      var file = items[i].getAsFile();
+      var activePid = null;
+      PIDS.forEach(function(pid) {
+        if (document.getElementById('panel-' + PANEL_NAMES[pid]).classList.contains('active')) activePid = pid;
+      });
+      if (activePid) setImgFile(activePid, file);
+      break;
+    }
+  }
+});
+
+function setImgFile(pid, file) {
+  if (!window._pastedFiles) window._pastedFiles = {};
+  window._pastedFiles[pid] = file;
+  var reader = new FileReader();
+  reader.onload = function(e) { showImgPreview(pid + '-img-preview', pid + '-img-el', e.target.result); };
+  reader.readAsDataURL(file);
+}
+
 // ── BAILEYS ───────────────────────────────────────────
 var SERVER = 'http://localhost:3001';
 var wsConectado = false;
@@ -489,23 +585,6 @@ function verificarServidor() {
     });
 }
 
-function previewImg(input, previewId, imgId) {
-  var file = input.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById(imgId).src = e.target.result;
-    document.getElementById(previewId).style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-}
-
-function limparImg(pid) {
-  document.getElementById(pid + '-img-input').value = '';
-  document.getElementById(pid + '-img-el').src = '';
-  document.getElementById(pid + '-img-preview').style.display = 'none';
-}
-
 async function enviarWA(msgId, statusId, imgInputId) {
   var texto = document.getElementById(msgId).textContent;
   var s = document.getElementById(statusId);
@@ -518,8 +597,11 @@ async function enviarWA(msgId, statusId, imgInputId) {
   s.className = 'send-ok';
   s.textContent = 'Enviando...';
   try {
+    var pid = imgInputId ? imgInputId.replace('-img-input','') : null;
     var imgInput = imgInputId ? document.getElementById(imgInputId) : null;
-    var file = imgInput && imgInput.files[0] ? imgInput.files[0] : null;
+    var file = (imgInput && imgInput.files[0]) ? imgInput.files[0]
+             : (pid && window._pastedFiles && window._pastedFiles[pid]) ? window._pastedFiles[pid]
+             : null;
     var r;
     if (file) {
       var formData = new FormData();
@@ -549,7 +631,6 @@ async function enviarWA(msgId, statusId, imgInputId) {
   }
 }
 
-// Verificar status a cada 5 segundos
 verificarServidor();
 setInterval(verificarServidor, 5000);
 </script>
