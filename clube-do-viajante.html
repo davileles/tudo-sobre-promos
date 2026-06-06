@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Clube do Viajante - Gerador de Mensagens</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1e2535;--surface:#2a3246;--surface2:#323c54;
+  --border:#3d4a66;--border2:#4a5878;
+  --accent:#ff585e;--accent2:#e04449;
+  --blue:#126eff;--text:#eeeeee;--muted:#8a9bbf;--muted2:#5a6a8a;
+  --r:10px;--font:'Montserrat',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:2.5rem 1rem 4rem}
+.wrap{width:100%;max-width:580px}
+header{margin-bottom:2rem}
+.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.logo-bird{width:56px;height:56px;flex-shrink:0;object-fit:contain}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand-name{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px;line-height:1.1}
+.brand-sub{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase}
+.subtitle{font-size:12px;color:var(--muted);font-weight:500;margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:1rem}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.tag{font-size:10px;font-weight:500;color:var(--muted2);text-transform:none;letter-spacing:0}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:14px;font-weight:500;padding:10px 12px;width:100%;outline:none;transition:border-color .15s;appearance:none;-webkit-appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input::placeholder,textarea::placeholder{color:var(--muted2)}
+textarea{resize:vertical;min-height:90px;line-height:1.6}
+input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.5);cursor:pointer}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a6a8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border:none;border-radius:var(--r);font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer;letter-spacing:.4px;transition:background .15s,transform .1s;margin-top:4px}
+.btn:active{transform:scale(.98)}
+.btn-gerar{background:var(--accent);color:#fff}
+.btn-gerar:hover{background:var(--accent2)}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:#0f5fe0}
+.btn-copy{background:var(--surface2);color:var(--text);border:1px solid var(--border2);margin-top:0;font-weight:700}
+.btn-copy:hover{background:var(--border)}
+.btn-send{background:var(--blue);color:#fff;margin-top:8px;font-weight:700}
+.btn-send:hover{background:#0f5fe0}
+.result-card{display:none;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1rem;margin-top:1rem}
+.result-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.result-header span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+pre.out{display:none}
+textarea.out{padding:1.25rem 1.5rem;font-family:'Courier New',monospace;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;background:transparent;border:none;border-radius:0;resize:vertical;min-height:200px;width:100%;outline:none}
+.copy-wrap{padding:0 1rem 1rem;display:flex;flex-direction:column;gap:0}
+.ok{text-align:center;font-size:12px;color:#4ade80;font-weight:700;margin-top:8px;min-height:16px}
+.send-ok{text-align:center;font-size:12px;font-weight:700;margin-top:6px;min-height:14px;color:#4ade80}
+.ws-bar{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:1rem;font-size:12px;font-weight:600;color:var(--muted)}
+.ws-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.ws-dot.on{background:#4ade80}
+.ws-dot.off{background:var(--muted2)}
+.img-upload{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:8px}
+.img-upload label.img-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;display:block;margin-bottom:10px}
+.img-drop{border:1.5px dashed var(--border2);border-radius:var(--r);padding:18px 14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.img-drop:hover,.img-drop.dragover{border-color:var(--accent);background:rgba(255,88,94,.05)}
+.img-drop-text{font-size:12px;color:var(--muted);font-weight:500;pointer-events:none}
+.img-drop-sub{font-size:11px;color:var(--muted2);margin-top:4px;pointer-events:none}
+.img-preview{margin-top:10px;display:none;position:relative}
+.img-preview img{width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block}
+.img-clear{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.badge-hint{display:inline-block;font-size:11px;font-weight:700;background:rgba(18,110,255,.15);color:var(--blue);border:1px solid rgba(18,110,255,.3);border-radius:6px;padding:3px 8px;margin-bottom:14px}
+.main-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:1.2rem}
+.main-tab{flex:1;padding:10px 8px;border:none;background:transparent;color:var(--muted);font-family:var(--font);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-radius:9px;cursor:pointer;transition:background .15s,color .15s}
+.main-tab.active{background:var(--accent);color:#fff}
+.main-tab:not(.active):hover{color:var(--text)}
+.main-panel{display:none}
+.main-panel.active{display:block}
+.mode-tabs{display:flex;gap:4px;margin-bottom:14px}
+.mode-tab{flex:1;padding:8px 6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:var(--font);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-radius:8px;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.mode-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.mode-tab:not(.active):hover{color:var(--text);border-color:var(--border2)}
+.sep{height:1px;background:var(--border);margin:14px 0}
+@media(max-width:480px){.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="logo-row">
+    <img class="logo-bird" id="logo-img" alt="Clube do Viajante"/>
+    <div class="brand">
+      <span class="brand-name">Clube do Viajante</span>
+      <span class="brand-sub">Gerador de Mensagens</span>
+    </div>
+  </div>
+  <p class="subtitle">Preencha os campos e copie a mensagem pronta para o grupo do WhatsApp.</p>
+</header>
+
+<div class="card" style="margin-bottom:1rem;padding:1rem 1.25rem">
+  <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">🔑 Chave API Anthropic <span style="font-size:10px;color:var(--muted2);text-transform:none;font-weight:500">(necessária para a IA funcionar)</span></label>
+  <div style="display:flex;gap:8px;align-items:center">
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." style="flex:1;margin:0"/>
+    <button onclick="salvarApiKey()" style="padding:10px 14px;background:var(--accent);color:#fff;border:none;border-radius:var(--r);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Salvar</button>
+  </div>
+  <p id="api-key-ok" style="font-size:11px;margin-top:6px;min-height:14px;color:var(--muted2)">A chave é salva apenas no seu navegador (localStorage).</p>
+</div>
+
+<div class="ws-bar">
+  <div class="ws-dot off" id="ws-dot"></div>
+  <span id="ws-label">Servidor local desconectado — inicie o baileys-server para envio automático</span>
+</div>
+
+<div class="main-tabs">
+  <button class="main-tab active" id="tab-oferta">✈️ Oferta</button>
+  <button class="main-tab" id="tab-milhas">🎟️ Emissão</button>
+</div>
+
+<!-- ══ PAINEL OFERTA ══ -->
+<div class="main-panel active" id="panel-oferta">
+  <div class="card">
+    <p class="badge-hint">🤖 Preencher automaticamente com IA</p>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="mt-link">🔗 Link</button>
+      <button class="mode-tab" id="mt-texto">📝 Texto</button>
+      <button class="mode-tab" id="mt-imagem">📎 Arquivo</button>
+    </div>
+    <div id="mode-link">
+      <div class="field" style="margin-bottom:10px">
+        <label>Cole o link da oferta</label>
+        <input type="text" id="url-input" placeholder="https://..."/>
+      </div>
+    </div>
+    <div id="mode-texto" style="display:none">
+      <div class="field" style="margin-bottom:10px">
+        <label>Cole o texto com as informações da oferta</label>
+        <textarea id="texto-input" placeholder="Cole aqui o texto copiado de um site, e-mail, grupo de WhatsApp..." style="min-height:120px"></textarea>
+      </div>
+    </div>
+    <div id="mode-imagem" style="display:none">
+      <div class="field" style="margin-bottom:10px">
+        <label>Envie um arquivo da oferta</label>
+        <div class="img-drop" id="ai-img-drop">
+          <input type="file" id="ai-img-input" accept="image/*,application/pdf" style="display:none"/>
+          <div class="img-drop-text">📎 Clique para selecionar ou arraste o arquivo</div>
+          <div class="img-drop-sub">Imagem (print, foto, banner) ou PDF</div>
+        </div>
+        <div id="ai-file-preview" style="display:none;margin-top:10px">
+          <img id="ai-img-el" src="" alt="preview" style="display:none;width:100%;max-height:180px;object-fit:cover;border-radius:8px"/>
+          <div id="ai-pdf-label" style="display:none;padding:10px 0;font-size:13px;color:var(--muted);font-weight:600">📄 <span id="ai-pdf-name"></span></div>
+          <button id="ai-clear-btn" style="margin-top:6px;padding:4px 12px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);border-radius:6px;font-family:var(--font);font-size:12px;cursor:pointer">✕ Remover arquivo</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-blue" id="url-btn">🤖 Analisar e preencher campos</button>
+    <p class="ok" id="url-ok" style="color:var(--muted);min-height:18px;margin-top:8px"></p>
+  </div>
+
+  <div class="card">
+    <p class="badge-hint">✈️ Chamada de oferta de viagem</p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Título da oferta</label>
+      <input type="text" id="o-titulo" placeholder="Ex: São Paulo → Lisboa por R$ 2.890"/>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Descrição</label>
+      <textarea id="o-corpo" placeholder="Detalhes da oferta..."></textarea>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Prazo <span class="tag">opcional</span></label>
+        <input type="date" id="o-prazo"/>
+      </div>
+      <div class="field">
+        <label>Loja / Plataforma <span class="tag">opcional</span></label>
+        <input type="text" id="o-loja" placeholder="Ex: Decolar, Hurb..."/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Cupom <span class="tag">opcional</span></label>
+        <input type="text" id="o-cupom" placeholder="Ex: CLUBE10"/>
+      </div>
+      <div class="field">
+        <label>Importante <span class="tag">opcional</span></label>
+        <input type="text" id="o-importante" placeholder="Ex: Apenas cartão de crédito"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>Link da oferta</label>
+      <input type="text" id="o-link" placeholder="https://..."/>
+    </div>
+  </div>
+
+  <div class="img-upload">
+    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional — enviada como legenda</span></label>
+    <div class="img-drop" id="o-img-drop">
+      <input type="file" id="o-img-input" accept="image/*" style="display:none"/>
+      <div class="img-drop-text">📷 Clique para selecionar ou arraste uma imagem</div>
+      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
+    </div>
+    <div class="img-preview" id="o-img-preview">
+      <img id="o-img-el" src="" alt="preview"/>
+      <button class="img-clear" id="o-img-clear">✕</button>
+    </div>
+  </div>
+
+  <button class="btn btn-gerar" id="o-gerar-btn">Gerar mensagem</button>
+  <div class="result-card" id="o-result">
+    <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
+    <pre class="out" id="o-msg"></pre>
+    <textarea class="out" id="o-msg-edit" spellcheck="false"></textarea>
+    <div class="copy-wrap">
+      <button class="btn btn-copy" id="o-copy-btn">Copiar para WhatsApp</button>
+      <button class="btn btn-send" id="o-send-btn">⚡ Enviar no WhatsApp</button>
+      <p class="ok" id="o-ok"></p>
+      <p class="send-ok" id="o-send-ok"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAINEL EMISSÃO ══ -->
+<div class="main-panel" id="panel-milhas">
+  <div class="card">
+    <p class="badge-hint">🤖 Preencher automaticamente com IA</p>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="mmt-texto">📝 Texto</button>
+      <button class="mode-tab" id="mmt-imagem">📎 Arquivo</button>
+    </div>
+    <div id="mmode-texto">
+      <div class="field" style="margin-bottom:10px">
+        <label>Cole o texto com os dados da emissão</label>
+        <textarea id="m-ai-texto" placeholder="Cole aqui os dados do voo, datas, pontos, programa..." style="min-height:100px"></textarea>
+      </div>
+    </div>
+    <div id="mmode-imagem" style="display:none">
+      <div class="field" style="margin-bottom:10px">
+        <label>Envie um arquivo (print ou PDF)</label>
+        <div class="img-drop" id="m-ai-img-drop">
+          <input type="file" id="m-ai-img-input" accept="image/*,application/pdf" style="display:none"/>
+          <div class="img-drop-text">📎 Clique para selecionar ou arraste o arquivo</div>
+          <div class="img-drop-sub">Print da busca, PDF ou imagem da oferta</div>
+        </div>
+        <div id="m-ai-file-preview" style="display:none;margin-top:10px">
+          <img id="m-ai-img-el" src="" alt="preview" style="display:none;width:100%;max-height:180px;object-fit:cover;border-radius:8px"/>
+          <div id="m-ai-pdf-label" style="display:none;padding:10px 0;font-size:13px;color:var(--muted);font-weight:600">📄 <span id="m-ai-pdf-name"></span></div>
+          <button id="m-ai-clear-btn" style="margin-top:6px;padding:4px 12px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);border-radius:6px;font-family:var(--font);font-size:12px;cursor:pointer">✕ Remover arquivo</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-blue" id="m-ai-btn">🤖 Analisar e preencher campos</button>
+    <p class="ok" id="m-ai-ok" style="color:var(--muted);min-height:18px;margin-top:8px"></p>
+  </div>
+
+  <div class="card">
+    <p class="badge-hint">🎟️ Emissão de passagem com milhas</p>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Origem <span class="tag">cidade completa</span></label>
+        <input type="text" id="m-origem" placeholder="Ex: São Paulo"/>
+      </div>
+      <div class="field">
+        <label>Destino <span class="tag">cidade completa</span></label>
+        <input type="text" id="m-destino" placeholder="Ex: Lisboa"/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Pontos <span class="tag">menor valor</span></label>
+        <input type="number" id="m-pontos" placeholder="Ex: 30000" min="0"/>
+      </div>
+      <div class="field">
+        <label>Programa de fidelidade</label>
+        <select id="m-programa">
+          <option value="">-- selecione --</option>
+          <option value="Smiles">Smiles</option>
+          <option value="Azul Fidelidade">Azul Fidelidade</option>
+          <option value="Azul pelo Mundo">Azul pelo Mundo</option>
+          <option value="LATAM Pass">LATAM Pass</option>
+          <option value="Iberia Plus">Iberia Plus</option>
+          <option value="Privilege Club">Privilege Club</option>
+          <option value="Executive Club">Executive Club</option>
+          <option value="TAP">TAP</option>
+          <option value="AAdvantage">AAdvantage</option>
+          <option value="SUMA">SUMA</option>
+          <option value="Flying Club">Flying Club</option>
+          <option value="Finnair Plus">Finnair Plus</option>
+          <option value="Aeroplan">Aeroplan</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Companhia aérea</label>
+        <input type="text" id="m-cia" placeholder="Ex: LATAM, Iberia, TAP..."/>
+      </div>
+      <div class="field">
+        <label>Voo</label>
+        <select id="m-tipo-voo">
+          <option value="nacional">Nacional</option>
+          <option value="internacional">Internacional</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px;display:none" id="m-classe-field">
+      <label>Classe <span class="tag">só para internacionais</span></label>
+      <select id="m-classe">
+        <option value="ECONÔMICA">Econômica</option>
+        <option value="EXECUTIVA">Executiva</option>
+      </select>
+    </div>
+    <div class="sep"></div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Datas de ida <span class="tag">uma por linha ou separadas por vírgula</span></label>
+      <textarea id="m-datas-ida" placeholder="Ex: 10, 11, 12 de março&#10;15, 16 de abril" style="min-height:70px"></textarea>
+    </div>
+    <div class="field">
+      <label>Datas de volta</label>
+      <textarea id="m-datas-volta" placeholder="Ex: 20, 21 de março&#10;25, 26 de abril" style="min-height:70px"></textarea>
+    </div>
+  </div>
+
+  <div class="img-upload">
+    <label class="img-label">Imagem <span class="tag" style="text-transform:none">opcional</span></label>
+    <div class="img-drop" id="m-img-drop">
+      <input type="file" id="m-img-input" accept="image/*" style="display:none"/>
+      <div class="img-drop-text">📷 Clique para selecionar ou arraste uma imagem</div>
+      <div class="img-drop-sub">Ou cole uma imagem copiada (Ctrl+V / Cmd+V)</div>
+    </div>
+    <div class="img-preview" id="m-img-preview">
+      <img id="m-img-el" src="" alt="preview"/>
+      <button class="img-clear" id="m-img-clear">✕</button>
+    </div>
+  </div>
+
+  <button class="btn btn-gerar" id="m-gerar-btn">Gerar mensagem</button>
+  <div class="result-card" id="m-result">
+    <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
+    <pre class="out" id="m-msg"></pre>
+    <textarea class="out" id="m-msg-edit" spellcheck="false"></textarea>
+    <div class="copy-wrap">
+      <button class="btn btn-copy" id="m-copy-btn">Copiar para WhatsApp</button>
+      <button class="btn btn-send" id="m-send-btn">⚡ Enviar no WhatsApp</button>
+      <p class="ok" id="m-ok"></p>
+      <p class="send-ok" id="m-send-ok"></p>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+// ══ CONSTANTES ══
+var LOJA_TODAS = 'Todas as disponíveis no ato da compra são válidas.';
+var RODAPE_OFERTA = '`Faça parte do Clube do Viajante e economize até 90% nas suas passagens: https://davileles.com/clube-do-viajante/`';
+var RODAPE_MILHAS = '`Dica de emissão encontrada por @davileles - Clube do Viajante`';
+var BALCAO_LINK   = '`Faça parte do Balcão clicando aqui: https://pay.hub.la/TkIbYhix67evTSu1be7c`';
+
+var PROGRAMAS_CPM = {
+  'Smiles':18,'Azul Fidelidade':15,'Azul pelo Mundo':15,
+  'LATAM Pass':26,'Iberia Plus':58,'Privilege Club':58,
+  'Executive Club':58,'TAP':43,'AAdvantage':100,'SUMA':80,
+  'Flying Club':50,  'Finnair Plus':58,
+  'Aeroplan':50
+};
+var PROGRAMAS_LINK = {
+  'Smiles':'https://www.smiles.com.br/home',
+  'Azul Fidelidade':'https://www.voeazul.com.br/br/pt/home',
+  'Azul pelo Mundo':'https://azulpelomundo.voeazul.com.br',
+  'LATAM Pass':'https://www.latamairlines.com/br/pt',
+  'Iberia Plus':'https://www.iberia.com/',
+  'Privilege Club':'https://www.qatarairways.com/',
+  'Executive Club':'https://www.britishairways.com/',
+  'TAP':'https://www.flytap.com/',
+  'AAdvantage':'https://www.aa.com.br/',
+  'SUMA':'https://www.aireuropa.com/en/flights/home',
+  'Flying Club':'https://www.virginatlantic.com/',
+  'Finnair Plus':'https://www.finnair.com/br/gb/finnair-plus',
+  'Aeroplan':'https://www.aircanada.com/home/ca/en/aco/flights'
+};
+
+// ══ ESTADO ══
+var currentMode = 'link';
+var currentMilhasMode = 'texto';
+var aiB64 = null, aiType = null, aiPdf = false;
+var mAiB64 = null, mAiType = null, mAiPdf = false;
+var pastedFile = null, mPastedFile = null;
+
+// ══ LOGO ══
+document.getElementById('logo-img').src = "data:image/png;base64,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";
+
+// ══ TABS ══
+function switchMain(name) {
+  ['oferta','milhas'].forEach(function(id) {
+    document.getElementById('tab-' + (id==='milhas'?'milhas':'oferta')).classList.toggle('active', id===name);
+    document.getElementById('panel-' + (id==='milhas'?'milhas':'oferta')).classList.toggle('active', id===name);
+  });
+  document.getElementById('tab-oferta').classList.toggle('active', name==='oferta');
+  document.getElementById('tab-milhas').classList.toggle('active', name==='milhas');
+  document.getElementById('panel-oferta').classList.toggle('active', name==='oferta');
+  document.getElementById('panel-milhas').classList.toggle('active', name==='milhas');
+}
+
+function setMode(m) {
+  currentMode = m;
+  ['link','texto','imagem'].forEach(function(id) {
+    document.getElementById('mt-'+id).classList.toggle('active', id===m);
+    document.getElementById('mode-'+id).style.display = id===m ? 'block' : 'none';
+  });
+  document.getElementById('url-ok').textContent = '';
+}
+
+function setMilhasMode(m) {
+  currentMilhasMode = m;
+  ['texto','imagem'].forEach(function(id) {
+    document.getElementById('mmt-'+id).classList.toggle('active', id===m);
+    document.getElementById('mmode-'+id).style.display = id===m ? 'block' : 'none';
+  });
+  document.getElementById('m-ai-ok').textContent = '';
+}
+
+// ══ ARQUIVO IA ══
+function carregarArquivoAi(file, isM) {
+  var isPdf = file.type === 'application/pdf';
+  var r = new FileReader();
+  r.onload = function(e) {
+    var src = e.target.result;
+    var parts = src.split(',');
+    if (isM) { mAiB64=parts[1]; mAiType=file.type; mAiPdf=isPdf; }
+    else      { aiB64=parts[1];  aiType=file.type;  aiPdf=isPdf; }
+    var prefix = isM ? 'm-ai' : 'ai';
+    var imgEl  = document.getElementById(prefix+'-img-el');
+    var pdfEl  = document.getElementById(prefix+'-pdf-label');
+    var prev   = document.getElementById(prefix+'-file-preview');
+    if (isPdf) {
+      imgEl.style.display='none'; pdfEl.style.display='block';
+      document.getElementById(prefix+'-pdf-name').textContent=file.name;
+    } else {
+      imgEl.src=src; imgEl.style.display='block'; pdfEl.style.display='none';
+    }
+    prev.style.display='block';
+  };
+  r.readAsDataURL(file);
+}
+
+function limparArquivoAi(isM) {
+  var prefix = isM ? 'm-ai' : 'ai';
+  document.getElementById(prefix+'-img-input').value='';
+  document.getElementById(prefix+'-img-el').src='';
+  document.getElementById(prefix+'-img-el').style.display='none';
+  document.getElementById(prefix+'-pdf-label').style.display='none';
+  document.getElementById(prefix+'-file-preview').style.display='none';
+  if (isM) { mAiB64=null; mAiType=null; mAiPdf=false; }
+  else      { aiB64=null;  aiType=null;  aiPdf=false; }
+}
+
+// ══ ARQUIVO OFERTA/MILHAS ══
+function carregarImgMsg(file, isM) {
+  var r = new FileReader();
+  r.onload = function(e) {
+    if (isM) { mPastedFile=file; document.getElementById('m-img-el').src=e.target.result; document.getElementById('m-img-preview').style.display='block'; }
+    else      { pastedFile=file;  document.getElementById('o-img-el').src=e.target.result; document.getElementById('o-img-preview').style.display='block'; }
+  };
+  r.readAsDataURL(file);
+}
+
+// ══ PROMPT OFERTA ══
+function buildPromptOferta() {
+  return `Você é um assistente especializado em ofertas de viagem e programas de fidelidade.
+
+REGRAS GERAIS:
+1. Extraia informações ESTRITAMENTE do conteúdo enviado. Não invente nada.
+2. Extraia sempre que existirem: cupons, descontos, valores, condições e validade/prazo.
+3. Se houver mais de um cupom, liste TODOS na descrição com suas regras.
+4. Se descontos variam, escreva "Desconto varia conforme destino/período:" e liste exemplos.
+
+COMPRA BONIFICADA (oferta onde se ganha pontos/milhas por real ou dólar gasto em parceiro):
+- TÍTULO: template exato: "[X] pontos por [real/dólar] entre [Parceiro] e [Programa]". Use "Até" só se houver variação de pontuação por perfil/categoria.
+- DESCRIÇÃO: extraia FIELMENTE o que está na página. Liste quebras de pontuação por perfil, categoria, condição, cupom e prazo específico de cada condição. Use bullets com hífen.
+- PRAZO: use o prazo de ENCERRAMENTO da campanha (quando a oferta para de valer). NUNCA use prazo de check-out/check-in — esses ficam na descrição. Se não houver prazo de encerramento explícito, deixe vazio.
+- IMPORTANTE: "Sempre verifique a necessidade de uso de cupom, formas de pagamento e produtos específicos participantes, além do prazo para receber os pontos. Recomendamos fortemente que todo processo seja gravado para possível reclamação futura. Sem a gravação você não obterá os pontos se eles não forem creditados corretamente."
+- LOJA: nome do parceiro/ecommerce
+- CUPOM: código principal se houver, senão vazio
+
+COMPRA DE PONTOS ou TRANSFERÊNCIA COM BÔNUS:
+- Sempre calcule e informe o custo do milheiro (custo de 1.000 pontos) na descrição.
+- Fórmula: CUSTO_MILHEIRO = (VALOR_TOTAL / PONTOS_RECEBIDOS) * 1000
+- Arredonde para 2 casas decimais.
+- Exemplo: R$ 885,60 para receber 32.000 pontos → (885,60 / 32.000) * 1000 = R$ 27,65 por mil pontos.
+- Formato na descrição: "💰 Custo do milheiro: R$ XX,XX por 1.000 pontos"
+- Se houver variação por perfil/quantidade, calcule o custo do milheiro para cada cenário.
+
+LINK: Use SEMPRE o link oficial da oferta. Procure no conteúdo hrefs próximos a "clique aqui", "acesse", "confira", "participar" etc. Extraia o href de destino do hyperlink. Remova parâmetros UTM. Se o conteúdo vier de um PDF (onde hyperlinks perdem o href) ou não tiver link explícito, use o link oficial do programa/parceiro com base no contexto:
+- Clube Livelo / assinatura Livelo → https://www.livelo.com.br/clube
+- Livelo (compra de pontos) → https://www.livelo.com.br/compre-pontos
+- Livelo (geral/compra bonificada) → https://www.livelo.com.br
+- Clube Smiles / assinatura Smiles → https://www.smiles.com.br/clube-smiles/beneficios-clube
+- Smiles (geral) → https://www.smiles.com.br/home
+- Clube LATAM Pass / assinatura LATAM → https://latampass.latam.com/pt_br/clube
+- LATAM Pass (geral) → https://www.latamairlines.com/br/pt
+- Clube Azul / assinatura Azul Fidelidade → https://www.voeazul.com.br/br/pt/programa-fidelidade/clube-azul
+- Azul Fidelidade (geral) → https://www.voeazul.com.br/br/pt/home
+- Azul pelo Mundo → https://azulpelomundo.voeazul.com.br
+- Clube Esfera / assinatura Esfera → https://www.esfera.com.vc/clube
+- Esfera (geral) → https://www.esfera.com.vc
+- Hoteis.com → https://www.hoteis.com
+- Magalu → https://www.magazineluiza.com.br
+- Iberia Plus → https://www.iberia.com/
+- SUMA → https://www.aireuropa.com/en/flights/home
+- AAdvantage → https://www.aa.com.br/
+- TAP → https://www.flytap.com/
+NUNCA use o link do blog ou artigo como link da oferta.
+
+Responda SOMENTE com JSON válido sem markdown:
+{"titulo":"","descricao":"","prazo":"DD/MM ou vazio","loja":"","cupom":"","link":"","importante":""}`;
+}
+
+// ══ PROMPT MILHAS ══
+function buildPromptMilhas() {
+  return `Você é um assistente especializado em emissão de passagens com milhas.
+Extraia ESTRITAMENTE do conteúdo enviado e responda SOMENTE com JSON válido sem markdown.
+
+REGRAS:
+- origem/destino: cidade completa (sem sigla IATA)
+- pontos: use SEMPRE o MENOR valor encontrado; todas as datas devem ser listadas independente do valor
+- programa: nome exato. "TudoAzul"→"Azul Fidelidade". "Avios Iberia"→"Iberia Plus"
+- cia: nome da companhia aérea
+- tipo: "nacional" ou "internacional"
+- classe: "ECONÔMICA" ou "EXECUTIVA" (só internacional; nacional deixe vazio)
+- datas_ida: TODAS as datas disponíveis, agrupadas por mês (uma linha por mês). Ex: "Agosto: 13\nSetembro: 12, 19\nNovembro: 9"
+- datas_volta: idem. Incluir ano se diferente do atual. Ex: "Setembro: 19\nAbril/2027: 1, 9"
+
+{"origem":"","destino":"","pontos":0,"programa":"","cia":"","tipo":"nacional","classe":"","datas_ida":"","datas_volta":""}`;
+}
+
+// ══ API KEY ══
+function salvarApiKey() {
+  var k = document.getElementById('api-key-input').value.trim();
+  if (!k || !k.startsWith('sk-')) {
+    document.getElementById('api-key-ok').style.color='#ff585e';
+    document.getElementById('api-key-ok').textContent='Chave inválida. Deve começar com "sk-ant-..."';
+    return;
+  }
+  localStorage.setItem('anthropic_api_key', k);
+  document.getElementById('api-key-ok').style.color='#4ade80';
+  document.getElementById('api-key-ok').textContent='✓ Chave salva com sucesso!';
+  document.getElementById('api-key-input').value='';
+  setTimeout(function(){ document.getElementById('api-key-ok').textContent='A chave é salva apenas no seu navegador (localStorage).'; document.getElementById('api-key-ok').style.color='var(--muted2)'; }, 3000);
+}
+
+function getApiKey() {
+  return localStorage.getItem('anthropic_api_key') || '';
+}
+
+// ══ CHAMADA API ══
+async function chamarIA(messages, useSearch) {
+  var apiKey = getApiKey();
+  if (!apiKey) throw new Error('API key não configurada. Insira sua chave Anthropic no campo acima.');
+  var body = { model:'claude-sonnet-4-20250514', max_tokens:2000, messages:messages };
+  if (useSearch) body.tools = [{type:'web_search_20250305', name:'web_search'}];
+  var text = '';
+  for (var t=0; t<6; t++) {
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}, body:JSON.stringify(body)
+    });
+    var data = await resp.json();
+    console.log('turno '+t, JSON.stringify(data).substring(0,400));
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    var rt = (data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
+    if (rt) text += rt;
+    var tools = (data.content||[]).filter(function(b){return b.type==='tool_use';});
+    if (!tools.length || data.stop_reason==='end_turn') break;
+    var results = tools.map(function(b){return{type:'tool_result',tool_use_id:b.id,content:''};});
+    body.messages = body.messages.concat([{role:'assistant',content:data.content},{role:'user',content:results}]);
+  }
+  text = text.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim();
+  var match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('JSON não encontrado: '+text.substring(0,200));
+  return JSON.parse(match[0]);
+}
+
+// ══ ANALISAR OFERTA ══
+async function analisarOferta() {
+  var okEl = document.getElementById('url-ok');
+  var btn  = document.getElementById('url-btn');
+  var PROMPT = buildPromptOferta();
+  var messages, pageText='';
+
+  if (currentMode==='link') {
+    var url = document.getElementById('url-input').value.trim();
+    if (!url) { okEl.style.color='#ff585e'; okEl.textContent='Cole um link antes.'; return; }
+    btn.textContent='⏳ Buscando...'; btn.disabled=true;
+    okEl.style.color='var(--muted)'; okEl.textContent='Buscando conteúdo da página...';
+    var html = '';
+    var proxies = [
+      'https://api.allorigins.win/get?url=',
+      'https://api.codetabs.com/v1/proxy?quest=',
+      'https://corsproxy.io/?'
+    ];
+    for (var pi=0; pi<proxies.length; pi++) {
+      try {
+        var pr = await fetch(proxies[pi]+encodeURIComponent(url), {signal:AbortSignal.timeout(8000)});
+        var pd = await pr.json().catch(async function(){ return {contents: await pr.text()}; });
+        var c = pd.contents || pd || '';
+        if (typeof c !== 'string') c = JSON.stringify(c);
+        if (c.length > 500) { html=c; break; }
+      } catch(ep) { console.log('proxy '+pi+' falhou:', ep.message); }
+    }
+    if (html) {
+      var hrefMatches = html.match(/href=["']([^"'#][^"']*?)["'][^>]*>[^<]*(?:clique|acesse|confira|participe|saiba mais|garanta|aproveite|resgate|cadastre|aqui|here|oferta|banco|promo|bonus|bônus|compra|transfer|participar|acessar)[^<]*/gi)||[];
+      var hrefs = hrefMatches.map(function(m){var hm=m.match(/href=["']([^"']+)["']/i);var tm=m.match(/>([^<]{3,60})/);return hm?'"'+(tm?tm[1].trim():'')+'" → '+hm[1]:null;}).filter(Boolean);
+      pageText = html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,6000);
+      if (hrefs.length) pageText += '\n\nLINKS COM ÂNCORAS RELEVANTES:\n'+hrefs.join('\n');
+    } else {
+      pageText = '(nenhum proxy conseguiu buscar a página)';
+    }
+    messages = [{role:'user',content:'URL enviada (NÃO use como link da oferta): '+url+'\n\nCONTEÚDO DA PÁGINA:\n'+pageText+'\n\n'+PROMPT}];
+
+  } else if (currentMode==='texto') {
+    var txt = document.getElementById('texto-input').value.trim();
+    if (!txt) { okEl.style.color='#ff585e'; okEl.textContent='Cole um texto antes.'; return; }
+    btn.textContent='⏳ Analisando...'; btn.disabled=true;
+    okEl.style.color='var(--muted)'; okEl.textContent='Analisando texto...';
+    messages = [{role:'user',content:'Extraia as informações desta oferta:\n\n'+txt+'\n\n'+PROMPT}];
+
+  } else {
+    if (!aiB64) { okEl.style.color='#ff585e'; okEl.textContent='Selecione um arquivo antes.'; return; }
+    btn.textContent='⏳ Analisando...'; btn.disabled=true;
+    okEl.style.color='var(--muted)'; okEl.textContent='Analisando arquivo...';
+    var fc = aiPdf
+      ? {type:'document',source:{type:'base64',media_type:'application/pdf',data:aiB64}}
+      : {type:'image',source:{type:'base64',media_type:aiType,data:aiB64}};
+    messages = [{role:'user',content:[fc,{type:'text',text:'Extraia as informações desta oferta.\n\n'+PROMPT}]}];
+  }
+
+  var useSearch = currentMode === 'link';
+  try {
+    var obj = await chamarIA(messages, useSearch);
+    // normaliza parceiros conhecidos em todos os campos de texto
+    function normalizarParceiros(str) {
+      if (!str) return str;
+      return str.replace(/\bHTC\b/gi, 'Hoteis.com')
+                .replace(/\bHotel Urbano\b/gi, 'Hoteis.com');
+    }
+    obj.titulo     = normalizarParceiros(obj.titulo);
+    obj.descricao  = normalizarParceiros(obj.descricao);
+    obj.loja       = normalizarParceiros(obj.loja);
+    obj.cupom      = normalizarParceiros(obj.cupom);
+    obj.importante = normalizarParceiros(obj.importante);
+    obj.link       = normalizarParceiros(obj.link);
+    // limpa todos os campos antes de preencher
+    ['o-titulo','o-corpo','o-prazo','o-loja','o-cupom','o-importante','o-link'].forEach(function(id){
+      document.getElementById(id).value='';
+    });
+    if (obj.titulo)     document.getElementById('o-titulo').value=obj.titulo;
+    if (obj.descricao)  document.getElementById('o-corpo').value=obj.descricao;
+    if (obj.loja)       document.getElementById('o-loja').value=obj.loja;
+    if (obj.cupom)      document.getElementById('o-cupom').value=obj.cupom;
+    if (obj.importante) document.getElementById('o-importante').value=obj.importante;
+    if (obj.link)       document.getElementById('o-link').value=obj.link;
+    if (!obj.link && currentMode==='link') document.getElementById('o-link').value=document.getElementById('url-input').value.trim();
+    if (obj.prazo && obj.prazo.includes('/')) {
+      var pp=obj.prazo.split('/');
+      if (pp.length===2) { var ano=new Date().getFullYear(); document.getElementById('o-prazo').value=ano+'-'+pp[1].padStart(2,'0')+'-'+pp[0].padStart(2,'0'); }
+    }
+    okEl.style.color='#4ade80'; okEl.textContent='✓ Campos preenchidos! Revise antes de gerar.';
+  } catch(e) {
+    okEl.style.color='#ff585e';
+    if (e.message && e.message.indexOf('API key') !== -1) {
+      okEl.textContent='🔑 Configure sua chave API Anthropic no campo acima.';
+    } else if (e.message && e.message.indexOf('JSON') !== -1) {
+      okEl.textContent='⚠️ Página não legível via link. Salve como PDF (Ctrl+P) e envie pelo modo 📎 Arquivo.';
+    } else {
+      okEl.textContent='Não foi possível analisar. Preencha manualmente.';
+    }
+    console.error(e);
+  } finally {
+    btn.textContent='🤖 Analisar e preencher campos'; btn.disabled=false;
+  }
+}
+
+// ══ ANALISAR MILHAS ══
+async function analisarMilhas() {
+  var okEl = document.getElementById('m-ai-ok');
+  var btn  = document.getElementById('m-ai-btn');
+  var PROMPT = buildPromptMilhas();
+  var messages;
+
+  if (currentMilhasMode==='texto') {
+    var txt = document.getElementById('m-ai-texto').value.trim();
+    if (!txt) { okEl.style.color='#ff585e'; okEl.textContent='Cole um texto antes.'; return; }
+    messages = [{role:'user',content:'Extraia os dados desta emissão:\n\n'+txt+'\n\n'+PROMPT}];
+  } else {
+    if (!mAiB64) { okEl.style.color='#ff585e'; okEl.textContent='Selecione um arquivo antes.'; return; }
+    var fc = mAiPdf
+      ? {type:'document',source:{type:'base64',media_type:'application/pdf',data:mAiB64}}
+      : {type:'image',source:{type:'base64',media_type:mAiType,data:mAiB64}};
+    messages = [{role:'user',content:[fc,{type:'text',text:'Extraia os dados desta emissão.\n\n'+PROMPT}]}];
+  }
+
+  btn.textContent='⏳ Analisando...'; btn.disabled=true;
+  okEl.style.color='var(--muted)'; okEl.textContent='Analisando...';
+
+  try {
+    var obj = await chamarIA(messages);
+    ['m-origem','m-destino','m-pontos','m-cia','m-datas-ida','m-datas-volta'].forEach(function(id){
+      document.getElementById(id).value='';
+    });
+    document.getElementById('m-programa').value='';
+    document.getElementById('m-tipo-voo').value='nacional';
+    document.getElementById('m-classe').value='ECONÔMICA';
+    document.getElementById('m-classe-field').style.display='none';
+
+    if (obj.origem)      document.getElementById('m-origem').value=obj.origem;
+    if (obj.destino)     document.getElementById('m-destino').value=obj.destino;
+    if (obj.pontos)      document.getElementById('m-pontos').value=obj.pontos;
+    if (obj.cia)         document.getElementById('m-cia').value=obj.cia;
+    if (obj.datas_ida)   document.getElementById('m-datas-ida').value=obj.datas_ida;
+    if (obj.datas_volta) document.getElementById('m-datas-volta').value=obj.datas_volta;
+    if (obj.programa) {
+      var sel=document.getElementById('m-programa');
+      for (var i=0;i<sel.options.length;i++) { if (sel.options[i].value===obj.programa){sel.value=obj.programa;break;} }
+    }
+    if (obj.tipo) {
+      document.getElementById('m-tipo-voo').value=obj.tipo;
+      document.getElementById('m-classe-field').style.display=obj.tipo==='internacional'?'flex':'none';
+    }
+    if (obj.classe) document.getElementById('m-classe').value=obj.classe;
+    okEl.style.color='#4ade80'; okEl.textContent='✓ Campos preenchidos! Revise antes de gerar.';
+  } catch(e) {
+    okEl.style.color='#ff585e'; okEl.textContent='Não foi possível analisar. Preencha manualmente.';
+    console.error(e);
+  } finally {
+    btn.textContent='🤖 Analisar e preencher campos'; btn.disabled=false;
+  }
+}
+
+// ══ GERAR OFERTA ══
+function gerarOferta() {
+  var titulo=document.getElementById('o-titulo').value.trim();
+  var corpo=document.getElementById('o-corpo').value.trim();
+  var prazoRaw=document.getElementById('o-prazo').value;
+  var loja=document.getElementById('o-loja').value.trim();
+  var cupom=document.getElementById('o-cupom').value.trim();
+  var importante=document.getElementById('o-importante').value.trim();
+  var link=document.getElementById('o-link').value.trim();
+  if (!titulo&&!corpo){alert('Preencha pelo menos o título ou a descrição.');return;}
+  var msg='';
+  if (titulo) msg+='*'+titulo+'*\n\n';
+  if (corpo)  msg+=corpo+'\n\n';
+  var prazoFmt='';
+  if (prazoRaw){var pp=prazoRaw.split('-');if(pp.length===3)prazoFmt=pp[2]+'/'+pp[1];}
+  if (prazoFmt&&prazoRaw!==hoje()) msg+='📆 *PRAZO* '+prazoFmt+'\n\n';
+  if (loja&&loja!==LOJA_TODAS) msg+='🛒 *LOJA* '+loja+'\n\n';
+  if (cupom)      msg+='🏷️ *CUPOM* '+cupom+'\n\n';
+  if (importante) msg+='⚠️ *IMPORTANTE* '+importante+'\n\n';
+  msg+='🔗 *LINK* '+(link||'—')+'\n\n';
+  msg+=RODAPE_OFERTA;
+  mostrar('o-msg','o-result','o-ok',msg);
+}
+
+// ══ GERAR MILHAS ══
+function gerarMilhas() {
+  var origem=document.getElementById('m-origem').value.trim();
+  var destino=document.getElementById('m-destino').value.trim();
+  var pontos=parseInt(document.getElementById('m-pontos').value)||0;
+  var programa=document.getElementById('m-programa').value;
+  var cia=document.getElementById('m-cia').value.trim();
+  var tipo=document.getElementById('m-tipo-voo').value;
+  var classe=document.getElementById('m-classe').value;
+  var datasIda=document.getElementById('m-datas-ida').value.trim();
+  var datasVolta=document.getElementById('m-datas-volta').value.trim();
+  if (!origem||!destino){alert('Preencha origem e destino.');return;}
+  if (!pontos){alert('Informe a quantidade de pontos.');return;}
+  if (!programa){alert('Selecione o programa de fidelidade.');return;}
+  var cpm=PROGRAMAS_CPM[programa]||0;
+  var valorReais=cpm>0?Math.round((pontos/1000)*cpm):0;
+  var valorStr=valorReais>0?'R$ '+valorReais.toLocaleString('pt-BR'):'—';
+  var linkProg=PROGRAMAS_LINK[programa]||'';
+  var trechoInfo=tipo==='internacional'?' o trecho em '+classe:'';
+  var titulo='*'+origem+' - '+destino+' por '+pontos.toLocaleString('pt-BR')+' pontos OU '+valorStr+trechoInfo+'*';
+  var msg='';
+  msg+=titulo+'\n\n';
+  msg+=RODAPE_MILHAS+'\n\n';
+  msg+='Você pode comprar essa passagem no Balcão de Milhas CDV por aproximadamente '+valorStr+' o trecho + taxa de embarque.\n\n';
+  msg+=BALCAO_LINK+'\n\n';
+  msg+='🛫 *DATAS DE IDA*\n'+(datasIda||'—')+'\n\n';
+  msg+='🛬 *DATAS DE VOLTA*\n'+(datasVolta||'—')+'\n\n';
+  msg+='🎟️ *PROGRAMA* '+programa+'\n\n';
+  msg+='✈️ *CIA AÉREA* '+cia+'\n\n';
+  msg+='🔗 *LINK* '+linkProg+'\n\n';
+  msg+=RODAPE_MILHAS;
+  mostrar('m-msg','m-result','m-ok',msg);
+}
+
+// ══ UTIL ══
+function hoje(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function mostrar(msgId, cardId, okId, msg) {
+  // preenche o textarea editável (msgId+'−edit')
+  var editId = msgId + '-edit';
+  var editEl = document.getElementById(editId);
+  if (editEl) { editEl.value = msg; editEl.style.height='auto'; editEl.style.height=editEl.scrollHeight+'px'; }
+  var card = document.getElementById(cardId);
+  card.style.display = 'block';
+  document.getElementById(okId).textContent = '';
+  setTimeout(function(){ card.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 50);
+}
+
+function copiar(msgId, okId) {
+  var editEl = document.getElementById(msgId+'-edit');
+  var texto = editEl ? editEl.value : '';
+  var okEl = document.getElementById(okId);
+  if (!texto) { okEl.textContent='Gere a mensagem primeiro.'; return; }
+  var done = function(){ okEl.style.color='#4ade80'; okEl.textContent='Copiado! Cole direto no WhatsApp.'; setTimeout(function(){ okEl.textContent=''; }, 3500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(done).catch(function(){ fallbackCopy(texto, done); });
+  } else { fallbackCopy(texto, done); }
+}
+function fallbackCopy(texto,done){
+  var ta=document.createElement('textarea');ta.value=texto;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');done();}catch(e){}
+  document.body.removeChild(ta);
+}
+
+// ══ BAILEYS ══
+var SERVER = 'http://localhost:3001';
+var wsConectado = false;
+// IDs dos grupos WhatsApp — substitua pelos IDs reais (formato: XXXXXXXXXXX@g.us)
+var GRUPO_OFERTA  = '120363423014138662@g.us';
+var GRUPO_EMISSAO = '120363172490263905@g.us';
+function verificarServidor(){
+  fetch(SERVER+'/status',{signal:AbortSignal.timeout(2000)})
+    .then(function(r){return r.json();})
+    .then(function(d){wsConectado=d.conectado;document.getElementById('ws-dot').className='ws-dot '+(d.conectado?'on':'off');document.getElementById('ws-label').textContent=d.conectado?'WhatsApp conectado — envio automático ativo':'Servidor encontrado mas WhatsApp não conectado';})
+    .catch(function(){wsConectado=false;document.getElementById('ws-dot').className='ws-dot off';document.getElementById('ws-label').textContent='Servidor local desconectado — inicie o baileys-server';});
+}
+async function enviarWA(msgId, statusId, fileKey) {
+  var editEl = document.getElementById(msgId+'-edit');
+  var texto = editEl ? editEl.value : '';
+  var s = document.getElementById(statusId);
+  if (!wsConectado) { s.style.color='#ff585e'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; }, 4000); return; }
+  s.style.color='#eeeeee'; s.textContent='Enviando...';
+  var grupo = fileKey==='o' ? GRUPO_OFERTA : GRUPO_EMISSAO;
+  try {
+    var file = fileKey==='o' ? pastedFile : mPastedFile;
+    var imgInput = document.getElementById(fileKey+'-img-input');
+    if (imgInput && imgInput.files[0]) file = imgInput.files[0];
+    var r;
+    if (file) {
+      var fd = new FormData(); fd.append('imagem',file); fd.append('legenda',texto); fd.append('grupo',grupo);
+      r = await fetch(SERVER+'/enviar-imagem', {method:'POST', body:fd});
+    } else {
+      r = await fetch(SERVER+'/enviar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mensagem:texto, grupo:grupo})});
+    }
+    var d = await r.json();
+    if (d.ok) { s.style.color='#4ade80'; s.textContent='✓ Enviado!'; setTimeout(function(){ s.textContent=''; }, 4000); }
+    else { s.style.color='#ff585e'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; }, 5000); }
+  } catch(e) { s.style.color='#ff585e'; s.textContent='Sem resposta.'; setTimeout(function(){ s.textContent=''; }, 4000); }
+}
+
+// ══ INIT ══
+window.addEventListener('DOMContentLoaded', function() {
+
+  // tabs principais
+  document.getElementById('tab-oferta').addEventListener('click', function(){ switchMain('oferta'); });
+  document.getElementById('tab-milhas').addEventListener('click', function(){ switchMain('milhas'); });
+
+  // modos IA oferta
+  document.getElementById('mt-link').addEventListener('click',   function(){ setMode('link'); });
+  document.getElementById('mt-texto').addEventListener('click',  function(){ setMode('texto'); });
+  document.getElementById('mt-imagem').addEventListener('click', function(){ setMode('imagem'); });
+
+  // modos IA milhas
+  document.getElementById('mmt-texto').addEventListener('click',  function(){ setMilhasMode('texto'); });
+  document.getElementById('mmt-imagem').addEventListener('click', function(){ setMilhasMode('imagem'); });
+
+  // botões analisar
+  document.getElementById('url-btn').addEventListener('click', analisarOferta);
+  document.getElementById('m-ai-btn').addEventListener('click', analisarMilhas);
+
+  // botões gerar
+  document.getElementById('o-gerar-btn').addEventListener('click', gerarOferta);
+  document.getElementById('m-gerar-btn').addEventListener('click', gerarMilhas);
+
+  // botões copiar
+  document.getElementById('o-copy-btn').addEventListener('click', function(){ copiar('o-msg','o-ok'); });
+  document.getElementById('m-copy-btn').addEventListener('click', function(){ copiar('m-msg','m-ok'); });
+
+  // botões enviar
+  document.getElementById('o-send-btn').addEventListener('click', function(){ enviarWA('o-msg','o-send-ok','o'); });
+  document.getElementById('m-send-btn').addEventListener('click', function(){ enviarWA('m-msg','m-send-ok','m'); });
+
+  // tipo de voo
+  document.getElementById('m-tipo-voo').addEventListener('change', function(){
+    document.getElementById('m-classe-field').style.display = this.value==='internacional' ? 'flex' : 'none';
+  });
+
+  // arquivo IA oferta
+  var aiInput = document.getElementById('ai-img-input');
+  var aiDrop  = document.getElementById('ai-img-drop');
+  aiDrop.addEventListener('click', function(){ aiInput.click(); });
+  aiInput.addEventListener('change', function(){ if(aiInput.files[0]) carregarArquivoAi(aiInput.files[0], false); });
+  aiDrop.addEventListener('dragover',  function(e){ e.preventDefault(); aiDrop.classList.add('dragover'); });
+  aiDrop.addEventListener('dragleave', function(){ aiDrop.classList.remove('dragover'); });
+  aiDrop.addEventListener('drop', function(e){ e.preventDefault(); aiDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarArquivoAi(e.dataTransfer.files[0], false); });
+  document.getElementById('ai-clear-btn').addEventListener('click', function(){ limparArquivoAi(false); });
+
+  // arquivo IA milhas
+  var mAiInput = document.getElementById('m-ai-img-input');
+  var mAiDrop  = document.getElementById('m-ai-img-drop');
+  mAiDrop.addEventListener('click', function(){ mAiInput.click(); });
+  mAiInput.addEventListener('change', function(){ if(mAiInput.files[0]) carregarArquivoAi(mAiInput.files[0], true); });
+  mAiDrop.addEventListener('dragover',  function(e){ e.preventDefault(); mAiDrop.classList.add('dragover'); });
+  mAiDrop.addEventListener('dragleave', function(){ mAiDrop.classList.remove('dragover'); });
+  mAiDrop.addEventListener('drop', function(e){ e.preventDefault(); mAiDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarArquivoAi(e.dataTransfer.files[0], true); });
+  document.getElementById('m-ai-clear-btn').addEventListener('click', function(){ limparArquivoAi(true); });
+
+  // imagem mensagem oferta
+  var oImgInput = document.getElementById('o-img-input');
+  var oImgDrop  = document.getElementById('o-img-drop');
+  oImgDrop.addEventListener('click', function(){ oImgInput.click(); });
+  oImgInput.addEventListener('change', function(){ if(oImgInput.files[0]) carregarImgMsg(oImgInput.files[0], false); });
+  oImgDrop.addEventListener('dragover',  function(e){ e.preventDefault(); oImgDrop.classList.add('dragover'); });
+  oImgDrop.addEventListener('dragleave', function(){ oImgDrop.classList.remove('dragover'); });
+  oImgDrop.addEventListener('drop', function(e){ e.preventDefault(); oImgDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarImgMsg(e.dataTransfer.files[0], false); });
+  document.getElementById('o-img-clear').addEventListener('click', function(){ oImgInput.value=''; document.getElementById('o-img-el').src=''; document.getElementById('o-img-preview').style.display='none'; pastedFile=null; });
+
+  // imagem mensagem milhas
+  var mImgInput = document.getElementById('m-img-input');
+  var mImgDrop  = document.getElementById('m-img-drop');
+  mImgDrop.addEventListener('click', function(){ mImgInput.click(); });
+  mImgInput.addEventListener('change', function(){ if(mImgInput.files[0]) carregarImgMsg(mImgInput.files[0], true); });
+  mImgDrop.addEventListener('dragover',  function(e){ e.preventDefault(); mImgDrop.classList.add('dragover'); });
+  mImgDrop.addEventListener('dragleave', function(){ mImgDrop.classList.remove('dragover'); });
+  mImgDrop.addEventListener('drop', function(e){ e.preventDefault(); mImgDrop.classList.remove('dragover'); if(e.dataTransfer.files[0]) carregarImgMsg(e.dataTransfer.files[0], true); });
+  document.getElementById('m-img-clear').addEventListener('click', function(){ mImgInput.value=''; document.getElementById('m-img-el').src=''; document.getElementById('m-img-preview').style.display='none'; mPastedFile=null; });
+
+  // paste global
+  document.addEventListener('paste', function(e){
+    var items=e.clipboardData&&e.clipboardData.items; if(!items) return;
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.startsWith('image/')){
+        var f=items[i].getAsFile();
+        var isMilhas=document.getElementById('panel-milhas').classList.contains('active');
+        carregarImgMsg(f, isMilhas);
+        break;
+      }
+    }
+  });
+
+  // restaurar api key salva
+  var savedKey = localStorage.getItem('anthropic_api_key');
+  if (savedKey) {
+    document.getElementById('api-key-ok').style.color='#4ade80';
+    document.getElementById('api-key-ok').textContent='✓ Chave configurada (salva no navegador).';
+  }
+
+  verificarServidor();
+  setInterval(verificarServidor, 5000);
+});
+</script>
+</body>
+</html>
