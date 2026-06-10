@@ -299,11 +299,31 @@ const BACKUP = {"hoje_dia": 9, "hoje_mes": 6, "comissao": {"jun_total": 5056.73,
 
 // ===================== GOOGLE SHEETS CSV URLS =====================
 const SHEET_ID = '2PACX-1vRDHse4JdgreKKlafZph0S5IC3qolopWxMrN9-1qHqlozZr_c0FNypMD0R3vKw1hIz2HXnjsFRKLIyZ';
-const URLS = {
+const BASE_URLS = {
   comissionamento: `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=450413662&single=true&output=csv`,
   trafego:         `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=571069526&single=true&output=csv`,
   anuncios:        `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=2047285181&single=true&output=csv`,
 };
+
+// Proxy fallback chain — tried in order until one works
+const PROXIES = [
+  url => url,                                                          // 1. direto
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,          // 2. corsproxy.io
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, // 3. allorigins
+];
+
+async function fetchWithProxy(url) {
+  for (const proxy of PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const text = await res.text();
+        if (text.length > 100) return text; // sanity check
+      }
+    } catch(e) { /* try next */ }
+  }
+  throw new Error('All proxies failed');
+}
 
 // ===================== PARSERS =====================
 function parseCSV(text) {
@@ -769,12 +789,10 @@ function loadFromBackup() {
 async function loadAll() {
   setStatus('loading', 'Buscando planilha...');
   try {
-    const [comisRes, trafRes] = await Promise.all([
-      fetch(URLS.comissionamento),
-      fetch(URLS.trafego),
+    const [comisText, trafText] = await Promise.all([
+      fetchWithProxy(BASE_URLS.comissionamento),
+      fetchWithProxy(BASE_URLS.trafego),
     ]);
-    if (!comisRes.ok || !trafRes.ok) throw new Error('HTTP ' + comisRes.status);
-    const [comisText, trafText] = await Promise.all([comisRes.text(), trafRes.text()]);
     const comisRows = parseComissionamento(comisText);
     const trafRows = parseTrafego(trafText);
     if (comisRows.length < 10) throw new Error('Dados insuficientes');
