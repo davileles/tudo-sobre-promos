@@ -316,6 +316,12 @@ function fmtDate(d) {
   return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
 }
 
+function dateKey(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+}
+
 function numVal(s) {
   if (!s) return 0;
   s = String(s).replace(/"/g,'').trim();
@@ -375,7 +381,7 @@ function processData(comisRows, trafRows) {
   // Daily comis by date+platform
   const byDate = {};
   for (const r of comisRows) {
-    const k = r.date.toISOString().slice(0,10);
+    const k = dateKey(r.date);
     if (!byDate[k]) byDate[k] = { date: r.date, amazon:0, ml:0, shopee:0 };
     if (r.plat==='Amazon')       byDate[k].amazon += r.com;
     else if (r.plat==='Mercado Livre') byDate[k].ml += r.com;
@@ -386,7 +392,7 @@ function processData(comisRows, trafRows) {
 
   // Trafego map by ISO date
   const trafMap = {};
-  for (const r of trafRows) trafMap[r.date.toISOString().slice(0,10)] = r;
+  for (const r of trafRows) trafMap[dateKey(r.date)] = r;
 
   // Last available day
   const today = comisDays[comisDays.length-1].date;
@@ -400,7 +406,7 @@ function processData(comisRows, trafRows) {
     for (const d of comisDays) {
       if (d.date.getMonth() !== month0) continue;
       if (d.date.getDate() > upToDay) continue;
-      const k = d.date.toISOString().slice(0,10);
+      const k = dateKey(d.date);
       const t = trafMap[k];
       if (t && t.membros > 0) sum += d.total / t.membros;
     }
@@ -436,7 +442,7 @@ function processData(comisRows, trafRows) {
   // Last 60 days for charts
   const cutoff = new Date(today); cutoff.setDate(cutoff.getDate()-59);
   const dailyChart = comisDays.filter(d=>d.date>=cutoff).map(d=>{
-    const k=d.date.toISOString().slice(0,10); const t=trafMap[k]||{};
+    const k=dateKey(d.date); const t=trafMap[k]||{};
     return {
       label: fmtDate(d.date),
       amazon:d.amazon, ml:d.ml, shopee:d.shopee, total:d.total,
