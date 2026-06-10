@@ -274,19 +274,11 @@ const BACKUP = {"hoje_dia": 9, "hoje_mes": 6, "comissao": {"jun_total": 5056.73,
 const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbzTIbzuuf7zzfmqG2i4RXjPoXvuqvVEhxcDLAJJ-4d2OkSLt4_EZY1jkFGvLNqc6Q_F/exec';
 
 async function fetchSheet(sheet) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch(`${APPS_SCRIPT}?sheet=${sheet}`, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    if (text.length < 50) throw new Error('Resposta vazia');
-    return text;
-  } catch(e) {
-    clearTimeout(timer);
-    throw e;
-  }
+  const res = await fetch(`${APPS_SCRIPT}?sheet=${sheet}`);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if (text.length < 50) throw new Error('Resposta vazia');
+  return text;
 }
 
 // ── PARSERS ──────────────────────────────────────────────
