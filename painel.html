@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSP — Painel de Resultados</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0c0e14;
+  --surface: #13161f;
+  --surface2: #1a1e2a;
+  --border: #252836;
+  --text: #e2e5f0;
+  --muted: #636880;
+  --amazon: #ff9900;
+  --ml: #f5c518;
+  --shopee: #f4654a;
+  --green: #34d399;
+  --red: #f87171;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.logo { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+.logo em { color: var(--green); font-style: normal; }
+.header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 11px; color: var(--muted); }
+.badge strong { color: var(--text); }
+#status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+#status-dot.loading { background: var(--amazon); animation: pulse 1s infinite; }
+#status-dot.ok { background: var(--green); }
+#status-dot.error { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+#status-label { font-size: 11px; color: var(--muted); }
+.refresh-btn {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); font-size: 11px; padding: 4px 10px; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.refresh-btn:hover { color: var(--green); border-color: var(--green); }
+
+.tabs {
+  display: flex; background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 20px; overflow-x: auto;
+}
+.tab {
+  padding: 12px 18px; font-size: 13px; font-weight: 500; color: var(--muted);
+  cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
+  white-space: nowrap; transition: color .15s, border-color .15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--green); }
+
+.page { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; }
+.page.active { display: block; }
+
+.section-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--muted); margin-bottom: 12px; margin-top: 24px;
+}
+.section-title:first-child { margin-top: 0; }
+
+/* COMPARISON CARDS */
+.cmp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.cmp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.cmp-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
+.cmp-main { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.cmp-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.cmp-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.cmp-row-label { color: var(--muted); }
+.cmp-row-val { font-weight: 600; }
+.up { color: var(--green); }
+.down { color: var(--red); }
+
+/* PLATFORM CARDS */
+.platform-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.platform-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; position: relative; overflow: hidden; }
+.platform-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.p-amazon::before { background: var(--amazon); }
+.p-ml::before { background: var(--ml); }
+.p-shopee::before { background: var(--shopee); }
+.p-name { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.p-val { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.p-amazon .p-val { color: var(--amazon); }
+.p-ml .p-val { color: var(--ml); }
+.p-shopee .p-val { color: var(--shopee); }
+.p-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-top: 1px solid var(--border); }
+.p-row-label { color: var(--muted); }
+
+/* TRAFEGO CARDS */
+.traf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.traf-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.traf-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 8px; }
+.traf-val { font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+.traf-compare { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.traf-col-label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; }
+.traf-col-val { font-size: 12px; font-weight: 600; }
+
+/* CHARTS */
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+.chart-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 14px; }
+.chart-wrap { position: relative; height: 190px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+@media (max-width: 640px) {
+  .platform-grid { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+  .cmp-main { font-size: 24px; }
+  .page { padding: 14px; }
+  header { padding: 12px 16px; }
+  .traf-compare { grid-template-columns: repeat(3,1fr); }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Tudo Sobre Promos <em>·</em> Painel</div>
+  <div class="header-right">
+    <div class="badge"><span id="status-dot" class="loading"></span><span id="status-label">Carregando...</span></div>
+    <div class="badge">Referência: dia <strong id="hoje-dia">—</strong></div>
+    <button class="refresh-btn" onclick="loadAll()">↻ Atualizar</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="showPage('comissao',this)">Comissão</button>
+  <button class="tab" onclick="showPage('trafego',this)">Tráfego</button>
+  <button class="tab" onclick="showPage('graficos',this)">Gráficos</button>
+</div>
+
+<!-- COMISSÃO -->
+<div id="page-comissao" class="page active">
+  <div class="section-title">Total acumulado no mês — comparativo até o mesmo dia</div>
+  <div class="cmp-grid">
+    <div class="cmp-card">
+      <div class="cmp-label">Comissão total</div>
+      <div class="cmp-main up" id="val-jun-total">—</div>
+      <div class="cmp-sub" id="sub-jun-total">Mês atual</div>
+      <div class="cmp-row"><span class="cmp-row-label">Mês anterior (mesmo dia)</span><span class="cmp-row-val" id="val-mai-total">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Variação vs. mês anterior</span><span class="cmp-row-val" id="var-vs-mai">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Média (meses anteriores)</span><span class="cmp-row-val" id="val-avg-d9">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Variação vs. média</span><span class="cmp-row-val" id="var-vs-avg">—</span></div>
+    </div>
+    <div class="cmp-card">
+      <div class="cmp-label">Comissão por membro</div>
+      <div class="cmp-main" id="val-cpm-jun" style="color:var(--blue)">—</div>
+      <div class="cmp-sub">Mês atual · <span id="membros-jun">—</span> membros</div>
+      <div class="cmp-row"><span class="cmp-row-label">Mês anterior (mesmo dia)</span><span class="cmp-row-val" id="val-cpm-mai">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Variação vs. mês anterior</span><span class="cmp-row-val" id="var-cpm-mai">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Média (meses anteriores)</span><span class="cmp-row-val" id="val-cpm-avg">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Variação vs. média</span><span class="cmp-row-val" id="var-cpm-avg">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Por plataforma — comparativo até o mesmo dia</div>
+  <div class="platform-grid">
+    <div class="platform-card p-amazon">
+      <div class="p-name">Amazon</div>
+      <div class="p-val" id="pv-amazon-jun">—</div>
+      <div class="p-row"><span class="p-row-label">Mês anterior</span><span id="pv-amazon-mai">—</span></div>
+      <div class="p-row"><span class="p-row-label">Variação</span><span id="pv-amazon-var">—</span></div>
+      <div class="p-row"><span class="p-row-label">Média geral</span><span id="pv-amazon-avg">—</span></div>
+      <div class="p-row"><span class="p-row-label">Var. vs. média</span><span id="pv-amazon-var2">—</span></div>
+    </div>
+    <div class="platform-card p-ml">
+      <div class="p-name">Mercado Livre</div>
+      <div class="p-val" id="pv-ml-jun">—</div>
+      <div class="p-row"><span class="p-row-label">Mês anterior</span><span id="pv-ml-mai">—</span></div>
+      <div class="p-row"><span class="p-row-label">Variação</span><span id="pv-ml-var">—</span></div>
+      <div class="p-row"><span class="p-row-label">Média geral</span><span id="pv-ml-avg">—</span></div>
+      <div class="p-row"><span class="p-row-label">Var. vs. média</span><span id="pv-ml-var2">—</span></div>
+    </div>
+    <div class="platform-card p-shopee">
+      <div class="p-name">Shopee</div>
+      <div class="p-val" id="pv-shopee-jun">—</div>
+      <div class="p-row"><span class="p-row-label">Mês anterior</span><span id="pv-shopee-mai">—</span></div>
+      <div class="p-row"><span class="p-row-label">Variação</span><span id="pv-shopee-var">—</span></div>
+      <div class="p-row"><span class="p-row-label">Média geral</span><span id="pv-shopee-avg">—</span></div>
+      <div class="p-row"><span class="p-row-label">Var. vs. média</span><span id="pv-shopee-var2">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TRÁFEGO -->
+<div id="page-trafego" class="page">
+  <div class="section-title">Ontem — comparativo</div>
+  <div class="traf-grid">
+    <div class="traf-card">
+      <div class="traf-label">Crescimento</div>
+      <div class="traf-val up" id="t-cresc-hoje">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-cresc-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-cresc-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-cresc-all">—</span></div>
+      </div>
+    </div>
+    <div class="traf-card">
+      <div class="traf-label">% Retenção</div>
+      <div class="traf-val" id="t-ret-hoje" style="color:var(--blue)">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-ret-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-ret-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-ret-all">—</span></div>
+      </div>
+    </div>
+    <div class="traf-card">
+      <div class="traf-label">Custo / clique (anúncio)</div>
+      <div class="traf-val" id="t-cpc-hoje" style="color:var(--amazon)">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-cpc-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-cpc-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-cpc-all">—</span></div>
+      </div>
+    </div>
+    <div class="traf-card">
+      <div class="traf-label">Custo / clique (anúncio + estrategista)</div>
+      <div class="traf-val" id="t-cpc2-hoje" style="color:var(--purple)">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-cpc2-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-cpc2-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-cpc2-all">—</span></div>
+      </div>
+    </div>
+    <div class="traf-card">
+      <div class="traf-label">Custo / membro (anúncio)</div>
+      <div class="traf-val" id="t-cpm-hoje" style="color:var(--amazon)">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-cpm-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-cpm-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-cpm-all">—</span></div>
+      </div>
+    </div>
+    <div class="traf-card">
+      <div class="traf-label">Custo / membro (anúncio + estrategista)</div>
+      <div class="traf-val" id="t-cpm2-hoje" style="color:var(--purple)">—</div>
+      <div class="traf-compare">
+        <div><span class="traf-col-label">Anteontem</span><span class="traf-col-val" id="t-cpm2-ontem">—</span></div>
+        <div><span class="traf-col-label">Média do mês</span><span class="traf-col-val" id="t-cpm2-jun">—</span></div>
+        <div><span class="traf-col-label">Média geral</span><span class="traf-col-val" id="t-cpm2-all">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Expectativa vs. realidade (último dia)</div>
+  <div class="cmp-grid">
+    <div class="cmp-card">
+      <div class="cmp-label">Novos membros</div>
+      <div class="cmp-main up" id="t-real-cresc">—</div>
+      <div class="cmp-sub">Crescimento efetivo</div>
+      <div class="cmp-row"><span class="cmp-row-label">Expectativa (baseada no gasto)</span><span class="cmp-row-val" id="t-expec">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Variação vs. expectativa</span><span class="cmp-row-val" id="t-var-expec">—</span></div>
+      <div class="cmp-row"><span class="cmp-row-label">Gasto em anúncios</span><span class="cmp-row-val" id="t-gasto">—</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- GRÁFICOS -->
+<div id="page-graficos" class="page">
+  <div class="section-title">Comissão diária por plataforma</div>
+  <div class="chart-card">
+    <div class="chart-label">Últimos 60 dias</div>
+    <div class="chart-wrap"><canvas id="chartComis"></canvas></div>
+  </div>
+
+  <div class="section-title">Tráfego</div>
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="chart-label">Membros no grupo</div>
+      <div class="chart-wrap"><canvas id="chartMembros"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Crescimento diário</div>
+      <div class="chart-wrap"><canvas id="chartCresco"></canvas></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="chart-label">Custo por clique (R$)</div>
+      <div class="chart-wrap"><canvas id="chartCPC"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Retenção diária (%)</div>
+      <div class="chart-wrap"><canvas id="chartRet"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== BACKUP DATA (embedded from last upload) =====================
+const BACKUP = {"hoje_dia": 9, "hoje_mes": 6, "comissao": {"jun_total": 5056.73, "mai_total": 3482.48, "avg_d9": 3456.05, "var_vs_mai": 45.2, "var_vs_avg": 46.3, "jun_amazon": 2523.46, "mai_amazon": 1479.21, "avg_amazon": 1160.94, "jun_ml": 1585.77, "mai_ml": 1355.12, "avg_ml": 1811.49, "jun_shopee": 947.5, "mai_shopee": 648.15, "avg_shopee": 483.63, "cpm_jun": 0.8577, "cpm_mai": 0.8781, "avg_cpm": 0.914, "membros_jun9": 5896.0, "membros_mai9": 3966.0, "avg_month_total": 9877.6, "avg_month_amazon": 3522.05, "avg_month_ml": 4971.47, "avg_month_shopee": 1384.08}, "trafego_hoje": {"data": "2026-06-09", "membros": 5896.0, "crescimento": 89.0, "pct_permanencia": 43.6, "custo_clique_anuncio": 0.5721, "custo_clique_total": 0.7132, "custo_membro_anuncio": 1.2149, "custo_membro_total": 1.5145, "expec_membros": 72.1, "gasto_anuncio": 108.13}, "trafego_ontem": {"data": "2026-06-08", "membros": 5807.0, "crescimento": 57.0, "pct_permanencia": 33.5, "custo_clique_anuncio": 0.5928, "custo_clique_total": 0.7574, "custo_membro_anuncio": 1.6849, "custo_membro_total": 2.1526, "expec_membros": 64.0, "gasto_anuncio": 96.04}, "trafego_avg_jun": {"crescimento": 59.2222, "pct_permanencia": 31.4, "custo_clique_anuncio": 0.5921, "custo_clique_total": 0.752, "custo_membro_anuncio": 2.1278, "custo_membro_total": 2.7267}, "trafego_avg_mai": {"crescimento": 51.3871, "pct_permanencia": 32.9, "custo_clique_anuncio": 0.6777, "custo_clique_total": 0.9622, "custo_membro_anuncio": 2.2823, "custo_membro_total": 4.241}, "trafego_avg_all": {"crescimento": 22.46, "pct_permanencia": 32.5, "custo_clique_anuncio": 0.6569, "custo_clique_total": 0.9111, "custo_membro_anuncio": 15.4414, "custo_membro_total": 22.8647}, "daily": [{"data": "2026-04-11", "amazon": 48.2, "ml": 216.96, "shopee": 76.45, "total": 341.61, "membros": 3732.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 28.135, "custo_membro_total": 41.465, "gasto": 56.27, "acum_total": 3649.75, "mes": 4, "dia": 11}, {"data": "2026-04-12", "amazon": 89.79, "ml": 47.72, "shopee": 68.67, "total": 206.18, "membros": 3734.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 36.46, "custo_membro_total": 49.79, "gasto": 72.92, "acum_total": 3855.93, "mes": 4, "dia": 12}, {"data": "2026-04-13", "amazon": 98.77, "ml": 176.96, "shopee": 52.7, "total": 328.43, "membros": 3736.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 28.545, "custo_membro_total": 41.875, "gasto": 57.09, "acum_total": 4184.36, "mes": 4, "dia": 13}, {"data": "2026-04-14", "amazon": 110.29, "ml": 157.59, "shopee": 54.54, "total": 322.42, "membros": 3738.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 30.015, "custo_membro_total": 43.345, "gasto": 60.03, "acum_total": 4506.78, "mes": 4, "dia": 14}, {"data": "2026-04-15", "amazon": 95.13, "ml": 89.51, "shopee": 47.85, "total": 232.49, "membros": 3740.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 28.705, "custo_membro_total": 42.035, "gasto": 57.41, "acum_total": 4739.27, "mes": 4, "dia": 15}, {"data": "2026-04-16", "amazon": 66.78, "ml": 119.69, "shopee": 107.16, "total": 293.63, "membros": 3742.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 27.66, "custo_membro_total": 40.99, "gasto": 55.32, "acum_total": 5032.9, "mes": 4, "dia": 16}, {"data": "2026-04-17", "amazon": 132.36, "ml": 223.46, "shopee": 40.26, "total": 396.08, "membros": 3744.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 26.215, "custo_membro_total": 39.545, "gasto": 52.43, "acum_total": 5428.98, "mes": 4, "dia": 17}, {"data": "2026-04-18", "amazon": 36.8, "ml": 74.88, "shopee": 61.82, "total": 173.5, "membros": 3746.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 31.92, "custo_membro_total": 45.25, "gasto": 63.84, "acum_total": 5602.48, "mes": 4, "dia": 18}, {"data": "2026-04-19", "amazon": 33.02, "ml": 56.04, "shopee": 83.23, "total": 172.29, "membros": 3748.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 35.21, "custo_membro_total": 48.54, "gasto": 70.42, "acum_total": 5774.77, "mes": 4, "dia": 19}, {"data": "2026-04-20", "amazon": 57.2, "ml": 341.31, "shopee": 48.74, "total": 447.25, "membros": 3750.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 32.745, "custo_membro_total": 46.075, "gasto": 65.49, "acum_total": 6222.02, "mes": 4, "dia": 20}, {"data": "2026-04-21", "amazon": 40.87, "ml": 167.63, "shopee": 103.61, "total": 312.11, "membros": 3752.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 29.09, "custo_membro_total": 42.42, "gasto": 58.18, "acum_total": 6534.13, "mes": 4, "dia": 21}, {"data": "2026-04-22", "amazon": 56.29, "ml": 101.71, "shopee": 72.7, "total": 230.7, "membros": 3754.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 30.33, "custo_membro_total": 43.66, "gasto": 60.66, "acum_total": 6764.83, "mes": 4, "dia": 22}, {"data": "2026-04-23", "amazon": 75.13, "ml": 632.65, "shopee": 45.4, "total": 753.18, "membros": 3756.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 25.985, "custo_membro_total": 39.315, "gasto": 51.97, "acum_total": 7518.01, "mes": 4, "dia": 23}, {"data": "2026-04-24", "amazon": 67.64, "ml": 78.57, "shopee": 138.74, "total": 284.95, "membros": 3758.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 29.4, "custo_membro_total": 42.73, "gasto": 58.8, "acum_total": 7802.96, "mes": 4, "dia": 24}, {"data": "2026-04-25", "amazon": 37.11, "ml": 26.1, "shopee": 13.43, "total": 76.64, "membros": 3760.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 26.35, "custo_membro_total": 39.68, "gasto": 52.7, "acum_total": 7879.6, "mes": 4, "dia": 25}, {"data": "2026-04-26", "amazon": 15.02, "ml": 166.44, "shopee": 34.23, "total": 215.69, "membros": 3762.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 35.08, "custo_membro_total": 48.41, "gasto": 70.16, "acum_total": 8095.29, "mes": 4, "dia": 26}, {"data": "2026-04-27", "amazon": 59.73, "ml": 9.65, "shopee": 69.45, "total": 138.83, "membros": 3764.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 28.195, "custo_membro_total": 41.525, "gasto": 56.39, "acum_total": 8234.12, "mes": 4, "dia": 27}, {"data": "2026-04-28", "amazon": 216.36, "ml": 102.17, "shopee": 20.6, "total": 339.13, "membros": 3766.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 26.54, "custo_membro_total": 39.87, "gasto": 53.08, "acum_total": 8573.25, "mes": 4, "dia": 28}, {"data": "2026-04-29", "amazon": 105.16, "ml": 43.37, "shopee": 41.78, "total": 190.31, "membros": 3768.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 19.67, "custo_membro_total": 33.0, "gasto": 39.34, "acum_total": 8763.56, "mes": 4, "dia": 29}, {"data": "2026-04-30", "amazon": 178.69, "ml": 42.96, "shopee": 42.02, "total": 263.67, "membros": 3770.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 0.0, "custo_membro_total": 0, "gasto": 0, "acum_total": 9027.23, "mes": 4, "dia": 30}, {"data": "2026-05-01", "amazon": 71.61, "ml": 241.75, "shopee": 70.04, "total": 383.4, "membros": 3772.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 0.0, "custo_membro_total": 0, "gasto": 0, "acum_total": 383.4, "mes": 5, "dia": 1}, {"data": "2026-05-02", "amazon": 44.73, "ml": 119.14, "shopee": 28.48, "total": 192.35, "membros": 3774.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 0.0, "custo_membro_total": 0, "gasto": 0, "acum_total": 575.75, "mes": 5, "dia": 2}, {"data": "2026-05-03", "amazon": 58.69, "ml": 40.01, "shopee": 19.04, "total": 117.74, "membros": 3776.0, "crescimento": 2.0, "pct_perm": 0, "custo_clique": 0, "custo_clique_total": 0, "custo_membro": 1.685, "custo_membro_total": 15.015, "gasto": 3.37, "acum_total": 693.49, "mes": 5, "dia": 3}, {"data": "2026-05-04", "amazon": 428.11, "ml": 82.04, "shopee": 25.09, "total": 535.24, "membros": 3781.0, "crescimento": 5.0, "pct_perm": 12.8, "custo_clique": 0.687, "custo_clique_total": 1.448, "custo_membro": 4.806, "custo_membro_total": 10.138, "gasto": 24.03, "acum_total": 1228.73, "mes": 5, "dia": 4}, {"data": "2026-05-05", "amazon": 624.03, "ml": 367.52, "shopee": 410.33, "total": 1401.88, "membros": 3788.0, "crescimento": 7.0, "pct_perm": 12.7, "custo_clique": 1.455, "custo_clique_total": 2.047, "custo_membro": 9.353, "custo_membro_total": 13.161, "gasto": 65.47, "acum_total": 2630.61, "mes": 5, "dia": 5}, {"data": "2026-05-06", "amazon": 88.47, "ml": 156.4, "shopee": 11.59, "total": 256.46, "membros": 3791.0, "crescimento": 3.0, "pct_perm": 7.7, "custo_clique": 2.887, "custo_clique_total": 3.998, "custo_membro": 23.097, "custo_membro_total": 31.983, "gasto": 69.29, "acum_total": 2887.07, "mes": 5, "dia": 6}, {"data": "2026-05-07", "amazon": 43.99, "ml": 267.81, "shopee": 60.11, "total": 371.91, "membros": 3779.0, "crescimento": -12.0, "pct_perm": -37.5, "custo_clique": 1.544, "custo_clique_total": 2.655, "custo_membro": -3.088, "custo_membro_total": 5.31, "gasto": 37.06, "acum_total": 3258.98, "mes": 5, "dia": 7}, {"data": "2026-05-08", "amazon": 80.44, "ml": 75.46, "shopee": 17.81, "total": 173.71, "membros": 3914.0, "crescimento": 135.0, "pct_perm": 84.4, "custo_clique": 0.568, "custo_clique_total": 0.749, "custo_membro": 0.618, "custo_membro_total": 0.816, "gasto": 83.44, "acum_total": 3432.69, "mes": 5, "dia": 8}, {"data": "2026-05-09", "amazon": 39.14, "ml": 4.99, "shopee": 5.66, "total": 49.79, "membros": 3966.0, "crescimento": 52.0, "pct_perm": 45.6, "custo_clique": 0.608, "custo_clique_total": 0.855, "custo_membro": 1.263, "custo_membro_total": 1.775, "gasto": 65.66, "acum_total": 3482.48, "mes": 5, "dia": 9}, {"data": "2026-05-10", "amazon": 59.72, "ml": 0.0, "shopee": 9.11, "total": 68.83, "membros": 4086.0, "crescimento": 120.0, "pct_perm": 56.3, "custo_clique": 0.447, "custo_clique_total": 0.582, "custo_membro": 0.734, "custo_membro_total": 0.956, "gasto": 88.09, "acum_total": 3551.31, "mes": 5, "dia": 10}, {"data": "2026-05-11", "amazon": 450.95, "ml": 167.83, "shopee": 40.64, "total": 659.42, "membros": 4163.0, "crescimento": 77.0, "pct_perm": 26.0, "custo_clique": 0.454, "custo_clique_total": 0.597, "custo_membro": 1.096, "custo_membro_total": 1.442, "gasto": 84.36, "acum_total": 4210.73, "mes": 5, "dia": 11}, {"data": "2026-05-12", "amazon": 107.66, "ml": 89.36, "shopee": 20.84, "total": 217.86, "membros": 4228.0, "crescimento": 65.0, "pct_perm": 37.4, "custo_clique": 0.444, "custo_clique_total": 0.613, "custo_membro": 1.08, "custo_membro_total": 1.49, "gasto": 70.17, "acum_total": 4428.59, "mes": 5, "dia": 12}, {"data": "2026-05-13", "amazon": 137.67, "ml": 85.91, "shopee": 32.12, "total": 255.7, "membros": 4296.0, "crescimento": 68.0, "pct_perm": 36.4, "custo_clique": 0.399, "custo_clique_total": 0.553, "custo_membro": 1.014, "custo_membro_total": 1.406, "gasto": 68.95, "acum_total": 4684.29, "mes": 5, "dia": 13}, {"data": "2026-05-14", "amazon": 142.2, "ml": 189.29, "shopee": 22.69, "total": 354.18, "membros": 4386.0, "crescimento": 90.0, "pct_perm": 43.5, "custo_clique": 0.454, "custo_clique_total": 0.64, "custo_membro": 0.721, "custo_membro_total": 1.018, "gasto": 64.93, "acum_total": 5038.47, "mes": 5, "dia": 14}, {"data": "2026-05-15", "amazon": 93.02, "ml": 270.99, "shopee": 31.1, "total": 395.11, "membros": 4443.0, "crescimento": 57.0, "pct_perm": 26.6, "custo_clique": 0.405, "custo_clique_total": 0.561, "custo_membro": 1.215, "custo_membro_total": 1.683, "gasto": 69.25, "acum_total": 5433.58, "mes": 5, "dia": 15}, {"data": "2026-05-16", "amazon": 126.76, "ml": 123.99, "shopee": 27.1, "total": 277.85, "membros": 4514.0, "crescimento": 71.0, "pct_perm": 43.3, "custo_clique": 0.441, "custo_clique_total": 0.619, "custo_membro": 0.932, "custo_membro_total": 1.307, "gasto": 66.17, "acum_total": 5711.43, "mes": 5, "dia": 16}, {"data": "2026-05-17", "amazon": 22.47, "ml": 70.59, "shopee": 23.0, "total": 116.06, "membros": 4616.0, "crescimento": 102.0, "pct_perm": 43.0, "custo_clique": 0.439, "custo_clique_total": 0.559, "custo_membro": 0.96, "custo_membro_total": 1.222, "gasto": 97.96, "acum_total": 5827.49, "mes": 5, "dia": 17}, {"data": "2026-05-18", "amazon": 49.26, "ml": 75.64, "shopee": 35.3, "total": 160.2, "membros": 4638.0, "crescimento": 22.0, "pct_perm": 12.7, "custo_clique": 0.532, "custo_clique_total": 0.7, "custo_membro": 3.819, "custo_membro_total": 5.03, "gasto": 84.01, "acum_total": 5987.69, "mes": 5, "dia": 18}, {"data": "2026-05-19", "amazon": 249.82, "ml": 207.84, "shopee": 36.5, "total": 494.16, "membros": 4704.0, "crescimento": 66.0, "pct_perm": 36.5, "custo_clique": 0.488, "custo_clique_total": 0.647, "custo_membro": 1.234, "custo_membro_total": 1.638, "gasto": 81.43, "acum_total": 6481.85, "mes": 5, "dia": 19}, {"data": "2026-05-20", "amazon": 79.85, "ml": 298.37, "shopee": 168.7, "total": 546.92, "membros": 4748.0, "crescimento": 44.0, "pct_perm": 29.5, "custo_clique": 0.552, "custo_clique_total": 0.743, "custo_membro": 1.742, "custo_membro_total": 2.348, "gasto": 76.66, "acum_total": 7028.77, "mes": 5, "dia": 20}, {"data": "2026-05-21", "amazon": 154.97, "ml": 188.28, "shopee": 68.5, "total": 411.75, "membros": 4823.0, "crescimento": 75.0, "pct_perm": 43.4, "custo_clique": 0.446, "custo_clique_total": 0.607, "custo_membro": 0.981, "custo_membro_total": 1.336, "gasto": 73.54, "acum_total": 7440.52, "mes": 5, "dia": 21}, {"data": "2026-05-22", "amazon": 108.18, "ml": 346.06, "shopee": 2.7, "total": 456.94, "membros": 4875.0, "crescimento": 52.0, "pct_perm": 39.1, "custo_clique": 0.605, "custo_clique_total": 0.822, "custo_membro": 1.431, "custo_membro_total": 1.944, "gasto": 74.42, "acum_total": 7897.46, "mes": 5, "dia": 22}, {"data": "2026-05-23", "amazon": 78.62, "ml": 80.32, "shopee": 18.02, "total": 176.96, "membros": 4925.0, "crescimento": 50.0, "pct_perm": 40.3, "custo_clique": 0.535, "custo_clique_total": 0.754, "custo_membro": 1.306, "custo_membro_total": 1.84, "gasto": 65.32, "acum_total": 8074.42, "mes": 5, "dia": 23}, {"data": "2026-05-24", "amazon": 10.02, "ml": 425.96, "shopee": 28.0, "total": 463.98, "membros": 5015.0, "crescimento": 90.0, "pct_perm": 49.2, "custo_clique": 0.492, "custo_clique_total": 0.647, "custo_membro": 0.94, "custo_membro_total": 1.236, "gasto": 84.58, "acum_total": 8538.4, "mes": 5, "dia": 24}, {"data": "2026-05-25", "amazon": 209.08, "ml": 46.74, "shopee": 14.1, "total": 269.92, "membros": 5036.0, "crescimento": 21.0, "pct_perm": 15.3, "custo_clique": 0.562, "custo_clique_total": 0.774, "custo_membro": 3.375, "custo_membro_total": 4.644, "gasto": 70.87, "acum_total": 8808.32, "mes": 5, "dia": 25}, {"data": "2026-05-26", "amazon": 203.42, "ml": 127.2, "shopee": 3.7, "total": 334.32, "membros": 5111.0, "crescimento": 75.0, "pct_perm": 46.6, "custo_clique": 0.536, "custo_clique_total": 0.716, "custo_membro": 1.058, "custo_membro_total": 1.413, "gasto": 79.34, "acum_total": 9142.64, "mes": 5, "dia": 26}, {"data": "2026-05-27", "amazon": 121.29, "ml": 154.13, "shopee": 64.5, "total": 339.92, "membros": 5170.0, "crescimento": 59.0, "pct_perm": 33.9, "custo_clique": 0.547, "custo_clique_total": 0.717, "custo_membro": 1.456, "custo_membro_total": 1.908, "gasto": 85.92, "acum_total": 9482.56, "mes": 5, "dia": 27}, {"data": "2026-05-28", "amazon": 87.61, "ml": 201.63, "shopee": 10.5, "total": 299.74, "membros": 5233.0, "crescimento": 63.0, "pct_perm": 37.7, "custo_clique": 0.48, "custo_clique_total": 0.651, "custo_membro": 1.189, "custo_membro_total": 1.612, "gasto": 74.9, "acum_total": 9782.3, "mes": 5, "dia": 28}, {"data": "2026-05-29", "amazon": 114.54, "ml": 109.6, "shopee": 23.5, "total": 247.64, "membros": 5253.0, "crescimento": 20.0, "pct_perm": 15.6, "custo_clique": 0.552, "custo_clique_total": 0.774, "custo_membro": 3.312, "custo_membro_total": 4.645, "gasto": 66.24, "acum_total": 10029.94, "mes": 5, "dia": 29}, {"data": "2026-05-30", "amazon": 108.36, "ml": 214.34, "shopee": 40.7, "total": 363.4, "membros": 5282.0, "crescimento": 29.0, "pct_perm": 33.0, "custo_clique": 0.765, "custo_clique_total": 1.082, "custo_membro": 2.216, "custo_membro_total": 3.135, "gasto": 64.25, "acum_total": 10393.34, "mes": 5, "dia": 30}, {"data": "2026-05-31", "amazon": 15.97, "ml": 53.07, "shopee": 40.6, "total": 109.64, "membros": 5363.0, "crescimento": 81.0, "pct_perm": 49.7, "custo_clique": 0.652, "custo_clique_total": 0.83, "custo_membro": 1.208, "custo_membro_total": 1.537, "gasto": 97.83, "acum_total": 10502.98, "mes": 5, "dia": 31}, {"data": "2026-06-01", "amazon": 90.26, "ml": 468.86, "shopee": 285.3, "total": 844.42, "membros": 5417.0, "crescimento": 54.0, "pct_perm": 28.1, "custo_clique": 0.507, "custo_clique_total": 0.653, "custo_membro": 1.708, "custo_membro_total": 2.202, "gasto": 92.23, "acum_total": 844.42, "mes": 6, "dia": 1}, {"data": "2026-06-02", "amazon": 202.26, "ml": 77.43, "shopee": 75.4, "total": 355.09, "membros": 5479.0, "crescimento": 62.0, "pct_perm": 32.3, "custo_clique": 0.54, "custo_clique_total": 0.694, "custo_membro": 1.516, "custo_membro_total": 1.946, "gasto": 94.01, "acum_total": 1199.51, "mes": 6, "dia": 2}, {"data": "2026-06-03", "amazon": 227.42, "ml": 366.9, "shopee": 39.2, "total": 633.52, "membros": 5494.0, "crescimento": 15.0, "pct_perm": 8.6, "custo_clique": 0.542, "custo_clique_total": 0.713, "custo_membro": 5.635, "custo_membro_total": 7.412, "gasto": 84.52, "acum_total": 1833.03, "mes": 6, "dia": 3}, {"data": "2026-06-04", "amazon": 215.22, "ml": 100.86, "shopee": 35.1, "total": 351.18, "membros": 5578.0, "crescimento": 84.0, "pct_perm": 43.3, "custo_clique": 0.538, "custo_clique_total": 0.687, "custo_membro": 1.154, "custo_membro_total": 1.471, "gasto": 96.92, "acum_total": 2184.21, "mes": 6, "dia": 4}, {"data": "2026-06-05", "amazon": 345.31, "ml": 26.74, "shopee": 73.6, "total": 445.65, "membros": 5640.0, "crescimento": 62.0, "pct_perm": 32.3, "custo_clique": 0.603, "custo_clique_total": 0.768, "custo_membro": 1.577, "custo_membro_total": 2.007, "gasto": 97.76, "acum_total": 2629.86, "mes": 6, "dia": 5}, {"data": "2026-06-06", "amazon": 241.85, "ml": 273.52, "shopee": 418.2, "total": 933.57, "membros": 5672.0, "crescimento": 32.0, "pct_perm": 21.6, "custo_clique": 0.753, "custo_clique_total": 0.956, "custo_membro": 3.083, "custo_membro_total": 3.916, "gasto": 98.64, "acum_total": 3563.43, "mes": 6, "dia": 6}, {"data": "2026-06-07", "amazon": 371.25, "ml": 47.59, "shopee": 18.4, "total": 437.24, "membros": 5750.0, "crescimento": 78.0, "pct_perm": 39.4, "custo_clique": 0.68, "custo_clique_total": 0.827, "custo_membro": 1.578, "custo_membro_total": 1.92, "gasto": 123.08, "acum_total": 4000.67, "mes": 6, "dia": 7}, {"data": "2026-06-08", "amazon": 435.93, "ml": 223.87, "shopee": 2.3, "total": 662.1, "membros": 5807.0, "crescimento": 57.0, "pct_perm": 33.5, "custo_clique": 0.593, "custo_clique_total": 0.757, "custo_membro": 1.685, "custo_membro_total": 2.153, "gasto": 96.04, "acum_total": 4662.77, "mes": 6, "dia": 8}, {"data": "2026-06-09", "amazon": 393.96, "ml": 0.0, "shopee": 0.0, "total": 393.96, "membros": 5896.0, "crescimento": 89.0, "pct_perm": 43.6, "custo_clique": 0.572, "custo_clique_total": 0.713, "custo_membro": 1.215, "custo_membro_total": 1.514, "gasto": 108.13, "acum_total": 5056.73, "mes": 6, "dia": 9}]};
+
+// ===================== GOOGLE SHEETS CSV URLS =====================
+const SHEET_ID = '2PACX-1vRDHse4JdgreKKlafZph0S5IC3qolopWxMrN9-1qHqlozZr_c0FNypMD0R3vKw1hIz2HXnjsFRKLIyZ';
+const URLS = {
+  comissionamento: `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=450413662&single=true&output=csv`,
+  trafego:         `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=571069526&single=true&output=csv`,
+  anuncios:        `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/pub?gid=2047285181&single=true&output=csv`,
+};
+
+// ===================== PARSERS =====================
+function parseCSV(text) {
+  // Split lines, handle quoted fields with commas
+  const lines = text.trim().split('\n');
+  return lines.map(line => {
+    const cells = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  // Formats: "2026-03-01 00:00:00", "2026-03-01", "01/03/2026"
+  s = s.replace(/"/g,'').trim();
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if ((m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/))) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function numVal(s) {
+  if (s == null || s === '' || s === 'NaN') return 0;
+  // Handle Brazilian number format
+  s = String(s).replace(/"/g,'').trim();
+  // If it looks like "1.234,56" → 1234.56; if "1234.56" → 1234.56
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
+    s = s.replace(/\./g,'').replace(',','.');
+  } else {
+    s = s.replace(',','.');
+  }
+  return parseFloat(s) || 0;
+}
+
+// Parse Comissionamento CSV
+// Structure: rows 0-6 are header/metadata with client names in col 0
+// Row 7 (index 7) = headers: [clients, idx, Data, Plataforma, Cliques, Vendas, Comissão, ...]
+// Rows 8+ = data
+function parseComissionamento(csv) {
+  const rows = parseCSV(csv);
+  // Find header row: row where col 2 = "Data" and col 3 = "Plataforma"
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    if (rows[i][2] === 'Data' && rows[i][3] === 'Plataforma') { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) return [];
+  const result = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[2]);
+    const plat = r[3] ? r[3].replace(/"/g,'').trim() : '';
+    const comissao = numVal(r[6]);
+    if (d && plat && comissao > 0) {
+      result.push({ date: d, plat, comissao });
+    }
+  }
+  return result;
+}
+
+// Parse Tráfego CSV
+// Row 6 = headers at cols 2+: Data, Membros, Clique Anúncio, ...
+// Rows 7+ = data
+function parseTrafego(csv) {
+  const rows = parseCSV(csv);
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    if (rows[i][2] === 'Data' && rows[i][3] === 'Membros') { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) return [];
+  const hdr = rows[headerIdx];
+  // Col map
+  const colIdx = {};
+  hdr.forEach((h, i) => { colIdx[h.replace(/"/g,'').trim()] = i; });
+  const result = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[colIdx['Data']]);
+    if (!d) continue;
+    const membros = numVal(r[colIdx['Membros']]);
+    if (membros < 100) continue; // skip empty rows
+    result.push({
+      date: d,
+      membros,
+      crescimento: numVal(r[colIdx['Crescimento']]),
+      pctPerm: numVal(r[colIdx['% de permanência']]),
+      gastoAnuncio: numVal(r[colIdx['Gasto em anúncio']]),
+      gastoEstrategista: numVal(r[colIdx['Gasto estrategista']]),
+      anuncioClique: numVal(r[colIdx['Anúncio/Clique']]),
+      totalClique: numVal(r[colIdx['Anún.+Gest./clique']]),
+      anuncioMembro: numVal(r[colIdx['Anúncio/membro']]),
+      gastoMembro: numVal(r[colIdx['Gasto/Membro']]),
+      expecMembros: numVal(r[colIdx['Expec. membros']]),
+    });
+  }
+  return result;
+}
+
+// ===================== PROCESSING =====================
+let STATE = null;
+
+function processData(comis, trafego) {
+  // Build daily comis pivot
+  const byDate = {};
+  for (const row of comis) {
+    const key = row.date.toISOString().slice(0,10);
+    if (!byDate[key]) byDate[key] = { date: row.date, amazon: 0, ml: 0, shopee: 0 };
+    if (row.plat === 'Amazon') byDate[key].amazon += row.comissao;
+    else if (row.plat === 'Mercado Livre') byDate[key].ml += row.comissao;
+    else if (row.plat === 'Shopee') byDate[key].shopee += row.comissao;
+  }
+  const comisDays = Object.values(byDate).sort((a,b) => a.date - b.date);
+  comisDays.forEach(d => d.total = d.amazon + d.ml + d.shopee);
+
+  // Build trafego map
+  const trafMap = {};
+  for (const row of trafego) {
+    trafMap[row.date.toISOString().slice(0,10)] = row;
+  }
+
+  // Find last available day (latest in comis)
+  const lastComis = comisDays[comisDays.length - 1];
+  const today = lastComis.date;
+  const todayDay = today.getDate();
+  const todayMonth = today.getMonth(); // 0-based
+
+  // Helper: cumulative sum for a month up to a day
+  function cumUntil(month0, day, field) {
+    return comisDays
+      .filter(d => d.date.getMonth() === month0 && d.date.getDate() <= day)
+      .reduce((s, d) => s + d[field], 0);
+  }
+
+  const curMonth = todayMonth;
+  const prevMonth = todayMonth === 0 ? 11 : todayMonth - 1;
+
+  const cur_total = cumUntil(curMonth, todayDay, 'total');
+  const prev_total = cumUntil(prevMonth, todayDay, 'total');
+  const cur_amazon = cumUntil(curMonth, todayDay, 'amazon');
+  const prev_amazon = cumUntil(prevMonth, todayDay, 'amazon');
+  const cur_ml = cumUntil(curMonth, todayDay, 'ml');
+  const prev_ml = cumUntil(prevMonth, todayDay, 'ml');
+  const cur_shopee = cumUntil(curMonth, todayDay, 'shopee');
+  const prev_shopee = cumUntil(prevMonth, todayDay, 'shopee');
+
+  // Complete months for average (all months before current)
+  const allMonths = [...new Set(comisDays.map(d => d.date.getMonth()))].filter(m => m !== curMonth);
+  function avgD(field) {
+    if (!allMonths.length) return 0;
+    const sums = allMonths.map(m => cumUntil(m, todayDay, field));
+    return sums.reduce((a,b) => a+b, 0) / sums.length;
+  }
+  const avg_total = avgD('total');
+  const avg_amazon = avgD('amazon');
+  const avg_ml = avgD('ml');
+  const avg_shopee = avgD('shopee');
+
+  // Members on today's day
+  const curKey = today.toISOString().slice(0,10);
+  const prevDate = new Date(today.getFullYear(), prevMonth, todayDay);
+  const prevKey = prevDate.toISOString().slice(0,10);
+  const curTraf = trafMap[curKey] || null;
+  const prevTraf = trafMap[prevKey] || null;
+  const membros_cur = curTraf ? curTraf.membros : 0;
+  const membros_prev = prevTraf ? prevTraf.membros : 0;
+  const cpm_cur = membros_cur > 0 ? cur_total / membros_cur : 0;
+  const cpm_prev = membros_prev > 0 ? prev_total / membros_prev : 0;
+  const avg_cpm = allMonths.map(m => {
+    const d = new Date(today.getFullYear(), m, todayDay);
+    const k = d.toISOString().slice(0,10);
+    const t = trafMap[k];
+    const tot = cumUntil(m, todayDay, 'total');
+    return (t && t.membros > 0) ? tot / t.membros : null;
+  }).filter(v => v !== null);
+  const avg_cpm_val = avg_cpm.length ? avg_cpm.reduce((a,b)=>a+b,0)/avg_cpm.length : 0;
+
+  // Tráfego: last day, prev day, month avg, all avg
+  const sortedTraf = trafego.filter(r => r.gastoAnuncio > 0 || r.crescimento > 0).sort((a,b) => a.date - b.date);
+  const lastTraf = sortedTraf[sortedTraf.length - 1] || null;
+  const prevTraf2 = sortedTraf[sortedTraf.length - 2] || null;
+  const curMonthTraf = sortedTraf.filter(r => r.date.getMonth() === curMonth);
+  const allTraf = sortedTraf.filter(r => r.anuncioClique > 0);
+  function avgT(arr, field) {
+    const vals = arr.map(r => r[field]).filter(v => v > 0);
+    return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+  }
+
+  // Last 60 days for charts
+  const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 59);
+  const dailyChart = comisDays.filter(d => d.date >= cutoff).map(d => {
+    const k = d.date.toISOString().slice(0,10);
+    const t = trafMap[k] || {};
+    return {
+      label: fmtDate(d.date),
+      amazon: d.amazon, ml: d.ml, shopee: d.shopee, total: d.total,
+      membros: t.membros || 0,
+      crescimento: t.crescimento || 0,
+      pctPerm: t.pctPerm ? t.pctPerm * 100 : 0,
+      cpc: t.anuncioClique || 0,
+      cpcTotal: t.totalClique || 0,
+    };
+  });
+
+  return {
+    todayDay, today,
+    comissao: {
+      cur_total, prev_total, avg_total,
+      cur_amazon, prev_amazon, avg_amazon,
+      cur_ml, prev_ml, avg_ml,
+      cur_shopee, prev_shopee, avg_shopee,
+      cpm_cur, cpm_prev, avg_cpm: avg_cpm_val,
+      membros_cur, membros_prev,
+    },
+    trafego: {
+      last: lastTraf, prev: prevTraf2,
+      avg_mes_cresc: avgT(curMonthTraf,'crescimento'),
+      avg_all_cresc: avgT(allTraf,'crescimento'),
+      avg_mes_ret: avgT(curMonthTraf.filter(r=>r.pctPerm>0),'pctPerm') * 100,
+      avg_all_ret: avgT(allTraf.filter(r=>r.pctPerm>0),'pctPerm') * 100,
+      avg_mes_cpc: avgT(curMonthTraf,'anuncioClique'),
+      avg_all_cpc: avgT(allTraf,'anuncioClique'),
+      avg_mes_cpc2: avgT(curMonthTraf,'totalClique'),
+      avg_all_cpc2: avgT(allTraf,'totalClique'),
+      avg_mes_cpm: avgT(curMonthTraf,'anuncioMembro'),
+      avg_all_cpm: avgT(allTraf,'anuncioMembro'),
+      avg_mes_cpm2: avgT(curMonthTraf,'gastoMembro'),
+      avg_all_cpm2: avgT(allTraf,'gastoMembro'),
+    },
+    dailyChart,
+  };
+}
+
+// ===================== RENDER =====================
+const R = v => 'R$\u00a0' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R4 = v => 'R$\u00a0' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4});
+const N0 = v => Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
+const N1 = v => Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
+
+function pctVar(cur, base) {
+  if (!base) return { str: '—', cls: '' };
+  const p = (cur / base - 1) * 100;
+  return { str: (p>=0?'+':'') + p.toFixed(1) + '%', cls: p>=0?'up':'down' };
+}
+
+function setText(id, val, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  if (cls) { el.className = ''; el.classList.add(cls); }
+}
+
+function renderComissao(S) {
+  const C = S.comissao;
+  const mesNome = S.today.toLocaleDateString('pt-BR',{month:'long'});
+  const prevMes = new Date(S.today.getFullYear(), S.today.getMonth()-1, 1).toLocaleDateString('pt-BR',{month:'long'});
+  document.getElementById('hoje-dia').textContent = S.todayDay + '/' + String(S.today.getMonth()+1).padStart(2,'0');
+  document.getElementById('sub-jun-total').textContent = mesNome.charAt(0).toUpperCase() + mesNome.slice(1) + ' · dias 1–' + S.todayDay;
+
+  // Total
+  setText('val-jun-total', R(C.cur_total), 'up');
+  setText('val-mai-total', R(C.prev_total));
+  const v1 = pctVar(C.cur_total, C.prev_total);
+  setText('var-vs-mai', v1.str, v1.cls);
+  setText('val-avg-d9', R(C.avg_total));
+  const v2 = pctVar(C.cur_total, C.avg_total);
+  setText('var-vs-avg', v2.str, v2.cls);
+
+  // CPM
+  setText('val-cpm-jun', R4(C.cpm_cur));
+  document.getElementById('membros-jun').textContent = N0(C.membros_cur);
+  setText('val-cpm-mai', R4(C.cpm_prev));
+  const v3 = pctVar(C.cpm_cur, C.cpm_prev);
+  setText('var-cpm-mai', v3.str, v3.cls);
+  setText('val-cpm-avg', R4(C.avg_cpm));
+  const v4 = pctVar(C.cpm_cur, C.avg_cpm);
+  setText('var-cpm-avg', v4.str, v4.cls);
+
+  // Platforms
+  function fillPlat(pfx, cur, prev, avg) {
+    setText('pv-'+pfx+'-jun', R(cur));
+    setText('pv-'+pfx+'-mai', R(prev));
+    const va = pctVar(cur, prev); const vb = pctVar(cur, avg);
+    const ea = document.getElementById('pv-'+pfx+'-var');
+    const eb = document.getElementById('pv-'+pfx+'-var2');
+    if (ea) { ea.textContent = va.str; ea.className = va.cls; }
+    if (eb) { eb.textContent = vb.str; eb.className = vb.cls; }
+    setText('pv-'+pfx+'-avg', R(avg));
+  }
+  fillPlat('amazon', C.cur_amazon, C.prev_amazon, C.avg_amazon);
+  fillPlat('ml',     C.cur_ml,     C.prev_ml,     C.avg_ml);
+  fillPlat('shopee', C.cur_shopee, C.prev_shopee, C.avg_shopee);
+}
+
+function renderTrafego(S) {
+  const T = S.trafego;
+  const H = T.last, O = T.prev;
+  if (!H) return;
+
+  setText('t-cresc-hoje', '+' + N0(H.crescimento), 'up');
+  document.getElementById('t-cresc-ontem').textContent = O ? '+' + N0(O.crescimento) : '—';
+  document.getElementById('t-cresc-jun').textContent = '+' + N1(T.avg_mes_cresc);
+  document.getElementById('t-cresc-all').textContent = '+' + N1(T.avg_all_cresc);
+
+  setText('t-ret-hoje', (H.pctPerm * 100).toFixed(1) + '%', '');
+  document.getElementById('t-ret-ontem').textContent = O ? (O.pctPerm * 100).toFixed(1) + '%' : '—';
+  document.getElementById('t-ret-jun').textContent = T.avg_mes_ret.toFixed(1) + '%';
+  document.getElementById('t-ret-all').textContent = T.avg_all_ret.toFixed(1) + '%';
+
+  setText('t-cpc-hoje', R4(H.anuncioClique));
+  document.getElementById('t-cpc-ontem').textContent = O ? R4(O.anuncioClique) : '—';
+  document.getElementById('t-cpc-jun').textContent = R4(T.avg_mes_cpc);
+  document.getElementById('t-cpc-all').textContent = R4(T.avg_all_cpc);
+
+  setText('t-cpc2-hoje', R4(H.totalClique));
+  document.getElementById('t-cpc2-ontem').textContent = O ? R4(O.totalClique) : '—';
+  document.getElementById('t-cpc2-jun').textContent = R4(T.avg_mes_cpc2);
+  document.getElementById('t-cpc2-all').textContent = R4(T.avg_all_cpc2);
+
+  setText('t-cpm-hoje', R(H.anuncioMembro));
+  document.getElementById('t-cpm-ontem').textContent = O ? R(O.anuncioMembro) : '—';
+  document.getElementById('t-cpm-jun').textContent = R(T.avg_mes_cpm);
+  document.getElementById('t-cpm-all').textContent = R(T.avg_all_cpm);
+
+  setText('t-cpm2-hoje', R(H.gastoMembro));
+  document.getElementById('t-cpm2-ontem').textContent = O ? R(O.gastoMembro) : '—';
+  document.getElementById('t-cpm2-jun').textContent = R(T.avg_mes_cpm2);
+  document.getElementById('t-cpm2-all').textContent = R(T.avg_all_cpm2);
+
+  // Expectativa
+  setText('t-real-cresc', '+' + N0(H.crescimento), 'up');
+  document.getElementById('t-expec').textContent = N1(H.expecMembros);
+  const ve = pctVar(H.crescimento, H.expecMembros);
+  const veEl = document.getElementById('t-var-expec');
+  if (veEl) { veEl.textContent = ve.str; veEl.className = 'cmp-row-val ' + ve.cls; }
+  document.getElementById('t-gasto').textContent = R(H.gastoAnuncio);
+}
+
+// ===================== CHARTS =====================
+let charts = {};
+Chart.defaults.color = '#636880';
+Chart.defaults.borderColor = '#252836';
+Chart.defaults.font.size = 11;
+
+function mk(id, cfg) {
+  if (charts[id]) { charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, cfg);
+}
+
+function renderCharts(S) {
+  const D = S.dailyChart;
+  const labels = D.map(r => r.label);
+
+  mk('chartComis', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Amazon', data: D.map(r => r.amazon), backgroundColor: '#ff990099', stack: 's' },
+        { label: 'Mercado Livre', data: D.map(r => r.ml), backgroundColor: '#f5c51899', stack: 's' },
+        { label: 'Shopee', data: D.map(r => r.shopee), backgroundColor: '#f4654a99', stack: 's' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + c.raw.toFixed(2) } } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => 'R$' + v } } }
+    }
+  });
+
+  mk('chartMembros', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Membros', data: D.map(r => r.membros||null), borderColor: '#60a5fa', backgroundColor: '#60a5fa18', fill: true, tension: 0.3, pointRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
+  });
+
+  mk('chartCresco', {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Novos membros', data: D.map(r => r.crescimento||0), backgroundColor: '#34d39988' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
+  });
+
+  mk('chartCPC', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Só anúncio', data: D.map(r => r.cpc||null), borderColor: '#ff9900', tension: 0.3, pointRadius: 0 },
+      { label: 'Anúncio+Gest.', data: D.map(r => r.cpcTotal||null), borderColor: '#a78bfa', tension: 0.3, pointRadius: 0 },
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(4) } } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => 'R$' + v.toFixed(2) } } }
+    }
+  });
+
+  mk('chartRet', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Retenção %', data: D.map(r => r.pctPerm||null), borderColor: '#60a5fa', backgroundColor: '#60a5fa12', fill: true, tension: 0.3, pointRadius: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + (c.raw||0).toFixed(1) + '%' } } },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+
+// ===================== NAVIGATION =====================
+let chartsBuilt = false;
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'graficos' && STATE) renderCharts(STATE);
+}
+
+// ===================== DATA LOADING =====================
+function setStatus(state, msg) {
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.className = state;
+  lbl.textContent = msg;
+}
+
+function loadFromBackup() {
+  // Convert backup format to processData format
+  const comisRows = [];
+  for (const d of BACKUP.daily) {
+    const date = new Date(d.data);
+    if (d.amazon > 0) comisRows.push({ date, plat: 'Amazon', comissao: d.amazon });
+    if (d.ml > 0) comisRows.push({ date, plat: 'Mercado Livre', comissao: d.ml });
+    if (d.shopee > 0) comisRows.push({ date, plat: 'Shopee', comissao: d.shopee });
+  }
+  const trafRows = BACKUP.daily.map(d => ({
+    date: new Date(d.data),
+    membros: d.membros,
+    crescimento: d.crescimento,
+    pctPerm: d.pct_perm / 100,
+    gastoAnuncio: d.gasto,
+    gastoEstrategista: 26.66,
+    anuncioClique: d.custo_clique,
+    totalClique: d.custo_clique_total,
+    anuncioMembro: d.custo_membro,
+    gastoMembro: d.custo_membro_total,
+    expecMembros: 0,
+  }));
+  return processData(comisRows, trafRows);
+}
+
+async function loadAll() {
+  setStatus('loading', 'Buscando planilha...');
+  try {
+    const [comisRes, trafRes] = await Promise.all([
+      fetch(URLS.comissionamento),
+      fetch(URLS.trafego),
+    ]);
+    if (!comisRes.ok || !trafRes.ok) throw new Error('HTTP ' + comisRes.status);
+    const [comisText, trafText] = await Promise.all([comisRes.text(), trafRes.text()]);
+    const comisRows = parseComissionamento(comisText);
+    const trafRows = parseTrafego(trafText);
+    if (comisRows.length < 10) throw new Error('Dados insuficientes');
+    STATE = processData(comisRows, trafRows);
+    setStatus('ok', 'Atualizado · ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+  } catch (e) {
+    console.warn('Live fetch failed, using backup:', e.message);
+    STATE = loadFromBackup();
+    setStatus('error', 'Dados locais (planilha indisponível)');
+  }
+  renderComissao(STATE);
+  renderTrafego(STATE);
+}
+
+// Init
+loadAll();
+</script>
+</body>
+</html>
