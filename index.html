@@ -465,7 +465,9 @@ function gerarCupom() {
   var validade = (isPct && limite)
     ? 'Válido em compras acima de R$ '+minimo+' com limite de R$ '+limite+' de desconto.'
     : 'Válido em compras acima de R$ '+minimo+'.';
-  var msg = '*🚨 Cupom de '+valor+tipo+' - '+loja+'*\n\n';
+  var msg = '';
+  if (gatilho) msg += '`🚨 '+gatilho+'`\n\n';
+  msg += '*🚨 Cupom de '+valor+tipo+' - '+loja+'*\n\n';
   msg += validade+'\n\n';
   msg += '🛒 *LOJA* '+loja.toUpperCase();
   if (cupom) msg += '\n\n🏷️ *CUPOM* '+cupom.toUpperCase();
