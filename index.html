@@ -461,6 +461,7 @@ function gerarCupom() {
   var minimo = document.getElementById('c-minimo').value.trim() || '0';
   var limite = document.getElementById('c-limite').value.trim();
   var cupom = document.getElementById('c-cupom').value.trim();
+  var gatilho = document.getElementById('c-gatilho').value.trim();
   var tipo = isPct ? '%' : ' reais';
   var validade = (isPct && limite)
     ? 'Válido em compras acima de R$ '+minimo+' com limite de R$ '+limite+' de desconto.'
