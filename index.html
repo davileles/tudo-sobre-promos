@@ -145,8 +145,11 @@ textarea.out:focus{outline:none}
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-12')">ML 12%</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-15')">ML 15%</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-18')">ML 18%</button>
-        <button class="preset-btn" onclick="aplicarPreset(this,'SH-30')">Shopee R$30</button>
-        <button class="preset-btn" onclick="aplicarPreset(this,'SH-90')">Shopee R$90</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'SH-30')">SH R$30</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'SH-90')">SH R$90</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'SH-COMBO')">Combo SH</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'AZ-10A')">AZ 10% (R$50)</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'AZ-10B')">AZ 10% (R$100)</button>
       </div>
     </div>
     <div class="g2" style="margin-bottom:12px">
@@ -402,12 +405,17 @@ var PRESETS = {
   'ML-15': { loja:'Mercado Livre', tipo:'pct', valor:'15', minimo:'79', limite:'60' },
   'ML-18': { loja:'Mercado Livre', tipo:'pct', valor:'18', minimo:'79', limite:'60' },
   'SH-30': { loja:'Shopee', tipo:'reais', valor:'30', minimo:'299', limite:'' },
-  'SH-90': { loja:'Shopee', tipo:'reais', valor:'90', minimo:'899', limite:'' }
+  'SH-90': { loja:'Shopee', tipo:'reais', valor:'90', minimo:'899', limite:'' },
+  'SH-COMBO': { _combo: true },
+  'AZ-10A': { loja:'Amazon', tipo:'pct', valor:'10', minimo:'100', limite:'50' },
+  'AZ-10B': { loja:'Amazon', tipo:'pct', valor:'10', minimo:'300', limite:'100' }
 };
+var _activePreset = null;
 function aplicarPreset(btn, key) {
   var p = PRESETS[key]; if (!p) return;
   var isActive = btn.classList.contains('active');
   document.querySelectorAll('#c-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  _activePreset = null;
   if (isActive) {
     document.getElementById('c-loja').value = 'Amazon';
     document.getElementById('c-loja-custom').classList.remove('visible');
@@ -420,6 +428,18 @@ function aplicarPreset(btn, key) {
     toggleLimite(); return;
   }
   btn.classList.add('active');
+  if (p._combo) {
+    _activePreset = 'SH-COMBO';
+    document.getElementById('c-loja').value = 'Shopee';
+    document.getElementById('c-loja-custom').classList.remove('visible');
+    document.getElementById('c-loja-custom').value = '';
+    document.getElementById('c-tipo').value = 'reais';
+    document.getElementById('c-valor').value = '';
+    document.getElementById('c-minimo').value = '';
+    document.getElementById('c-limite').value = '';
+    document.getElementById('c-cupom').value = '';
+    toggleLimite(); return;
+  }
   document.getElementById('c-loja').value = p.loja;
   document.getElementById('c-loja-custom').classList.remove('visible');
   document.getElementById('c-loja-custom').value = '';
@@ -455,13 +475,28 @@ function toggleLimite() {
 }
 
 function gerarCupom() {
+  var gatilho = document.getElementById('c-gatilho').value.trim();
+  var cImportante = document.getElementById('c-importante').value.trim();
+
+  // ── Combo Shopee ──────────────────────────────────────
+  if (_activePreset === 'SH-COMBO') {
+    var msg = '';
+    if (gatilho) msg += '`🚨 '+gatilho+'`\n\n';
+    msg += '*🚨 Cupons Shopee renovados*\n\n';
+    msg += 'Acesse o link abaixo para resgatar os cupons disponíveis.\n\n';
+    if (cImportante) msg += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
+    msg += '🔗 *RESGATE O CUPOM AQUI* '+linksMap['Shopee_sem'];
+    msg += '\n\n`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+    mostrar('c-msg','c-result','c-ok', msg);
+    return;
+  }
+
   var loja = getLoja('c');
   var isPct = document.getElementById('c-tipo').value === 'pct';
   var valor = document.getElementById('c-valor').value.trim() || '0';
   var minimo = document.getElementById('c-minimo').value.trim() || '0';
   var limite = document.getElementById('c-limite').value.trim();
   var cupom = document.getElementById('c-cupom').value.trim();
-  var gatilho = document.getElementById('c-gatilho').value.trim();
   var tipo = isPct ? '%' : ' reais';
   var validade = (isPct && limite)
     ? 'Válido em compras acima de R$ '+minimo+' com limite de R$ '+limite+' de desconto.'
@@ -477,7 +512,6 @@ function gerarCupom() {
     msg += '\n\n⚠️ *IMPORTANTE* Ideal para compras de até R$ '+ideal+'.\n\n';
   } else { msg += '\n\n'; }
   var url = loja==='Amazon' ? linksMap['Amazon'] : loja==='Mercado Livre' ? linksMap['Mercado Livre'] : loja==='Shopee' ? (cupom ? linksMap['Shopee_com'] : linksMap['Shopee_sem']) : '';
-  var cImportante = document.getElementById('c-importante').value.trim();
   if (cImportante) msg += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
   if (url) msg += '🔗 *RESGATE O CUPOM AQUI* '+url;
   else msg = msg.trimEnd();
