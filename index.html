@@ -107,6 +107,17 @@ textarea.out:focus{outline:none}
 .fila-refresh span{font-size:12px;color:var(--muted2)}
 .btn-refresh{background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)}
 .btn-refresh:hover{border-color:var(--accent);color:var(--text)}
+
+/* ── AGENDAMENTO ── */
+.sched-wrap{margin-top:10px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);display:flex;flex-direction:column;gap:6px}
+.sched-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted)}
+.sched-row{display:flex;gap:8px;align-items:center}
+.sched-row input[type="datetime-local"]{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font);font-size:13px;font-weight:500;padding:8px 10px;outline:none;transition:border-color .15s;color-scheme:dark}
+.sched-row input[type="datetime-local"]:focus{border-color:var(--accent)}
+.sched-clear{background:transparent;border:none;color:var(--muted2);font-size:16px;cursor:pointer;padding:4px 6px;border-radius:6px;transition:color .15s}
+.sched-clear:hover{color:#f87171}
+.sched-hint{font-size:11px;color:var(--muted2);line-height:1.4}
+.sched-hint.agendado{color:#facc15;font-weight:600}
 </style>
 </head>
 <body>
@@ -214,7 +225,15 @@ textarea.out:focus{outline:none}
     <textarea class="out" id="c-msg"></textarea>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('c-msg','c-ok')">Copiar para WhatsApp</button>
-      <button class="btn btn-send visible" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input')">⚡ Enviar no WhatsApp</button>
+      <div class="sched-wrap">
+        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">opcional — vazio = envio imediato</span></span>
+        <div class="sched-row">
+          <input type="datetime-local" id="c-sched" oninput="atualizarHintSched('c')"/>
+          <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('c')">✕</button>
+        </div>
+        <span class="sched-hint" id="c-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+      </div>
+      <button class="btn btn-send visible" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input','c-sched')">⚡ Enviar no WhatsApp</button>
       <p class="ok" id="c-ok"></p>
       <p class="send-ok" id="c-send-ok"></p>
     </div>
@@ -301,7 +320,15 @@ textarea.out:focus{outline:none}
     <textarea class="out" id="o-msg"></textarea>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('o-msg','o-ok')">Copiar para WhatsApp</button>
-      <button class="btn btn-send visible" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input')">⚡ Enviar no WhatsApp</button>
+      <div class="sched-wrap">
+        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">opcional — vazio = envio imediato</span></span>
+        <div class="sched-row">
+          <input type="datetime-local" id="o-sched" oninput="atualizarHintSched('o')"/>
+          <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('o')">✕</button>
+        </div>
+        <span class="sched-hint" id="o-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+      </div>
+      <button class="btn btn-send visible" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input','o-sched')">⚡ Enviar no WhatsApp</button>
       <p class="ok" id="o-ok"></p>
       <p class="send-ok" id="o-send-ok"></p>
     </div>
@@ -367,7 +394,15 @@ textarea.out:focus{outline:none}
     <textarea class="out" id="l-msg"></textarea>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('l-msg','l-ok')">Copiar para WhatsApp</button>
-      <button class="btn btn-send visible" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input')">⚡ Enviar no WhatsApp</button>
+      <div class="sched-wrap">
+        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">opcional — vazio = envio imediato</span></span>
+        <div class="sched-row">
+          <input type="datetime-local" id="l-sched" oninput="atualizarHintSched('l')"/>
+          <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('l')">✕</button>
+        </div>
+        <span class="sched-hint" id="l-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+      </div>
+      <button class="btn btn-send visible" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input','l-sched')">⚡ Enviar no WhatsApp</button>
       <p class="ok" id="l-ok"></p>
       <p class="send-ok" id="l-send-ok"></p>
     </div>
@@ -657,26 +692,127 @@ function verificarServidor() {
     });
 }
 
-async function enviarWA(msgId, statusId, imgInputId) {
+// ── AGENDAMENTO HELPERS ───────────────────────────────
+function limparSched(pid) {
+  var el = document.getElementById(pid+'-sched');
+  if (el) { el.value = ''; atualizarHintSched(pid); }
+}
+function atualizarHintSched(pid) {
+  var el = document.getElementById(pid+'-sched');
+  var hint = document.getElementById(pid+'-sched-hint');
+  if (!el || !hint) return;
+  var val = el.value;
+  if (!val) {
+    hint.className = 'sched-hint';
+    hint.textContent = 'Deixe em branco para envio imediato. Horário de Brasília (SP).';
+    return;
+  }
+  // Interpreta o valor do datetime-local como horário de SP
+  // O input retorna "YYYY-MM-DDTHH:mm" sem fuso — vamos tratar como SP
+  var spDate = parseDatetimeAsSP(val);
+  if (!spDate || isNaN(spDate.getTime())) {
+    hint.className = 'sched-hint';
+    hint.textContent = 'Data inválida.';
+    return;
+  }
+  var agora = new Date();
+  if (spDate <= agora) {
+    hint.className = 'sched-hint';
+    hint.textContent = '⚠️ Esse horário já passou — será enviado imediatamente.';
+    return;
+  }
+  var label = spDate.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+  hint.className = 'sched-hint agendado';
+  hint.textContent = '📅 Agendado para ' + label + ' (Horário de Brasília)';
+}
+
+// Converte "YYYY-MM-DDTHH:mm" como se fosse horário de São Paulo → Date UTC
+// Converte "YYYY-MM-DDTHH:mm" do input (horário SP) para um objeto Date UTC correto.
+// Estratégia: usa Intl para saber a hora ATUAL de SP, calcula a diferença com Date.now(),
+// e aplica esse offset ao valor digitado pelo usuário.
+function parseDatetimeAsSP(val) {
+  if (!val) return null;
+  // "val" vem como "YYYY-MM-DDTHH:mm" — sem informação de fuso
+  // Precisamos saber: quando o usuário diz "08:34 SP", qual é o UTC?
+
+  // 1. Pega a hora atual real do browser (UTC ms)
+  var agora = Date.now();
+
+  // 2. Descobre como SP está agora: formata agora em SP e recria como Date
+  var fmt = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  });
+  // sv-SE retorna formato "YYYY-MM-DD HH:mm:ss" — sem ambiguidade
+  var spAgoraStr = fmt.format(new Date(agora)).replace(' ', 'T');
+  // Interpreta essa string como UTC para medir diferença
+  var spAgoraUtcMs = Date.parse(spAgoraStr + 'Z');
+
+  // 3. Offset SP em ms: quanto SP está atrás do UTC
+  //    spAgoraUtcMs é "hora SP lida como UTC" — menor que agora (UTC real)
+  //    Diferença = quanto o UTC está à frente de SP = o offset positivo
+  //    Ex: agora=09:34 UTC, spAgoraStr=06:34 SP → diff = +3h = SP é UTC-3
+  var offsetMs = agora - spAgoraUtcMs; // ex: +10800000 (3h em ms)
+
+  // 4. O usuário digitou val como hora SP. Interpreta val como UTC e soma o offset.
+  var valAsUtcMs = Date.parse(val + ':00Z');
+  if (isNaN(valAsUtcMs)) return null;
+
+  // val como UTC + offset = timestamp UTC real que corresponde a val hora SP
+  return new Date(valAsUtcMs + offsetMs);
+}
+
+
+async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
   var el = document.getElementById(msgId);
   var texto = el.tagName==='TEXTAREA' ? el.value : el.textContent;
   var s = document.getElementById(statusId);
   if (!wsConectado) { s.className='send-ok send-err'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; },4000); return; }
-  s.className='send-ok'; s.textContent='Enviando...';
+
+  // Verificar agendamento
+  var agendarEm = null;
+  if (schedInputId) {
+    var schedEl = document.getElementById(schedInputId);
+    if (schedEl && schedEl.value) {
+      var spDate = parseDatetimeAsSP(schedEl.value);
+      if (!spDate || isNaN(spDate.getTime())) {
+        s.className='send-ok send-err'; s.textContent='Data de agendamento inválida.';
+        setTimeout(function(){ s.textContent=''; },4000); return;
+      }
+      agendarEm = spDate.toISOString();
+    }
+  }
+
+  s.className='send-ok'; s.textContent = agendarEm ? 'Agendando...' : 'Enviando...';
   try {
     var pid = imgInputId ? imgInputId.replace('-img-input','') : null;
     var imgInput = imgInputId ? document.getElementById(imgInputId) : null;
     var file = (imgInput && imgInput.files[0]) ? imgInput.files[0] : (pid && window._pastedFiles && window._pastedFiles[pid]) ? window._pastedFiles[pid] : null;
     var r;
-    if (file) {
+    if (file && !agendarEm) {
+      // Imagem só pode ser enviada imediato (sem agendamento via /enviar-imagem)
       var formData = new FormData(); formData.append('imagem',file); formData.append('legenda',texto); formData.append('grupo','tsp');
       r = await fetch(SERVER+'/enviar-imagem', { method:'POST', body:formData });
     } else {
-      r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mensagem:texto,grupo:'tsp'}) });
+      var payload = { mensagem: texto, grupo: 'tsp' };
+      if (agendarEm) payload.agendarEm = agendarEm;
+      r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     }
     var d = await r.json();
-    if (d.ok) { s.textContent='✓ Enviado no grupo!'; setTimeout(function(){ s.textContent=''; },4000); }
-    else { s.className='send-ok send-err'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; },5000); }
+    if (d.ok) {
+      if (d.agendado) {
+        s.textContent = '📅 Agendado para ' + d.horario + ' (SP)!';
+      } else {
+        s.textContent = '✓ Enviado no grupo!';
+      }
+      setTimeout(function(){ s.textContent=''; },5000);
+    } else { s.className='send-ok send-err'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; },5000); }
   } catch(e) { s.className='send-ok send-err'; s.textContent='Sem resposta do servidor.'; setTimeout(function(){ s.textContent=''; },4000); }
 }
 
