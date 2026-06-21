@@ -53,8 +53,9 @@ header {
 .tab.active { color: var(--orange); border-bottom-color: var(--orange); }
 
 /* ── PAGES ── */
-.page { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; }
+.page { display: none; padding: 20px 32px; width: 100%; box-sizing: border-box; }
 .page.active { display: block; }
+.page > * { box-sizing: border-box; }
 
 /* ── SECTION TITLE ── */
 .section-title {
@@ -65,9 +66,9 @@ header {
 .section-title:first-child { margin-top: 0; }
 
 /* ── GENERIC GRID ── */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 14px; }
-.grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 12px; margin-bottom: 14px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
 
 /* ── CARDS ── */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
@@ -106,7 +107,7 @@ header {
 .smc-val { font-size: 12px; font-weight: 700; }
 
 /* ── CHART CARDS ── */
-.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
 .chart-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--orange); margin-bottom: 14px; }
 .chart-wrap { position: relative; height: 190px; }
 
@@ -124,7 +125,7 @@ header {
 @media (max-width: 640px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .card-main { font-size: 24px; }
-  .page { padding: 14px; }
+  .page { padding: 14px 16px; }
   header { padding: 12px 16px; }
 }
 </style>
@@ -236,10 +237,23 @@ header {
   </div>
 
   <div class="section-title">Comissão diária por plataforma — mês anterior + mês atual</div>
-  <div class="chart-card">
+  <div class="chart-card" style="margin-bottom:14px">
     <div class="chart-label" id="chart-comis-label">Barras empilhadas · R$</div>
     <div class="chart-wrap"><canvas id="chart-comis-diaria"></canvas></div>
   </div>
+
+  <div class="section-title">Evolução mensal — comissão</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Comissão total por mês (R$)</div>
+      <div class="chart-wrap"><canvas id="chart-mes-comis-total"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Comissão por membro por mês (R$)</div>
+      <div class="chart-wrap"><canvas id="chart-mes-comis-cpm"></canvas></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════ ABA TRÁFEGO ═══════════════ -->
@@ -331,6 +345,18 @@ header {
     <div class="chart-label">Evolução de seguidores</div>
     <div class="chart-wrap"><canvas id="chart-seguidores"></canvas></div>
   </div>
+  <div class="section-title">Evolução mensal — tráfego</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Crescimento de membros por mês</div>
+      <div class="chart-wrap"><canvas id="chart-mes-crescimento"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Total de membros no fim de cada mês</div>
+      <div class="chart-wrap"><canvas id="chart-mes-membros-total"></canvas></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -383,7 +409,7 @@ function numVal(s) {
 }
 
 const R  = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-const R4 = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4});
+const R4 = R; // alias — 2 casas decimais
 const N0 = v => Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
 const N1 = v => Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const PCT = v => N1(v) + '%';
@@ -651,6 +677,46 @@ function processAll(comisRaw, trafRows) {
     .reduce((s, r) => s + r.gastoEstrat, 0);
   const gastoTotalMesCalc = gastoAnuncioMesCalc + gastoEstratMesCalc;
 
+  // ── Dados mensais agregados ──
+  const nomeMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const mesesDisponiveis = [...new Set(comisDays.map(d => d.date.getMonth() + '-' + d.date.getFullYear()))]
+    .map(s => { const [m,y] = s.split('-'); return { mes: +m, ano: +y }; })
+    .sort((a,b) => a.ano !== b.ano ? a.ano - b.ano : a.mes - b.mes);
+
+  const monthlyData = mesesDisponiveis.map(({ mes, ano }) => {
+    const isCurrent = mes === curMonth && ano === refDate.getFullYear();
+    const diasMes = comisDays.filter(d => d.date.getMonth() === mes && d.date.getFullYear() === ano);
+    const totalComis = diasMes.reduce((s,d) => s + d.total, 0);
+
+    // CPM mensal = Σ(comissão_dia / membros_dia)
+    let cpmMes = 0;
+    for (const d of diasMes) {
+      const t = trafMap[dateKey(d.date)];
+      if (t && t.membros > 0) cpmMes += d.total / t.membros;
+    }
+
+    // Tráfego do mês
+    const trafMesRows = trafRows.filter(r => r.date.getMonth() === mes && r.date.getFullYear() === ano)
+      .sort((a,b) => a.date - b.date);
+    const gastoAnuncioMes = trafMesRows.reduce((s,r) => s + r.gastoAnuncio, 0);
+    const gastoEstratMes  = trafMesRows.reduce((s,r) => s + r.gastoEstrat,  0);
+    const gastoTotalMes   = gastoAnuncioMes + gastoEstratMes;
+
+    // Membros no fim do mês (último registro do mês)
+    const membrosUltimo = trafMesRows.length ? trafMesRows[trafMesRows.length-1].membros : 0;
+    // Membros no início do mês (primeiro registro)
+    const membrosPrimeiro = trafMesRows.length ? trafMesRows[0].membros : 0;
+    const crescMensal = membrosUltimo - membrosPrimeiro;
+
+    return {
+      label: nomeMes[mes] + (isCurrent ? '*' : ''),
+      totalComis, cpmMes,
+      gastoAnuncioMes, gastoTotalMes,
+      membrosUltimo, crescMensal,
+      isCurrent,
+    };
+  });
+
   return {
     refDate, refDay,
     comissao: {
@@ -683,6 +749,7 @@ function processAll(comisRaw, trafRows) {
       membrosAtual: lastT ? lastT.membros : 0,
     },
     chartDays,
+    monthlyData,
   };
 }
 
@@ -705,10 +772,10 @@ function renderComissao(S) {
   set('c-total-avg', R(C.avgTotal));
   const v2 = pctVar(C.curTotal, C.avgTotal); set('c-total-var2', v2.str, v2.cls);
 
-  document.getElementById('c-cpm-cur').textContent = R4(C.cpmCur);
-  set('c-cpm-prev', R4(C.cpmPrev));
+  document.getElementById('c-cpm-cur').textContent = R(C.cpmCur);
+  set('c-cpm-prev', R(C.cpmPrev));
   const v3 = pctVar(C.cpmCur, C.cpmPrev); set('c-cpm-var', v3.str, v3.cls);
-  set('c-cpm-avg', R4(C.cpmAvg));
+  set('c-cpm-avg', R(C.cpmAvg));
   const v4 = pctVar(C.cpmCur, C.cpmAvg); set('c-cpm-var2', v4.str, v4.cls);
 
   function fillPlat(pfx, cur, prev, avg, cliques) {
@@ -781,9 +848,9 @@ function renderTrafego(S) {
   set('t-cliques-conteudo-dia',N0(H.cliqConteudo));
   set('t-cliques-bio-dia',     N0(H.cliqBio));
 
-  document.getElementById('t-cpc-dia').textContent = T.cpcDia > 0 ? R4(T.cpcDia) : '—';
+  document.getElementById('t-cpc-dia').textContent = T.cpcDia > 0 ? R(T.cpcDia) : '—';
   set('t-cpm-dia',        T.cpmDia  > 0 ? R(T.cpmDia)  : '—');
-  set('t-cpc2-dia',       T.cpc2Dia > 0 ? R4(T.cpc2Dia) : '—');
+  set('t-cpc2-dia',       T.cpc2Dia > 0 ? R(T.cpc2Dia) : '—');
   set('t-gasto-estrat-dia', R(H.gastoEstrat));
 
   // Mês
@@ -799,7 +866,7 @@ function renderTrafego(S) {
   set('t-seg-cresc-dia', (T.segCrescDia >= 0 ? '+' : '') + N0(T.segCrescDia));
   set('t-seg-cresc-mes', (T.segCrescMes >= 0 ? '+' : '') + N0(T.segCrescMes));
 
-  document.getElementById('t-avg-cpc-mes').textContent = T.avgCPCMes > 0 ? R4(T.avgCPCMes) : '—';
+  document.getElementById('t-avg-cpc-mes').textContent = T.avgCPCMes > 0 ? R(T.avgCPCMes) : '—';
   set('t-avg-cpm-mes',    T.avgCPMMes  > 0 ? R(T.avgCPMMes)  : '—');
   set('t-avg-ret-mes',    T.avgRetMes  > 0 ? PCT(T.avgRetMes) : '—');
   set('t-gasto-total-mes', R(T.gastoMesTotal));
@@ -875,7 +942,7 @@ function renderCharts(S) {
     ]},
     options: { responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(4) }}},
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
       scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + v.toFixed(2) }}}
     }
   });
@@ -899,6 +966,129 @@ function renderCharts(S) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false }},
       scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  // ── Gráficos mensais ──
+  const M = S.monthlyData;
+  const mLabels = M.map(r => r.label);
+
+  mk('chart-mes-comis-total', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [{
+      label: 'Comissão total',
+      data: M.map(r => r.totalComis),
+      backgroundColor: M.map(r => r.isCurrent ? '#ffa500cc' : '#ffa50055'),
+      borderColor:     M.map(r => r.isCurrent ? '#ffa500'   : '#ffa50088'),
+      borderWidth: 1,
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + c.raw.toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-comis-cpm', {
+    type: 'line',
+    data: { labels: mLabels, datasets: [{
+      label: 'Comissão/membro',
+      data: M.map(r => r.cpmMes),
+      borderColor: '#60a5fa', backgroundColor: '#60a5fa18',
+      fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#60a5fa',
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + v.toFixed(2) }}}
+    }
+  });
+
+  mk('chart-mes-crescimento', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [{
+      label: 'Novos membros',
+      data: M.map(r => r.crescMensal),
+      backgroundColor: M.map(r => r.isCurrent ? '#c63b00cc' : '#c63b0055'),
+      borderColor:     M.map(r => r.isCurrent ? '#c63b00'   : '#c63b0088'),
+      borderWidth: 1,
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+' + N0(c.raw) + ' membros' }}},
+      scales: { x: { grid: { display: false }}}
+    }
+  });
+
+  mk('chart-mes-membros-total', {
+    type: 'line',
+    data: { labels: mLabels, datasets: [{
+      label: 'Total de membros',
+      data: M.map(r => r.membrosUltimo),
+      borderColor: '#ffa500', backgroundColor: '#ffa50018',
+      fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#ffa500',
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => N0(c.raw) + ' membros' }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-invest-comis', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Comissão total',
+        data: M.map(r => r.totalComis),
+        backgroundColor: '#ffa50066', borderColor: '#ffa500', borderWidth: 1,
+      },
+      {
+        label: 'Gasto anúncio',
+        data: M.map(r => r.gastoAnuncioMes),
+        backgroundColor: '#f87171aa', borderColor: '#f87171', borderWidth: 1,
+      },
+      {
+        label: 'Gasto total (+ estrategista)',
+        data: M.map(r => r.gastoTotalMes),
+        backgroundColor: '#a78bfa44', borderColor: '#a78bfa', borderWidth: 1,
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+
+  // Saldo mensal: crescimento de comissão - investimento
+  mk('chart-mes-saldo', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Saldo vs. anúncio',
+        data: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          return r.totalComis - prevComis - r.gastoAnuncioMes;
+        }),
+        backgroundColor: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          const s = r.totalComis - prevComis - r.gastoAnuncioMes;
+          return s >= 0 ? '#34d39966' : '#f8717166';
+        }),
+        borderColor: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          const s = r.totalComis - prevComis - r.gastoAnuncioMes;
+          return s >= 0 ? '#34d399' : '#f87171';
+        }),
+        borderWidth: 1,
+        label: 'Saldo (crescimento comissão − anúncio)',
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
     }
   });
 }
