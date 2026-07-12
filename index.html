@@ -105,6 +105,10 @@ textarea.out:focus{outline:none}
 .fila-fb{font-size:12px;font-weight:700;margin-top:8px;text-align:center;height:16px}
 .fila-fb.ok{color:#4ade80}
 .fila-fb.err{color:#f87171}
+.fila-img-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;margin-left:auto}
+.fila-img-badge.has{background:#0d2e1a;color:#4ade80}
+.fila-img-badge.none{background:#1e1e1e;color:#555}
+.fila-img-thumb{width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block}
 .fila-refresh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .fila-refresh span{font-size:12px;color:var(--muted2)}
 .btn-refresh{background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)}
@@ -870,16 +874,26 @@ async function carregarFila() {
       var cod = d2.codigo ? ' · '+d2.codigo : '';
       var data = new Date(o.timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       var orig = (o.conteudoOriginal || '').replace(/</g,'&lt;');
+      var imgs = o.imagens || [];
+      var temImg = imgs.length > 0;
+      var imgBadge = temImg
+        ? '<span class="fila-img-badge has">🖼️ Com imagem</span>'
+        : '<span class="fila-img-badge none">📵 Sem imagem</span>';
+      var imgThumb = temImg
+        ? '<div style="padding:0 14px 10px"><img class="fila-img-thumb" src="data:'+imgs[0].mime+';base64,'+imgs[0].imagemBase64+'" alt="imagem da oferta"/></div>'
+        : '';
       var msg = (o.mensagemFormatada || '').replace(/</g,'&lt;');
       return '<div class="fila-card" id="fila-card-'+o.id+'">'
         +'<div class="fila-card-header">'
         +'<span class="fila-id">#'+o.id+'</span>'
         +'<span class="fila-loja">'+loja+' '+valor+tipo+cod+'</span>'
         +'<span class="fila-info">'+data+'</span>'
+        +imgBadge
         +'</div>'
         +'<div class="fila-original"><div class="fila-original-label">Original (Telegram)</div><div class="fila-original-txt">'+orig+'</div></div>'
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
+        +imgThumb
         +'<div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px">'
         +'<div style="display:flex;gap:8px">'
         +'<button class="btn" style="margin-top:0;padding:14px;font-size:14px;font-weight:700;flex:1;border-radius:12px" onclick="aprovarFila('+o.id+')">✓ Aprovar e enviar</button>'
