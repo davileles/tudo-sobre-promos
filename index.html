@@ -880,7 +880,7 @@ async function carregarFila() {
         ? '<span class="fila-img-badge has">🖼️ Com imagem</span>'
         : '<span class="fila-img-badge none">📵 Sem imagem</span>';
       var imgThumb = temImg
-        ? '<div style="padding:0 14px 10px"><img class="fila-img-thumb" src="data:'+imgs[0].mime+';base64,'+imgs[0].imagemBase64+'" alt="imagem da oferta"/></div>'
+        ? '<div style="padding:0 14px 10px;position:relative">'          +'<img class="fila-img-thumb" src="data:'+imgs[0].mime+';base64,'+imgs[0].imagemBase64+'" alt="imagem da oferta"/>'          +'<button onclick="removerImagem('+o.id+')" style="position:absolute;top:6px;right:20px;background:rgba(0,0,0,.7);color:#f87171;border:1px solid #f87171;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.4">🗑 Remover imagem</button>'          +'</div>'
         : '';
       var msg = (o.mensagemFormatada || '').replace(/</g,'&lt;');
       return '<div class="fila-card" id="fila-card-'+o.id+'">'
@@ -941,6 +941,21 @@ async function rejeitarFila(id) {
       setTimeout(carregarFila, 1500);
     }
   } catch(e) { fb.className='fila-fb err'; fb.textContent='Erro.'; }
+}
+
+async function removerImagem(id) {
+  var fb = document.getElementById('fila-fb-'+id);
+  fb.className = 'fila-fb'; fb.textContent = 'Removendo imagem...';
+  try {
+    var r = await fetch(SERVER+'/painel/remover-imagem/'+id, { method:'POST' });
+    var d = await r.json();
+    if (d.ok) {
+      fb.className = 'fila-fb ok'; fb.textContent = '✓ Imagem removida';
+      setTimeout(carregarFila, 800);
+    } else {
+      fb.className = 'fila-fb err'; fb.textContent = 'Erro: '+(d.erro||'falha');
+    }
+  } catch(e) { fb.className='fila-fb err'; fb.textContent='Sem resposta do servidor.'; }
 }
 
 // ── BADGE (apenas cupom_tsp pendentes) ───────────────
