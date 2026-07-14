@@ -363,6 +363,12 @@ header {
     <div class="chart-label">Evolução de seguidores</div>
     <div class="chart-wrap"><canvas id="chart-seguidores"></canvas></div>
   </div>
+  <div class="section-title">Investimento diário — últimos 60 dias</div>
+  <div class="chart-card">
+    <div class="chart-label">Gasto em anúncio por dia (R$)</div>
+    <div class="chart-wrap"><canvas id="chart-gasto-diario"></canvas></div>
+  </div>
+
   <div class="section-title">Evolução mensal — tráfego</div>
   <div class="grid-2">
     <div class="chart-card">
@@ -771,6 +777,15 @@ function processAll(comisRaw, trafRows) {
     },
     chartDays,
     monthlyData,
+    trafChartMap: Object.fromEntries(
+      chartDays.map(r => {
+        const parts = r.label.split('/');
+        const d = new Date(refDate.getFullYear(), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+        const k = dateKey(d);
+        const t = trafMap[k] || {};
+        return [r.label, { gastoAnuncio: t.gastoAnuncio||0, gastoEstrat: t.gastoEstrat||0 }];
+      })
+    ),
   };
 }
 
@@ -987,6 +1002,46 @@ function renderCharts(S) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false }},
       scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  // ── Gráfico de investimento diário ──
+  mk('chart-gasto-diario', {
+    type: 'bar',
+    data: { labels, datasets: [
+      {
+        label: 'Anúncio',
+        data: D.map(r => {
+          const t = S.trafChartMap ? S.trafChartMap[r.label] : null;
+          return t ? t.gastoAnuncio : null;
+        }),
+        backgroundColor: '#f97316aa',
+        borderColor: '#f97316',
+        borderWidth: 1,
+        spanGaps: false,
+      },
+      {
+        label: 'Estrategista',
+        data: D.map(r => {
+          const t = S.trafChartMap ? S.trafChartMap[r.label] : null;
+          return t ? t.gastoEstrat : null;
+        }),
+        backgroundColor: '#a78bfa88',
+        borderColor: '#a78bfa',
+        borderWidth: 1,
+        spanGaps: false,
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#ccc', font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => 'R$' + N0(v) } }
+      }
     }
   });
 
