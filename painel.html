@@ -380,6 +380,10 @@ header {
       <div class="chart-wrap"><canvas id="chart-mes-membros-total"></canvas></div>
     </div>
   </div>
+  <div class="chart-card">
+    <div class="chart-label">Gasto em tráfego por mês (R$)</div>
+    <div class="chart-wrap"><canvas id="chart-mes-gasto-trafego"></canvas></div>
+  </div>
 
 </div>
 
@@ -1183,6 +1187,44 @@ function renderCharts(S) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => N0(c.raw) + ' membros' }}},
       scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-gasto-trafego', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Anúncio',
+        data: M.map(r => r.gastoAnuncioMes),
+        backgroundColor: M.map(r => r.isCurrent ? '#f97316cc' : '#f9731655'),
+        borderColor:     M.map(r => r.isCurrent ? '#f97316'   : '#f9731688'),
+        borderWidth: 1,
+        stack: 's',
+      },
+      {
+        label: 'Estrategista',
+        data: M.map(r => r.gastoTotalMes - r.gastoAnuncioMes),
+        backgroundColor: M.map(r => r.isCurrent ? '#a78bfacc' : '#a78bfa55'),
+        borderColor:     M.map(r => r.isCurrent ? '#a78bfa'   : '#a78bfa88'),
+        borderWidth: 1,
+        stack: 's',
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#ccc', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: c => ' R$ ' + (c.raw||0).toFixed(2),
+            footer: items => {
+              const total = items.reduce((s, it) => s + (it.raw||0), 0);
+              return 'Total: R$ ' + total.toFixed(2);
+            },
+          },
+        },
+      },
+      scales: { x: { stacked: true, grid: { display: false }}, y: { stacked: true, ticks: { callback: v => 'R$' + N0(v) }}}
     }
   });
 
