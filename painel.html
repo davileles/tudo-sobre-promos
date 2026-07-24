@@ -129,9 +129,52 @@ header {
   .page { padding: 14px 16px; }
   header { padding: 12px 16px; }
 }
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;display:flex;flex-direction:column}
+.login-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+.login-title span{color:var(--orange)}
+.login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:26px}
+.login-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.login-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:10px;font-size:14px;font-family:'Montserrat',sans-serif;outline:none;transition:border-color .2s;margin-bottom:14px}
+.login-input:focus{border-color:var(--orange)}
+.login-input.codigo{text-align:center;letter-spacing:10px;font-size:20px;font-weight:800}
+.login-btn{width:100%;background:var(--orange);border:none;color:#111;padding:12px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;transition:opacity .2s;margin-bottom:10px}
+.login-btn:hover{opacity:.85}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-link{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:'Montserrat',sans-serif;text-decoration:underline}
+.login-msg{font-size:12px;font-weight:700;text-align:center;min-height:18px;margin-bottom:6px}
+.login-msg.err{color:var(--red)}
+.login-msg.ok{color:var(--green)}
+#app-content{display:none}
 </style>
 </head>
 <body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title"><span>Tudo Sobre Promos</span></div>
+    <div class="login-sub">Painel de Resultados &middot; acesso restrito</div>
+
+    <div id="etapa-email">
+      <div class="login-label">E-mail</div>
+      <input class="login-input" id="login-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+      <div class="login-msg" id="login-msg"></div>
+      <button class="login-btn" id="login-btn" onclick="enviarCodigo()">Enviar código</button>
+    </div>
+
+    <div id="etapa-codigo" style="display:none">
+      <div class="login-label">Código enviado por e-mail</div>
+      <input class="login-input codigo" id="login-codigo" type="text" inputmode="numeric" maxlength="6" placeholder="000000"/>
+      <div class="login-msg" id="login-msg2"></div>
+      <button class="login-btn" id="login-btn2" onclick="validarCodigo()">Entrar</button>
+      <button class="login-link" onclick="voltarEmail()">Usar outro e-mail</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-content">
 
 <div id="loading-overlay">
   <div class="spinner"></div>
@@ -1401,7 +1444,87 @@ async function loadAll() {
   document.getElementById('loading-overlay').classList.add('hidden');
 }
 
-loadAll();
+// ── LOGIN (OTP por e-mail via proxy CDV) ─────────────────────────────────────
+const AUTH_PROXY = 'https://cdv-proxy-production.up.railway.app';
+const AUTH_KEY   = 'tsp_auth';
+const AUTH_TTL   = 24 * 60 * 60 * 1000; // 24h
+let _authEmail = '';
+
+function _msg(id, texto, tipo){ var el=document.getElementById(id); el.textContent=texto||''; el.className='login-msg '+(tipo||''); }
+
+function lerSessao(){
+  try{
+    var s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    if(!s || !s.ts) return null;
+    if(Date.now() - s.ts > AUTH_TTL){ localStorage.removeItem(AUTH_KEY); return null; }
+    return s;
+  }catch(e){ return null; }
+}
+
+function abrirPainel(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display  = 'block';
+  loadAll();
+}
+
+async function enviarCodigo(){
+  var email = document.getElementById('login-email').value.trim().toLowerCase();
+  var btn   = document.getElementById('login-btn');
+  if(!email || email.indexOf('@') < 0){ _msg('login-msg','Digite um e-mail válido.','err'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    var r = await fetch(AUTH_PROXY + '/admin/enviar-codigo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email, app: 'tsp' })
+    });
+    var d = await r.json();
+    if(d.ok){
+      _authEmail = email;
+      document.getElementById('etapa-email').style.display  = 'none';
+      document.getElementById('etapa-codigo').style.display = 'block';
+      _msg('login-msg2', d.dev ? 'Modo dev: código no log do servidor.' : 'Código enviado para ' + email, 'ok');
+      document.getElementById('login-codigo').focus();
+    } else {
+      _msg('login-msg', d.motivo === 'nao_autorizado' ? 'E-mail sem autorização de acesso.' : 'Não foi possível enviar o código.', 'err');
+    }
+  }catch(e){ _msg('login-msg','Erro de conexão. Tente novamente.','err'); }
+  btn.disabled = false; btn.textContent = 'Enviar código';
+}
+
+async function validarCodigo(){
+  var codigo = document.getElementById('login-codigo').value.trim();
+  var btn    = document.getElementById('login-btn2');
+  if(codigo.length < 6){ _msg('login-msg2','Digite os 6 dígitos.','err'); return; }
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  try{
+    var r = await fetch(AUTH_PROXY + '/admin/verificar-codigo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: _authEmail, codigo: codigo })
+    });
+    var d = await r.json();
+    if(d.ok){
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: d.email, ts: Date.now() }));
+      abrirPainel();
+      return;
+    }
+    var msgs = { expirado:'Código expirado. Solicite outro.', invalido:'Código incorreto.', nao_encontrado:'Solicite um novo código.', nao_autorizado:'E-mail sem autorização de acesso.' };
+    _msg('login-msg2', msgs[d.motivo] || 'Não foi possível validar.', 'err');
+  }catch(e){ _msg('login-msg2','Erro de conexão. Tente novamente.','err'); }
+  btn.disabled = false; btn.textContent = 'Entrar';
+}
+
+function voltarEmail(){
+  document.getElementById('etapa-codigo').style.display = 'none';
+  document.getElementById('etapa-email').style.display  = 'block';
+  document.getElementById('login-codigo').value = '';
+  _msg('login-msg',''); _msg('login-msg2','');
+}
+
+document.getElementById('login-email').addEventListener('keydown', function(e){ if(e.key==='Enter') enviarCodigo(); });
+document.getElementById('login-codigo').addEventListener('keydown', function(e){ if(e.key==='Enter') validarCodigo(); });
+
+if(lerSessao()) abrirPainel();
 </script>
+</div><!-- /app-content -->
 </body>
 </html>
