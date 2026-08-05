@@ -87,6 +87,11 @@ textarea.out:focus{outline:none}
 
 /* ── FILA ── */
 .fila-vazia{text-align:center;color:var(--muted2);padding:48px 0;font-size:14px}
+.fila-auto{display:flex;align-items:flex-start;gap:8px;margin:0 14px 10px;padding:9px 11px;border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.45}
+.fila-auto.sim{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);color:#4ade80}
+.fila-auto.nao{background:rgba(255,255,255,.03);border:1px solid var(--border2);color:var(--muted)}
+.fila-auto.enviado{background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);color:var(--accent)}
+.fila-auto small{display:block;font-weight:500;color:var(--muted2);margin-top:2px}
 .fila-loading{text-align:center;color:var(--muted);padding:32px 0;font-size:13px}
 .fila-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
 .fila-card-header{display:flex;align-items:center;gap:8px;padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -896,6 +901,26 @@ async function carregarFila() {
         ? '<div style="padding:0 14px 10px;position:relative">'          +'<img class="fila-img-thumb" src="data:'+imgs[0].mime+';base64,'+imgs[0].imagemBase64+'" alt="imagem da oferta"/>'          +'<button onclick="removerImagem('+o.id+')" style="position:absolute;top:6px;right:20px;background:rgba(0,0,0,.7);color:#f87171;border:1px solid #f87171;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.4">🗑 Remover imagem</button>'          +'</div>'
         : '';
       var msg = (o.mensagemFormatada || '').replace(/</g,'&lt;');
+
+      // Selo do gate de auto-envio
+      var av = o.autoAvaliacao;
+      var autoSelo = '';
+      if (av) {
+        var motivo = (av.motivo || '').replace(/</g,'&lt;');
+        if (av.auto && av.modo === 'sombra') {
+          autoSelo = '<div class="fila-auto sim">🤖 <div><b>Enviaria automaticamente</b>'
+            +'<small>Modo sombra ativo — nada foi enviado. Se você aprovar este cupom, o gate acertou.</small></div></div>';
+        } else if (av.auto) {
+          autoSelo = '<div class="fila-auto sim">🤖 <div><b>Elegível para auto-envio</b><small>'+motivo+'</small></div></div>';
+        } else {
+          autoSelo = '<div class="fila-auto nao">🔒 <div><b>Não seria enviado automaticamente</b>'
+            +'<small>Motivo: '+motivo+'</small></div></div>';
+        }
+      } else {
+        autoSelo = '<div class="fila-auto nao">🔒 <div><b>Sem avaliação de auto-envio</b>'
+          +'<small>Capturado antes do gate entrar no ar.</small></div></div>';
+      }
+
       return '<div class="fila-card" id="fila-card-'+o.id+'">'
         +'<div class="fila-card-header">'
         +'<span class="fila-id">#'+o.id+'</span>'
@@ -903,6 +928,7 @@ async function carregarFila() {
         +'<span class="fila-info">'+data+'</span>'
         +imgBadge
         +'</div>'
+        +autoSelo
         +'<div class="fila-original"><div class="fila-original-label">Original (Telegram)</div><div class="fila-original-txt">'+orig+'</div></div>'
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
