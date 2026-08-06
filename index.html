@@ -907,7 +907,10 @@ async function carregarFila() {
       var autoSelo = '';
       if (av) {
         var motivo = (av.motivo || '').replace(/</g,'&lt;');
-        if (av.auto && av.modo === 'sombra') {
+        if (o.autoAgendado) {
+          autoSelo = '<div class="fila-auto enviado">⏳ <div><b>Aguardando auto-envio</b>'
+            +'<small>Aprovado pelo gate — bloqueado só por hor\u00e1rio/rajada ('+motivo+'). Ser\u00e1 enviado automaticamente; aprovar manualmente envia agora.</small></div></div>';
+        } else if (av.auto && av.modo === 'sombra') {
           autoSelo = '<div class="fila-auto sim">🤖 <div><b>Enviaria automaticamente</b>'
             +'<small>Modo sombra ativo — nada foi enviado. Se você aprovar este cupom, o gate acertou.</small></div></div>';
         } else if (av.auto) {
