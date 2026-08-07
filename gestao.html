@@ -92,6 +92,8 @@
   .fila-origem{font-size:10px;font-weight:700;color:var(--muted);background:var(--card);
     border:1px solid var(--border);border-radius:5px;padding:2px 7px;white-space:nowrap;
     max-width:210px;overflow:hidden;text-overflow:ellipsis}
+  .fila-ref{margin:0 16px 10px;padding:8px 11px;border-radius:9px;font-size:11.5px;font-weight:600;line-height:1.45;
+    background:rgba(240,160,60,.10);border:1px solid rgba(240,160,60,.34);color:var(--text)}
   .fila-cupom{display:flex;align-items:center;gap:8px;margin:0 16px 10px;padding:8px 11px;border-radius:9px;
     background:rgba(255,165,0,.10);border:1px solid rgba(255,165,0,.32);font-size:11.5px;font-weight:700;color:var(--text)}
   .fila-cupom b{font-family:ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.3px}
@@ -1866,7 +1868,7 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
 }
 
 /* ══════ FILA ══════ */
-var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee'];
+var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee','oferta_magalu'];
 // Nomes de grupo vêm do servidor (nunca de storage local) só para exibição.
 var NOMES_GRUPOS_CACHE = {};
 function carregarNomesGrupos(){
@@ -1875,12 +1877,21 @@ function carregarNomesGrupos(){
     .then(function(d){ NOMES_GRUPOS_CACHE = d.nomes || {}; })
     .catch(function(){});
 }
-var MK_TIPO = { oferta_amazon:'mk-amazon', oferta_ml:'mk-ml', oferta_shopee:'mk-shopee' };
+var MK_TIPO = { oferta_amazon:'mk-amazon', oferta_ml:'mk-ml', oferta_shopee:'mk-shopee', oferta_magalu:'mk-magalu' };
 
 function ehTSP(o){ return TIPOS_TSP.indexOf(o.tipoConteudo) !== -1; }
 
 // Deixa explicito que o preco da mensagem ja saiu com o cupom aplicado, e sobre
 // qual valor. Sem isso o operador nao tem como conferir a conta antes de enviar.
+// Magalu nao tem API: o preco vem do texto do grupo. Sem este aviso o operador
+// aprovaria achando que o valor foi conferido, como nas outras lojas.
+function seloReferencia(o) {
+  var d = o.dadosExtraidos || {};
+  if (!d.precoDeReferencia) return '';
+  return '<div class="fila-ref">⚠️ Preço vindo do texto do grupo — a Magalu não tem API para conferir. '
+       + 'Confira no link antes de aprovar.</div>';
+}
+
 function seloCupom(o) {
   var d = o.dadosExtraidos || {};
   if (!d.cupom || !d.cupom.codigo) return '';
@@ -1988,6 +1999,7 @@ async function carregarFila() {
         +'</div>'
         +autoSelo
         +(orig ? '<div class="fila-original"><div class="fila-original-label">Conteúdo original</div><div class="fila-original-txt">'+orig+'</div></div>' : '')
+        +seloReferencia(o)
         +seloCupom(o)
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
