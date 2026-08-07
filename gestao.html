@@ -89,36 +89,40 @@
   .sep{height:1px;background:var(--border);margin:16px 0}
 
   /* ══ BASE DE CUPONS ══ */
-  .cup{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;transition:opacity .15s}
+  .fila-cupom{display:flex;align-items:center;gap:8px;margin:0 16px 10px;padding:8px 11px;border-radius:9px;
+    background:rgba(255,165,0,.10);border:1px solid rgba(255,165,0,.32);font-size:11.5px;font-weight:700;color:var(--text)}
+  .fila-cupom b{font-family:ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.3px}
+  .fila-cupom small{font-weight:600;color:var(--muted);display:block;margin-top:2px}
+
+  .cup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .cup{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px 9px;position:relative;overflow:hidden;transition:opacity .15s;display:flex;flex-direction:column;gap:5px;min-width:0}
   .cup::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--outra)}
   .cup.mk-amazon::before{background:var(--amazon)}
   .cup.mk-ml::before{background:var(--ml)}
   .cup.mk-shopee::before{background:var(--shopee)}
   .cup.mk-magalu::before{background:var(--magalu)}
-  .cup.off{opacity:.42}
-  .cup-info{flex:1;min-width:0}
-  .cup-cod{font-size:13.5px;font-weight:800;letter-spacing:.4px;font-family:ui-monospace,'SF Mono',Menlo,monospace}
-  .cup-loja{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
-  .cup-regra{font-size:11.5px;color:var(--muted);margin-top:4px}
-  .cup-val{font-size:16px;font-weight:800;color:var(--accent);white-space:nowrap}
-  .cup-venc{font-size:10px;font-weight:700;margin-top:3px;white-space:nowrap}
-  .cup-venc.ok{color:var(--muted)}
+  .cup.off{opacity:.4}
+  .cup-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .cup-cod{font-size:12px;font-weight:800;letter-spacing:.3px;font-family:ui-monospace,'SF Mono',Menlo,monospace;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;line-height:1.5}
+  .cup-val{font-size:15px;font-weight:800;color:var(--accent);line-height:1;white-space:nowrap}
+  .cup-regra{font-size:10.5px;color:var(--muted);line-height:1.4}
+  .cup-bot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:1px}
+  .cup-venc{font-size:9.5px;font-weight:700;white-space:nowrap}
+  .cup-venc.ok{color:var(--muted2)}
   .cup-venc.perto{color:#f0a03c}
   .cup-venc.morto{color:#e5534b}
-  .cup-acoes{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
-  .sw{position:relative;width:40px;height:22px;border-radius:11px;background:var(--border-ctrl);border:none;cursor:pointer;transition:background .18s;flex-shrink:0;padding:0}
-  .sw::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s}
+  .sw{position:relative;width:34px;height:19px;border-radius:10px;background:var(--border-ctrl);border:none;cursor:pointer;transition:background .18s;flex-shrink:0;padding:0}
+  .sw::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .18s}
   .sw.on{background:var(--accent)}
-  .sw.on::after{transform:translateX(18px)}
-  .cup-del{background:transparent;border:none;color:var(--muted2);font-size:14px;cursor:pointer;padding:2px 4px;line-height:1}
+  .sw.on::after{transform:translateX(15px)}
+  .cup-del{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-del:hover{color:#e5534b}
-  .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px}
+  .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:18px 0 8px}
   .cup-grupo:first-child{margin-top:0}
   .cup-vazio{text-align:center;color:var(--muted);font-size:12.5px;padding:36px 12px}
-  @media(max-width:600px){
-    .cup{flex-wrap:wrap;gap:10px}
-    .cup-info{flex-basis:100%}
-  }
+  @media(max-width:1000px){ .cup-grid{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:620px){ .cup-grid{grid-template-columns:1fr} }
 
   /* ══ FORM ══ */
   .field{display:flex;flex-direction:column}
@@ -722,7 +726,8 @@ function renderCupons() {
 
   el.innerHTML = Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(loja){
     var lista = lojas[loja].sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
-    return '<div class="cup-grupo">' + esc(loja) + ' · ' + lista.length + '</div>' + lista.map(cardCupom).join('');
+    return '<div class="cup-grupo">' + esc(loja) + ' · ' + lista.length + '</div>'
+         + '<div class="cup-grid">' + lista.map(cardCupom).join('') + '</div>';
   }).join('');
 }
 
@@ -733,20 +738,20 @@ function cardCupom(c) {
   var val = c.tipo === 'pct' ? fmtBRL(c.valor) + '%' : 'R$ ' + fmtBRL(c.valor);
   var ch  = esc(c.chave);
 
+  // Codigo pode estourar a largura da coluna: o title garante a leitura completa.
   return '<div class="cup ' + mk + (on ? '' : ' off') + '" id="cup-' + ch + '">'
-    + '<div class="cup-info">'
-      + '<div class="cup-loja">' + esc(c.loja) + '</div>'
-      + '<div class="cup-cod">' + esc(c.codigo) + '</div>'
-      + '<div class="cup-regra">' + esc(regraCupom(c)) + '</div>'
-    + '</div>'
-    + '<div style="text-align:right">'
+    + '<div class="cup-top">'
+      + '<div class="cup-cod" title="' + esc(c.codigo) + '">' + esc(c.codigo) + '</div>'
       + '<div class="cup-val">' + val + '</div>'
-      + '<div class="cup-venc ' + v.cls + '">' + v.txt + '</div>'
     + '</div>'
-    + '<div class="cup-acoes">'
-      + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)" '
-      + 'title="' + (on ? 'Desativar' : 'Ativar') + '"></button>'
-      + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
+    + '<div class="cup-regra">' + esc(regraCupom(c)) + '</div>'
+    + '<div class="cup-bot">'
+      + '<span class="cup-venc ' + v.cls + '">' + v.txt + '</span>'
+      + '<span style="display:flex;align-items:center;gap:4px">'
+        + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
+        + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)" '
+        + 'title="' + (on ? 'Desativar' : 'Ativar') + '"></button>'
+      + '</span>'
     + '</div>'
   + '</div>';
 }
@@ -1167,6 +1172,19 @@ var MK_TIPO = { oferta_amazon:'mk-amazon', oferta_ml:'mk-ml', oferta_shopee:'mk-
 
 function ehTSP(o){ return TIPOS_TSP.indexOf(o.tipoConteudo) !== -1; }
 
+// Deixa explicito que o preco da mensagem ja saiu com o cupom aplicado, e sobre
+// qual valor. Sem isso o operador nao tem como conferir a conta antes de enviar.
+function seloCupom(o) {
+  var d = o.dadosExtraidos || {};
+  if (!d.cupom || !d.cupom.codigo) return '';
+  var cheio = d.preco, fim = d.precoFinal;
+  var detalhe = (cheio != null && fim != null)
+    ? 'R$ ' + fmtBRL(cheio) + ' → R$ ' + fmtBRL(fim) + ' (−R$ ' + fmtBRL(d.cupom.desconto) + ')'
+    : 'desconto de R$ ' + fmtBRL(d.cupom.desconto);
+  return '<div class="fila-cupom">🎫 <div>Cupom <b>' + esc(d.cupom.codigo) + '</b> aplicado'
+       + '<small>' + detalhe + '</small></div></div>';
+}
+
 async function carregarFila() {
   var lista = document.getElementById('fila-lista');
   var status = document.getElementById('fila-status');
@@ -1251,6 +1269,7 @@ async function carregarFila() {
         +'</div>'
         +autoSelo
         +(orig ? '<div class="fila-original"><div class="fila-original-label">Conteúdo original</div><div class="fila-original-txt">'+orig+'</div></div>' : '')
+        +seloCupom(o)
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
         +imgThumb
