@@ -291,6 +291,20 @@
   .mon-loja.on{color:var(--text);border-color:var(--accent)}
   .mon-aviso{font-size:11px;color:#e5534b;margin-top:9px;font-weight:600}
 
+  .sel-grupos{align-items:start}
+  .sel-box{position:relative}
+  .sug{position:absolute;top:100%;left:0;right:0;z-index:120;background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:270px;overflow-y:auto;
+    box-shadow:0 8px 24px rgba(0,0,0,.35);display:none}
+  .sug.open{display:block}
+  .sug-item{padding:9px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sug-item:last-child{border-bottom:none}
+  .sug-item:hover{background:var(--card);color:var(--accent)}
+  .sug-item .ja{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--muted2);margin-left:6px;border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+  .sug-vazio{padding:11px 12px;font-size:12px;color:var(--muted2);font-style:italic}
+
   .grp-resumo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   @media(max-width:700px){ .grp-resumo{grid-template-columns:1fr} }
   .grp-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
@@ -665,10 +679,32 @@
 <div class="panel" id="panel-grupos">
   <div class="aviso">
     <b>Fonte</b> é de onde as ofertas são lidas. <b>Destino</b> é para onde elas vão depois de aprovadas.
-    A lista vem direto da sessão do WhatsApp — não é preciso copiar ID de grupo.
+    Busque pelo nome nos campos abaixo — a lista vem da sessão do WhatsApp, sem precisar copiar ID de grupo.
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
+  <div class="sec-label">🎯 Seleção de grupos</div>
+  <div class="g2 sel-grupos">
+    <div class="field sel-box">
+      <label>Adicionar grupo FONTE <span class="tag">de onde as ofertas vêm</span></label>
+      <input type="text" id="add-fonte" autocomplete="off" placeholder="Digite parte do nome do grupo…"
+             oninput="sugerirGrupos('fonte')" onfocus="sugerirGrupos('fonte')"/>
+      <div class="sug" id="sug-fonte"></div>
+    </div>
+    <div class="field sel-box">
+      <label>Adicionar grupo DESTINO <span class="tag">para onde as ofertas vão</span></label>
+      <input type="text" id="add-destino" autocomplete="off" placeholder="Digite parte do nome do grupo…"
+             oninput="sugerirGrupos('destino')" onfocus="sugerirGrupos('destino')"/>
+      <div class="sug" id="sug-destino"></div>
+    </div>
+  </div>
+
+  <div class="sec-label" style="margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>Grupos selecionados</span>
+    <span style="font-weight:600;text-transform:none;letter-spacing:0" id="grupos-total"></span>
+  </div>
   <div class="grp-resumo" id="grp-resumo"></div>
+  <div id="grupos-lista" style="display:none"></div>
+
   <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
     <span>⏱️ Monitoramento dos grupos fonte</span>
     <span style="font-weight:600;text-transform:none;letter-spacing:0" id="mon-agora"></span>
@@ -733,14 +769,6 @@
   </div>
   <p class="send-ok" id="vit-ok"></p>
   <div id="vit-resultado"></div>
-
-  <div class="sep"></div>
-  <div class="sec-label">👥 Grupos do WhatsApp</div>
-  <div class="busca-row">
-    <input type="text" id="busca-grupo" placeholder="Buscar grupo pelo nome" oninput="renderGrupos()"/>
-    <button class="btn btn-copy btn-sm" onclick="carregarGrupos()">↻ Recarregar</button>
-  </div>
-  <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 
 </div>
 
@@ -2101,19 +2129,18 @@ async function salvarPapeis() {
   }
 }
 
-async function carregarGrupos() {
-  var el = document.getElementById('grupos-lista');
-  el.innerHTML = '<div class="fila-loading"><div class="spinner"></div></div>';
+async function carregarGrupos(forcar) {
   await carregarPapeis();
   try {
-    var r = await fetch(SERVER+'/grupos', { signal: AbortSignal.timeout(20000) });
+    var r = await fetch(SERVER+'/grupos' + (forcar ? '?refresh=1' : ''), { signal: AbortSignal.timeout(30000) });
     var d = await r.json();
     if (!d.ok) throw new Error(d.erro || 'falha');
     GRUPOS_CACHE = d.grupos || [];
     renderGrupos();
   } catch(e) {
-    el.innerHTML = '<div class="fila-vazia">Não deu para listar os grupos.<br/>'
-      + 'Verifique se o WhatsApp está conectado e tente recarregar.</div>';
+    var av = document.getElementById('grupos-persist');
+    av.style.display = 'block';
+    av.innerHTML = '<b>Não deu para listar os grupos.</b> Verifique se o WhatsApp está conectado e recarregue.';
   }
 }
 
@@ -2141,39 +2168,72 @@ function renderResumoGrupos() {
     + caixa('destino', '📤 Destinos — para onde são enviadas', 'Sem destino: as ofertas caem no grupo TSP padrão.');
 }
 
+// A lista completa de ~400 grupos nao e mais renderizada: era o que travava a
+// aba. A selecao passa a ser por busca, e so os grupos escolhidos aparecem.
 function renderGrupos() {
-  var el = document.getElementById('grupos-lista');
-  var busca = (document.getElementById('busca-grupo').value || '').toLowerCase();
-  var lista = GRUPOS_CACHE.filter(function(g){ return (g.nome||'').toLowerCase().indexOf(busca) !== -1; });
-  if (!lista.length) { renderResumoGrupos(); el.innerHTML = '<div class="fila-vazia">Nenhum grupo com esse nome.</div>'; return; }
-
   var nFonte = 0, nDest = 0;
   GRUPOS_CACHE.forEach(function(g){
     if (PAPEIS[g.id] === 'fonte') nFonte++;
     if (PAPEIS[g.id] === 'destino') nDest++;
   });
-
+  var tot = document.getElementById('grupos-total');
+  if (tot) tot.textContent = nFonte + ' fonte · ' + nDest + ' destino · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
   renderResumoGrupos();
   renderMonitor();
-
-  el.innerHTML = '<div class="sec-label">'+nFonte+' fonte · '+nDest+' destino · '+GRUPOS_CACHE.length+' no total</div>'
-    + lista.map(function(g) {
-    var papel = PAPEIS[g.id] || 'off';
-    var cls = papel === 'fonte' ? 'is-fonte' : papel === 'destino' ? 'is-destino' : '';
-    var nome = (g.nome || '(sem nome)').replace(/</g,'&lt;');
-    return '<div class="grp '+cls+'">'
-      +'<div class="grp-info">'
-      +'<div class="grp-nome">'+nome+'</div>'
-      +'<div class="grp-meta">'+g.id+'</div>'
-      +'</div>'
-      +'<div class="grp-papeis">'
-      +['fonte','destino','off'].map(function(p){
-        return '<button data-p="'+p+'" class="'+(papel===p?'on':'')+'" onclick="definirPapel(\''+g.id+'\',\''+p+'\')">'
-          +(p==='off'?'ignorar':p)+'</button>';
-      }).join('')
-      +'</div></div>';
-  }).join('');
 }
+
+// Autocomplete: filtra em memoria, limita a 12 para a lista nao virar a mesma
+// parede de antes, e marca o que ja tem papel.
+function sugerirGrupos(papel) {
+  var input = document.getElementById('add-' + papel);
+  var caixa = document.getElementById('sug-' + papel);
+  var termo = (input.value || '').trim().toLowerCase();
+
+  if (!GRUPOS_CACHE.length) {
+    caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
+    caixa.classList.add('open');
+    return;
+  }
+  var lista = GRUPOS_CACHE
+    .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
+    .filter(function(g){ return PAPEIS[g.id] !== papel; })
+    .slice(0, 12);
+
+  if (!lista.length) {
+    caixa.innerHTML = '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
+  } else {
+    caixa.innerHTML = lista.map(function(g){
+      var outro = PAPEIS[g.id] && PAPEIS[g.id] !== papel
+        ? '<span class="ja">hoje ' + esc(PAPEIS[g.id]) + '</span>' : '';
+      return '<div class="sug-item" data-jid="' + esc(g.id) + '" data-papel="' + esc(papel) + '" '
+        + 'onclick="escolherGrupo(this)" title="' + esc(g.nome) + '">' + esc(g.nome) + outro + '</div>';
+    }).join('');
+  }
+  caixa.classList.add('open');
+}
+
+function fecharSugestoes(){
+  ['fonte','destino'].forEach(function(p){
+    var c = document.getElementById('sug-' + p); if (c) c.classList.remove('open');
+  });
+}
+
+function escolherGrupo(el){
+  var jid = el.dataset.jid, papel = el.dataset.papel;
+  var atual = PAPEIS[jid];
+  if (atual && atual !== papel) {
+    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+    if (!confirm('"' + (g ? g.nome : jid) + '" já é ' + atual + '. Mudar para ' + papel + '?')) return;
+  }
+  definirPapel(jid, papel);
+  document.getElementById('add-' + papel).value = '';
+  fecharSugestoes();
+}
+
+// Clique fora fecha as sugestoes sem interferir na escolha.
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.sel-box')) fecharSugestoes();
+});
 
 function definirPapel(jid, papel) {
   if (papel === 'off') delete PAPEIS[jid];
