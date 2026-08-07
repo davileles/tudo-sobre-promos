@@ -661,12 +661,16 @@
         <select id="vit-cupom-novo"></select>
       </div>
       <div class="field" style="justify-content:flex-end">
-        <button class="btn" style="margin-top:0" onclick="cadastrarVitrine()">➕ Cadastrar na vitrine</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(false)">➕ Cadastrar na vitrine</button>
+          <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(true)">🚀 Cadastrar e disparar</button>
+        </div>
       </div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       Aceita <code>link</code> ou <code>Nome que eu quero | link</code>. Sem nome, ele é lido do próprio endereço.
-      Pode deixar sem cupom e associar depois, quando sair um bom.
+      <b>Cadastrar</b> guarda para disparar depois; <b>Cadastrar e disparar</b> manda estes produtos agora,
+      com o cupom selecionado. Nos dois casos eles ficam salvos na vitrine.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
   </div>
@@ -784,7 +788,10 @@ function switchTab(name) {
   if (name === 'fila') carregarFila();
   if (name === 'grupos' && !GRUPOS_CACHE.length) carregarGrupos();
   if (name === 'cupons') carregarCupons();
-  if (name === 'vitrine') { carregarVitrine(); if (!CUPONS_CACHE.length) carregarCupons(); }
+  if (name === 'vitrine') {
+    // Cupons primeiro: o select da Vitrine depende deles.
+    (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
+  }
   if (name === 'templates') carregarTemplates();
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
@@ -805,7 +812,7 @@ function toggleSidebar(forcar) {
 var VIT_CACHE = [], VIT_SEL = {};
 
 function carregarVitrine(){
-  fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
+  return fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
     .then(function(d){ VIT_CACHE = d.itens || []; renderVitrine(); })
     .catch(function(e){
@@ -815,14 +822,32 @@ function carregarVitrine(){
 }
 
 // Só cupons vigentes: oferecer cupom morto no select seria oferecer erro.
-function opcoesCupom(){
+function cuponsVigentes(){
   var agora = Date.now();
-  var vig = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora && c.loja === 'Amazon';
-  }).sort(function(a,b){ return (a.codigo||'').localeCompare(b.codigo||''); });
+  return CUPONS_CACHE.filter(function(c){
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+  }).sort(function(a,b){
+    var l = (a.loja||'').localeCompare(b.loja||'','pt-BR');
+    return l !== 0 ? l : (a.codigo||'').localeCompare(b.codigo||'');
+  });
+}
+
+// Rotulo com loja, codigo e desconto: sem os tres nao da para escolher com
+// seguranca — dois cupons de lojas diferentes podem ter codigos parecidos.
+function opcoesCupom(){
+  var vig = cuponsVigentes();
+  if (!vig.length) {
+    return '<option value="">— nenhum cupom vigente (ative na aba Base de Cupons) —</option>';
+  }
   return '<option value="">— sem cupom —</option>' + vig.map(function(c){
     var v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
-    return '<option value="' + esc(c.codigo) + '">' + esc(c.codigo) + ' · ' + v + '</option>';
+    var extra = [];
+    if (c.limite != null) extra.push('teto R$ ' + c.limite);
+    if (c.minimo)         extra.push('mín R$ ' + c.minimo);
+    return '<option value="' + esc(c.codigo) + '">'
+      + esc(c.loja || 'Outros') + ' · ' + esc(c.codigo) + ' · ' + v
+      + (extra.length ? ' (' + extra.join(', ') + ')' : '')
+      + '</option>';
   }).join('');
 }
 
@@ -876,24 +901,38 @@ function atualizarBarraVitrine(){
   document.getElementById('vit-btn-disparar').textContent = '🚀 Disparar ' + n + ' oferta' + (n === 1 ? '' : 's');
 }
 
-function cadastrarVitrine(){
+function cadastrarVitrine(dispararDepois){
   var texto = document.getElementById('vit-links').value.trim();
+  var cupom = document.getElementById('vit-cupom-novo').value || null;
   var ok = document.getElementById('vit-cad-ok');
   if (!texto) { ok.className = 'send-ok send-err'; ok.textContent = 'Cole ao menos um link.'; return; }
   ok.className = 'send-ok'; ok.textContent = 'Resolvendo links...';
 
   fetch(SERVER + '/vitrine', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ texto: texto, cupom: document.getElementById('vit-cupom-novo').value || null })
+    body: JSON.stringify({ texto: texto, cupom: cupom })
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    var msg = (d.salvos || []).length + ' cadastrado(s)';
+    var salvos = d.salvos || [];
+    var msg = salvos.length + ' cadastrado(s)';
     if ((d.erros || []).length) msg += ' · ' + d.erros.length + ' falhou: ' + d.erros.map(function(e){ return e.erro; }).join('; ');
-    ok.className = d.erros && d.erros.length ? 'send-ok send-err' : 'send-ok';
+    ok.className = (d.erros && d.erros.length) ? 'send-ok send-err' : 'send-ok';
     ok.textContent = msg;
-    if ((d.salvos || []).length) document.getElementById('vit-links').value = '';
-    carregarVitrine();
+    if (salvos.length) document.getElementById('vit-links').value = '';
+
+    return carregarVitrine().then(function(){
+      if (!dispararDepois || !salvos.length) return;
+      // Seleciona exatamente o que acabou de entrar e reusa o fluxo de disparo,
+      // para os dois caminhos passarem pela mesma confirmacao e pelo mesmo
+      // relatorio de enviados/descartados.
+      VIT_SEL = {};
+      salvos.forEach(function(s){ VIT_SEL[s.asin] = true; });
+      var sel = document.getElementById('vit-cupom-disparo');
+      if (cupom) sel.value = cupom;
+      renderVitrine();
+      dispararVitrine();
+    });
   })
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
 }
@@ -1090,7 +1129,9 @@ var CUPONS_CACHE = [];
 function carregarCupons() {
   var st = document.getElementById('cupons-status');
   st.textContent = 'Carregando...';
-  fetch(SERVER + '/cupons/base?t=' + Date.now(), { cache:'no-cache' })
+  // Devolve a promise: a Vitrine monta o select de cupons a partir de
+  // CUPONS_CACHE e precisa esperar isto terminar, senao abre vazia.
+  return fetch(SERVER + '/cupons/base?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
     .then(function(d){
       CUPONS_CACHE = d.itens || [];
