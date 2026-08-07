@@ -634,8 +634,9 @@
       </div>
       <div class="tpl-preview" id="tpl-preview">—</div>
       <p style="font-size:10.5px;color:var(--muted2);margin-top:10px;line-height:1.5">
-        Renderizado com um produto de exemplo. Blocos <code>{{#var}}…{{/var}}</code> só aparecem quando a variável tem valor —
-        é o que evita "De: ~R$ ~" vazio ou selo de cupom órfão.
+        Renderizado com um produto de exemplo. Basta escrever a variável onde ela deve aparecer:
+        <strong>linha cujas variáveis estiverem todas vazias some sozinha</strong>, então
+        <code>De: ~R$ {{preco_de}}~</code> desaparece quando não há preço de lista. Linha sem variável é texto fixo e sempre aparece.
       </p>
     </div>
   </div>
