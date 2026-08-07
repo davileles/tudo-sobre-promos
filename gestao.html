@@ -1136,7 +1136,7 @@ var PERSIST_SERVER = false;
 
 async function carregarPapeis() {
   try {
-    var r = await fetch(SERVER+'/radar/config', { signal: AbortSignal.timeout(3000) });
+    var r = await fetch(SERVER+'/mkt/config', { signal: AbortSignal.timeout(3000) });
     if (r.ok) {
       var d = await r.json();
       if (d && d.papeis) { PAPEIS = d.papeis; PERSIST_SERVER = true; return; }
@@ -1146,7 +1146,7 @@ async function carregarPapeis() {
   try { PAPEIS = JSON.parse(localStorage.getItem('tsp-papeis') || '{}'); } catch(e) { PAPEIS = {}; }
   var el = document.getElementById('grupos-persist');
   el.style.display = 'block';
-  el.innerHTML = '<b>Salvando só neste navegador.</b> A rota <code>/radar/config</code> ainda não existe no servidor, '
+  el.innerHTML = '<b>Salvando só neste navegador.</b> A rota <code>/mkt/config</code> ainda não existe no servidor, '
     + 'então o monitor não enxerga essa marcação. Assim que ela for criada, a marcação passa a valer para o robô.';
 }
 
@@ -1154,7 +1154,7 @@ async function salvarPapeis() {
   try { localStorage.setItem('tsp-papeis', JSON.stringify(PAPEIS)); } catch(e) {}
   if (!PERSIST_SERVER) return;
   try {
-    await fetch(SERVER+'/radar/config', {
+    await fetch(SERVER+'/mkt/config', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ papeis: PAPEIS })
     });
