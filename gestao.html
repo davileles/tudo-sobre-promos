@@ -94,6 +94,16 @@
   .fila-cupom b{font-family:ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.3px}
   .fila-cupom small{font-weight:600;color:var(--muted);display:block;margin-top:2px}
 
+  .tpl-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  @media(max-width:900px){ .tpl-cols{grid-template-columns:1fr} }
+  .tpl-preview{background:var(--card-deep,var(--card));border:1px solid var(--border);border-radius:10px;
+    padding:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word;min-height:340px}
+  .tpl-vars{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+  .tpl-var{background:var(--card);border:1px solid var(--border-ctrl);color:var(--muted);border-radius:6px;
+    padding:3px 7px;font-size:10px;font-weight:700;cursor:pointer;font-family:ui-monospace,Menlo,monospace;
+    transition:color .15s,border-color .15s}
+  .tpl-var:hover{color:var(--accent);border-color:var(--accent)}
+
   .cup-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .cup{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px 9px;position:relative;overflow:hidden;transition:opacity .15s;display:flex;flex-direction:column;gap:5px;min-width:0}
   .cup::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--outra)}
@@ -293,6 +303,7 @@
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
   <div class="side-group">Cadastros</div>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
+  <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
 </div>
 
@@ -591,6 +602,45 @@
   <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
+<!-- ════════ TEMPLATES ════════ -->
+<div class="panel" id="panel-templates">
+  <div class="fila-bar">
+    <span id="tpl-status">Carregando...</span>
+    <div class="fila-acoes">
+      <select id="tpl-loja" onchange="carregarTemplateLoja()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <button class="btn btn-copy btn-sm" onclick="carregarTemplates()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="tpl-cols">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title" style="margin-bottom:10px">Corpo da mensagem</div>
+      <textarea id="tpl-corpo" spellcheck="false" oninput="previewTemplate()"
+        style="min-height:340px;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;line-height:1.65"></textarea>
+      <div class="tpl-vars" id="tpl-vars"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn" style="flex:1;margin-top:0" onclick="salvarTemplateAtual()">💾 Salvar template</button>
+        <button class="btn btn-rej btn-sm" onclick="restaurarPadrao()" title="Copia o corpo do template padrão para cá">↺ Usar padrão</button>
+      </div>
+      <p class="send-ok" id="tpl-ok"></p>
+    </div>
+
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title" style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>Prévia</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
+          <input type="checkbox" id="tpl-com-cupom" checked onchange="previewTemplate()" style="width:auto;accent-color:var(--accent)"/> com cupom
+        </label>
+      </div>
+      <div class="tpl-preview" id="tpl-preview">—</div>
+      <p style="font-size:10.5px;color:var(--muted2);margin-top:10px;line-height:1.5">
+        Renderizado com um produto de exemplo. Blocos <code>{{#var}}…{{/var}}</code> só aparecem quando a variável tem valor —
+        é o que evita "De: ~R$ ~" vazio ou selo de cupom órfão.
+      </p>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ BASE DE CUPONS ════════ -->
 <div class="panel" id="panel-cupons">
   <div class="fila-bar">
@@ -633,7 +683,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','cupons','grupos'];
+var TABS = ['fila','cupom','oferta','livre','cupons','templates','grupos'];
 function switchTab(name) {
   TABS.forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
@@ -642,6 +692,7 @@ function switchTab(name) {
   if (name === 'fila') carregarFila();
   if (name === 'grupos' && !GRUPOS_CACHE.length) carregarGrupos();
   if (name === 'cupons') carregarCupons();
+  if (name === 'templates') carregarTemplates();
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
 }
@@ -655,6 +706,121 @@ function toggleSidebar(forcar) {
   nav.classList.toggle('open', abrir);
   if (bd) bd.classList.toggle('open', abrir);
   document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ══════ TEMPLATES ══════ */
+var TPL_CACHE = {}, TPL_VARS = [], TPL_TIMER = null;
+
+// Lojas que o radar pode produzir. O select junta estas com as ja cadastradas,
+// para dar de onde partir mesmo antes de existir template proprio.
+var TPL_LOJAS = ['_padrao','Amazon','Mercado Livre','Shopee','Magazine Luiza'];
+
+function chaveLojaTpl(loja){
+  return (loja||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'') || '_padrao';
+}
+
+function carregarTemplates(){
+  document.getElementById('tpl-status').textContent = 'Carregando...';
+  fetch(SERVER + '/templates?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      TPL_CACHE = d.templates || {};
+      TPL_VARS  = d.variaveis || [];
+      montarSelectLojas();
+      renderVars();
+      carregarTemplateLoja();
+      var n = Object.keys(TPL_CACHE).length;
+      document.getElementById('tpl-status').textContent = n + ' template(s) cadastrado(s)';
+    })
+    .catch(function(e){ document.getElementById('tpl-status').textContent = 'Falha: ' + e.message; });
+}
+
+function montarSelectLojas(){
+  var sel = document.getElementById('tpl-loja');
+  var atual = sel.value;
+  var lojas = TPL_LOJAS.slice();
+  // Inclui templates cadastrados que nao estao na lista fixa
+  Object.keys(TPL_CACHE).forEach(function(k){
+    if (k === '_padrao') return;
+    var nome = TPL_CACHE[k].nome || k;
+    if (!lojas.some(function(l){ return chaveLojaTpl(l) === k; })) lojas.push(nome);
+  });
+  sel.innerHTML = lojas.map(function(l){
+    var k = chaveLojaTpl(l);
+    var rotulo = (l === '_padrao' ? 'Padrão (usado quando a loja não tem template)' : l)
+               + (TPL_CACHE[k] ? '' : ' — sem template');
+    return '<option value="' + esc(l) + '">' + esc(rotulo) + '</option>';
+  }).join('');
+  if (atual) sel.value = atual;
+}
+
+function carregarTemplateLoja(){
+  var loja = document.getElementById('tpl-loja').value;
+  var t = TPL_CACHE[chaveLojaTpl(loja)];
+  // Loja sem template proprio: parte do padrao em vez de abrir vazio.
+  document.getElementById('tpl-corpo').value = (t && t.corpo) || (TPL_CACHE._padrao && TPL_CACHE._padrao.corpo) || '';
+  previewTemplate();
+}
+
+function renderVars(){
+  document.getElementById('tpl-vars').innerHTML = TPL_VARS.map(function(v){
+    return '<button class="tpl-var" title="' + esc(v.desc) + '" data-v="' + esc(v.chave) + '" onclick="inserirVar(this)">{{' + esc(v.chave) + '}}</button>';
+  }).join('');
+}
+
+function inserirVar(btn){
+  var ta = document.getElementById('tpl-corpo');
+  var txt = '{{' + btn.dataset.v + '}}';
+  var i = ta.selectionStart, f = ta.selectionEnd;
+  ta.value = ta.value.slice(0, i) + txt + ta.value.slice(f);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = i + txt.length;
+  previewTemplate();
+}
+
+// Debounce: o preview e uma chamada de rede a cada tecla sem isso.
+function previewTemplate(){
+  clearTimeout(TPL_TIMER);
+  TPL_TIMER = setTimeout(function(){
+    var corpo = document.getElementById('tpl-corpo').value;
+    var loja  = document.getElementById('tpl-loja').value;
+    fetch(SERVER + '/templates/preview', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ corpo: corpo, loja: loja === '_padrao' ? 'Amazon' : loja,
+                             comCupom: document.getElementById('tpl-com-cupom').checked })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ document.getElementById('tpl-preview').textContent = d.mensagem || '(vazio)'; })
+    .catch(function(){ document.getElementById('tpl-preview').textContent = '(falha ao gerar prévia)'; });
+  }, 350);
+}
+
+function salvarTemplateAtual(){
+  var loja = document.getElementById('tpl-loja').value;
+  var ok = document.getElementById('tpl-ok');
+  ok.className = 'send-ok'; ok.textContent = 'Salvando...';
+  fetch(SERVER + '/templates/' + encodeURIComponent(loja), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ nome: loja === '_padrao' ? 'Padrão' : loja,
+                           corpo: document.getElementById('tpl-corpo').value })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    TPL_CACHE[chaveLojaTpl(loja)] = d.template;
+    montarSelectLojas();
+    document.getElementById('tpl-loja').value = loja;
+    ok.textContent = 'Template salvo.';
+    setTimeout(function(){ ok.textContent = ''; }, 3000);
+  })
+  .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
+}
+
+function restaurarPadrao(){
+  if (!TPL_CACHE._padrao) return;
+  if (!confirm('Substituir o conteúdo do editor pelo template padrão?')) return;
+  document.getElementById('tpl-corpo').value = TPL_CACHE._padrao.corpo;
+  previewTemplate();
 }
 
 /* ══════ BASE DE CUPONS ══════ */
@@ -1226,10 +1392,14 @@ async function carregarFila() {
       var data = new Date(o.timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       var orig = (o.conteudoOriginal || '').replace(/</g,'&lt;');
       var imgs = o.imagens || [];
-      var temImg = imgs.length > 0;
-      var imgBadge = temImg
-        ? '<span class="fila-img-badge has">🖼️ Com imagem</span>'
-        : '<span class="fila-img-badge none">📵 Sem imagem</span>';
+      // Ofertas de marketplace saem como link preview: a imagem vira thumbnail do
+      // card do WhatsApp, entao nao ha o que revisar aqui.
+      var ehMarketplace = String(o.tipoConteudo || '').indexOf('oferta_') === 0;
+      var temImg = imgs.length > 0 && !ehMarketplace;
+      var imgBadge = ehMarketplace
+        ? '<span class="fila-img-badge has">🔗 Link preview</span>'
+        : (temImg ? '<span class="fila-img-badge has">🖼️ Com imagem</span>'
+                  : '<span class="fila-img-badge none">📵 Sem imagem</span>');
       var imgThumb = temImg
         ? '<div style="padding:0 16px 12px;position:relative">'
           +'<img class="fila-img-thumb" src="data:'+imgs[0].mime+';base64,'+imgs[0].imagemBase64+'" alt="imagem da oferta"/>'
