@@ -94,6 +94,25 @@
   .fila-cupom b{font-family:ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.3px}
   .fila-cupom small{font-weight:600;color:var(--muted);display:block;margin-top:2px}
 
+  .vit{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--border);
+    border-radius:11px;padding:11px 14px;margin-bottom:7px;position:relative;overflow:hidden;transition:border-color .15s}
+  .vit::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--amazon)}
+  .vit.sel{border-color:var(--accent)}
+  .vit input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);flex-shrink:0;cursor:pointer}
+  .vit-info{flex:1;min-width:0}
+  .vit-nome{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vit-meta{font-size:10px;color:var(--muted2);margin-top:3px;font-family:ui-monospace,Menlo,monospace}
+  .vit-cupom{font-size:10px;font-weight:800;color:var(--accent);background:rgba(255,165,0,.12);
+    border:1px solid rgba(255,165,0,.32);border-radius:5px;padding:2px 6px;white-space:nowrap}
+  .vit-acoes{display:flex;gap:4px;flex-shrink:0}
+  .vit-acoes button{background:transparent;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:2px 4px}
+  .vit-acoes button:hover{color:var(--accent)}
+  .vit-barra{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;position:sticky;bottom:14px;
+    box-shadow:0 6px 20px rgba(0,0,0,.28);z-index:60}
+  .vit-res{font-size:12px;line-height:1.6;padding:11px 14px;border-radius:10px;margin-top:10px}
+  .vit-res.ok{background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3)}
+  .vit-res.warn{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3)}
+
   .tpl-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
   @media(max-width:900px){ .tpl-cols{grid-template-columns:1fr} }
   .tpl-preview{background:var(--card-deep,var(--card));border:1px solid var(--border);border-radius:10px;
@@ -316,6 +335,7 @@
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
   <div class="side-group">Cadastros</div>
+  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine</button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
@@ -617,6 +637,57 @@
   <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
+<!-- ════════ VITRINE ════════ -->
+<div class="panel" id="panel-vitrine">
+  <div class="aviso">
+    Produtos que você quer manter à mão. Preço e estoque são consultados <b>no momento do disparo</b> —
+    o que fica salvo é só o link. Ao disparar, as ofertas vão <b>direto para os grupos destino</b>.
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Cadastrar produtos</div>
+    <div class="field">
+      <label>Links <span class="tag">um por linha</span></label>
+      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;https://link.amazon/xxxx" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+    </div>
+    <div class="g2" style="margin-top:10px">
+      <div class="field">
+        <label>Vincular cupom <span class="tag">opcional</span></label>
+        <select id="vit-cupom-novo"></select>
+      </div>
+      <div class="field" style="justify-content:flex-end">
+        <button class="btn" style="margin-top:0" onclick="cadastrarVitrine()">➕ Cadastrar na vitrine</button>
+      </div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
+      Aceita <code>link</code> ou <code>Nome que eu quero | link</code>. Sem nome, ele é lido do próprio endereço.
+      Pode deixar sem cupom e associar depois, quando sair um bom.
+    </p>
+    <p class="send-ok" id="vit-cad-ok"></p>
+  </div>
+
+  <div class="fila-bar">
+    <span id="vit-status">Carregando...</span>
+    <div class="fila-acoes">
+      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
+      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarVitrine()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div id="vit-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="card vit-barra" id="vit-barra" style="display:none">
+    <div class="field" style="flex:1;min-width:180px">
+      <label>Cupom para este disparo <span class="tag">substitui o vinculado</span></label>
+      <select id="vit-cupom-disparo"></select>
+    </div>
+    <button class="btn" id="vit-btn-disparar" style="margin-top:0" onclick="dispararVitrine()">🚀 Disparar selecionados</button>
+  </div>
+  <p class="send-ok" id="vit-ok"></p>
+  <div id="vit-resultado"></div>
+</div>
+
 <!-- ════════ TEMPLATES ════════ -->
 <div class="panel" id="panel-templates">
   <div class="fila-bar">
@@ -699,7 +770,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','cupons','templates','grupos'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos'];
 function switchTab(name) {
   TABS.forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
@@ -708,6 +779,7 @@ function switchTab(name) {
   if (name === 'fila') carregarFila();
   if (name === 'grupos' && !GRUPOS_CACHE.length) carregarGrupos();
   if (name === 'cupons') carregarCupons();
+  if (name === 'vitrine') { carregarVitrine(); if (!CUPONS_CACHE.length) carregarCupons(); }
   if (name === 'templates') carregarTemplates();
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
@@ -722,6 +794,174 @@ function toggleSidebar(forcar) {
   nav.classList.toggle('open', abrir);
   if (bd) bd.classList.toggle('open', abrir);
   document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ══════ VITRINE ══════ */
+var VIT_CACHE = [], VIT_SEL = {};
+
+function carregarVitrine(){
+  fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ VIT_CACHE = d.itens || []; renderVitrine(); })
+    .catch(function(e){
+      document.getElementById('vit-status').textContent = 'Falha: ' + e.message;
+      document.getElementById('vit-lista').innerHTML = '<div class="cup-vazio">Sem resposta do servidor.</div>';
+    });
+}
+
+// Só cupons vigentes: oferecer cupom morto no select seria oferecer erro.
+function opcoesCupom(){
+  var agora = Date.now();
+  var vig = CUPONS_CACHE.filter(function(c){
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora && c.loja === 'Amazon';
+  }).sort(function(a,b){ return (a.codigo||'').localeCompare(b.codigo||''); });
+  return '<option value="">— sem cupom —</option>' + vig.map(function(c){
+    var v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
+    return '<option value="' + esc(c.codigo) + '">' + esc(c.codigo) + ' · ' + v + '</option>';
+  }).join('');
+}
+
+function renderVitrine(){
+  ['vit-cupom-novo','vit-cupom-disparo'].forEach(function(id){
+    var s = document.getElementById(id); if (!s) return;
+    var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
+  });
+
+  var el = document.getElementById('vit-lista');
+  document.getElementById('vit-status').textContent = VIT_CACHE.length + ' produto(s) na vitrine';
+  if (!VIT_CACHE.length) {
+    el.innerHTML = '<div class="cup-vazio">Vitrine vazia. Cole os links acima para começar.</div>';
+    atualizarBarraVitrine(); return;
+  }
+
+  el.innerHTML = VIT_CACHE.map(function(i){
+    var sel = !!VIT_SEL[i.asin];
+    return '<div class="vit' + (sel ? ' sel' : '') + '">'
+      + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
+      + '<div class="vit-info">'
+        + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
+        + '<div class="vit-meta">' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
+      + '</div>'
+      + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
+      + '<div class="vit-acoes">'
+        + '<button data-asin="' + esc(i.asin) + '" onclick="editarNomeVitrine(this)" title="Renomear">✎</button>'
+        + '<button data-asin="' + esc(i.asin) + '" onclick="vincularCupomVitrine(this)" title="Vincular cupom">🎫</button>'
+        + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+  atualizarBarraVitrine();
+}
+
+function selVitrine(cb){
+  if (cb.checked) VIT_SEL[cb.dataset.asin] = true; else delete VIT_SEL[cb.dataset.asin];
+  cb.closest('.vit').classList.toggle('sel', cb.checked);
+  atualizarBarraVitrine();
+}
+
+function marcarTodosVitrine(v){
+  VIT_SEL = {};
+  if (v) VIT_CACHE.forEach(function(i){ VIT_SEL[i.asin] = true; });
+  renderVitrine();
+}
+
+function atualizarBarraVitrine(){
+  var n = Object.keys(VIT_SEL).length;
+  document.getElementById('vit-barra').style.display = n ? 'flex' : 'none';
+  document.getElementById('vit-btn-disparar').textContent = '🚀 Disparar ' + n + ' oferta' + (n === 1 ? '' : 's');
+}
+
+function cadastrarVitrine(){
+  var texto = document.getElementById('vit-links').value.trim();
+  var ok = document.getElementById('vit-cad-ok');
+  if (!texto) { ok.className = 'send-ok send-err'; ok.textContent = 'Cole ao menos um link.'; return; }
+  ok.className = 'send-ok'; ok.textContent = 'Resolvendo links...';
+
+  fetch(SERVER + '/vitrine', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ texto: texto, cupom: document.getElementById('vit-cupom-novo').value || null })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var msg = (d.salvos || []).length + ' cadastrado(s)';
+    if ((d.erros || []).length) msg += ' · ' + d.erros.length + ' falhou: ' + d.erros.map(function(e){ return e.erro; }).join('; ');
+    ok.className = d.erros && d.erros.length ? 'send-ok send-err' : 'send-ok';
+    ok.textContent = msg;
+    if ((d.salvos || []).length) document.getElementById('vit-links').value = '';
+    carregarVitrine();
+  })
+  .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
+}
+
+function salvarCampoVitrine(asin, campos){
+  return fetch(SERVER + '/vitrine/' + encodeURIComponent(asin), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(campos)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    carregarVitrine();
+  }).catch(function(e){ alert('Não foi possível salvar: ' + e.message); });
+}
+
+function editarNomeVitrine(btn){
+  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
+  var novo = prompt('Nome do produto:', i.nome);
+  if (novo === null || novo.trim() === i.nome) return;
+  salvarCampoVitrine(i.asin, { nome: novo.trim() });
+}
+
+function vincularCupomVitrine(btn){
+  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
+  var novo = prompt('Código do cupom para "' + i.nome + '" (deixe vazio para desvincular):', i.cupom || '');
+  if (novo === null) return;
+  salvarCampoVitrine(i.asin, { cupom: novo.trim().toUpperCase() || null });
+}
+
+function removerVitrine(btn){
+  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
+  if (!confirm('Remover "' + i.nome + '" da vitrine?')) return;
+  fetch(SERVER + '/vitrine/' + encodeURIComponent(i.asin), { method:'DELETE' })
+    .then(function(){ delete VIT_SEL[i.asin]; carregarVitrine(); });
+}
+
+function dispararVitrine(){
+  var asins = Object.keys(VIT_SEL);
+  if (!asins.length) return;
+  var cupom = document.getElementById('vit-cupom-disparo').value || null;
+  if (!confirm('Disparar ' + asins.length + ' oferta(s) direto para os grupos destino'
+      + (cupom ? ' com o cupom ' + cupom : '') + '?\n\nOs preços serão consultados agora.')) return;
+
+  var btn = document.getElementById('vit-btn-disparar');
+  var ok  = document.getElementById('vit-ok');
+  btn.disabled = true; btn.textContent = 'Consultando preços e enviando...';
+  ok.className = 'send-ok'; ok.textContent = '';
+  document.getElementById('vit-resultado').innerHTML = '';
+
+  fetch(SERVER + '/vitrine/disparar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins: asins, cupom: cupom })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var h = '';
+    if (d.enviados.length) {
+      h += '<div class="vit-res ok"><b>' + d.enviados.length + ' oferta(s) enviada(s)</b><br>'
+         + d.enviados.map(function(e){
+             return '· ' + esc(e.nome) + (e.cupom ? ' — cupom ' + esc(e.cupom) : '')
+                  + (e.aviso ? ' <span style="color:var(--muted)">(' + esc(e.aviso) + ')</span>' : '');
+           }).join('<br>') + '</div>';
+    }
+    var problemas = (d.descartados || []).concat(d.falhas || []);
+    if (problemas.length) {
+      h += '<div class="vit-res warn"><b>' + problemas.length + ' não enviada(s)</b><br>'
+         + problemas.map(function(p){ return '· ' + esc(p.nome || p.asin) + ' — ' + esc(p.motivo || p.erro); }).join('<br>') + '</div>';
+    }
+    document.getElementById('vit-resultado').innerHTML = h;
+    VIT_SEL = {};
+    carregarVitrine();
+  })
+  .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; })
+  .finally(function(){ btn.disabled = false; atualizarBarraVitrine(); });
 }
 
 /* ══════ TEMPLATES ══════ */
