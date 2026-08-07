@@ -147,7 +147,12 @@
   .sw.on::after{transform:translateX(15px)}
   .cup-del{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-del:hover{color:#e5534b}
-  .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:18px 0 8px}
+  .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
+    margin:18px 0 8px;display:flex;align-items:center;gap:10px}
+  .cup-grupo-acao{background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);border-radius:6px;
+    padding:2px 8px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;
+    font-family:'Montserrat',sans-serif;transition:color .15s,border-color .15s}
+  .cup-grupo-acao:hover{color:var(--accent);border-color:var(--accent)}
   .cup-grupo:first-child{margin-top:0}
   .cup-vazio{text-align:center;color:var(--muted);font-size:12.5px;padding:36px 12px}
   @media(max-width:1000px){ .cup-grid{grid-template-columns:repeat(2,1fr)} }
@@ -1147,8 +1152,16 @@ function renderCupons() {
   itens.forEach(function(c){ (lojas[c.loja || 'Outros'] = lojas[c.loja || 'Outros'] || []).push(c); });
 
   el.innerHTML = Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(loja){
-    var lista = lojas[loja].sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
-    return '<div class="cup-grupo">' + esc(loja) + ' · ' + lista.length + '</div>'
+    // Mais recente primeiro: cupom novo e o que interessa na hora de disparar.
+    var lista = lojas[loja].sort(function(a,b){
+      return new Date(b.capturadoEm || 0) - new Date(a.capturadoEm || 0);
+    });
+    var algumAtivo = lista.some(function(c){ return c.ativo !== false; });
+    return '<div class="cup-grupo">'
+         +   '<span>' + esc(loja) + ' · ' + lista.length + '</span>'
+         +   '<button class="cup-grupo-acao" data-loja="' + esc(loja) + '" data-ativo="' + (algumAtivo ? '0' : '1') + '" '
+         +     'onclick="alternarLoja(this)">' + (algumAtivo ? 'desativar todos' : 'ativar todos') + '</button>'
+         + '</div>'
          + '<div class="cup-grid">' + lista.map(cardCupom).join('') + '</div>';
   }).join('');
 }
@@ -1176,6 +1189,27 @@ function cardCupom(c) {
       + '</span>'
     + '</div>'
   + '</div>';
+}
+
+function alternarLoja(btn) {
+  var loja  = btn.dataset.loja;
+  var ativo = btn.dataset.ativo === '1';
+  var alvos = CUPONS_CACHE.filter(function(c){ return (c.loja || 'Outros') === loja; });
+  if (!alvos.length) return;
+  if (!ativo && !confirm('Desativar os ' + alvos.length + ' cupons de ' + loja + '?')) return;
+
+  btn.disabled = true;
+  fetch(SERVER + '/cupons/loja/' + encodeURIComponent(loja), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ativo: ativo })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    alvos.forEach(function(c){ c.ativo = ativo; });   // servidor confirmou
+    renderCupons();
+  })
+  .catch(function(e){ alert('Não foi possível alterar: ' + e.message); btn.disabled = false; });
 }
 
 function alternarCupom(btn) {
