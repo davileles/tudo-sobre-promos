@@ -15,6 +15,7 @@
     --amazon:#ff9900;--amazon-dim:rgba(255,153,0,.14);
     --ml:#f5c518;--ml-dim:rgba(245,197,24,.14);
     --shopee:#f4654a;--shopee-dim:rgba(244,101,74,.14);
+    --magalu:#0086ff;--magalu-dim:rgba(0,134,255,.14);
     --outra:#888888;--outra-dim:rgba(136,136,136,.14);
   }
   [data-theme="light"]{
@@ -23,7 +24,7 @@
     --text:#18181b;--muted:#71717a;--muted2:#a1a1aa;
     --accent:#c67a00;--accent2:#a33000;
     --green:#16a34a;--red:#dc2626;--blue:#2563eb;--purple:#7c3aed;--amber:#d97706;
-    --amazon:#cc7a00;--ml:#b8940f;--shopee:#d94a2e;
+    --amazon:#cc7a00;--ml:#b8940f;--shopee:#d94a2e;--magalu:#0069c9;
   }
   [data-theme="light"] header{box-shadow:0 2px 8px rgba(0,0,0,.06)}
   [data-theme="light"] .main-tab:hover:not(.active){background:rgba(0,0,0,.04)}
@@ -82,6 +83,7 @@
   .card.mk-amazon::before{background:var(--amazon)}
   .card.mk-ml::before{background:var(--ml)}
   .card.mk-shopee::before{background:var(--shopee)}
+  .card.mk-magalu::before{background:var(--magalu)}
   .card.mk-outra::before{background:var(--outra)}
   .card-title{font-size:13px;font-weight:700;line-height:1.3}
   .sep{height:1px;background:var(--border);margin:16px 0}
@@ -92,6 +94,7 @@
   .cup.mk-amazon::before{background:var(--amazon)}
   .cup.mk-ml::before{background:var(--ml)}
   .cup.mk-shopee::before{background:var(--shopee)}
+  .cup.mk-magalu::before{background:var(--magalu)}
   .cup.off{opacity:.42}
   .cup-info{flex:1;min-width:0}
   .cup-cod{font-size:13.5px;font-weight:800;letter-spacing:.4px;font-family:ui-monospace,'SF Mono',Menlo,monospace}
@@ -187,6 +190,7 @@
   .fila-card.mk-amazon::before{background:var(--amazon)}
   .fila-card.mk-ml::before{background:var(--ml)}
   .fila-card.mk-shopee::before{background:var(--shopee)}
+  .fila-card.mk-magalu::before{background:var(--magalu)}
   .fila-card-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 16px 10px}
   .fila-id{font-size:10px;font-weight:800;color:var(--muted2)}
   .fila-loja{font-size:13px;font-weight:800}
@@ -784,7 +788,7 @@ function excluirCupom(btn) {
 }
 
 /* ══════ FAIXA DE MARKETPLACE ══════ */
-var MK = { 'Amazon':'mk-amazon', 'Mercado Livre':'mk-ml', 'Shopee':'mk-shopee' };
+var MK = { 'Amazon':'mk-amazon', 'Mercado Livre':'mk-ml', 'Shopee':'mk-shopee', 'Magazine Luiza':'mk-magalu' };
 function marcarLoja(pid) {
   var mapa = { c:'card-cupom', o:'card-oferta', l:'card-livre' };
   var card = document.getElementById(mapa[pid]); if (!card) return;
