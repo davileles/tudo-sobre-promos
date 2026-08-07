@@ -89,6 +89,9 @@
   .sep{height:1px;background:var(--border);margin:16px 0}
 
   /* ══ BASE DE CUPONS ══ */
+  .fila-origem{font-size:10px;font-weight:700;color:var(--muted);background:var(--card);
+    border:1px solid var(--border);border-radius:5px;padding:2px 7px;white-space:nowrap;
+    max-width:210px;overflow:hidden;text-overflow:ellipsis}
   .fila-cupom{display:flex;align-items:center;gap:8px;margin:0 16px 10px;padding:8px 11px;border-radius:9px;
     background:rgba(255,165,0,.10);border:1px solid rgba(255,165,0,.32);font-size:11.5px;font-weight:700;color:var(--text)}
   .fila-cupom b{font-family:ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.3px}
@@ -1800,6 +1803,14 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
 
 /* ══════ FILA ══════ */
 var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee'];
+// Nomes de grupo vêm do servidor (nunca de storage local) só para exibição.
+var NOMES_GRUPOS_CACHE = {};
+function carregarNomesGrupos(){
+  return fetch(SERVER + '/grupos/nomes', { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ NOMES_GRUPOS_CACHE = d.nomes || {}; })
+    .catch(function(){});
+}
 var MK_TIPO = { oferta_amazon:'mk-amazon', oferta_ml:'mk-ml', oferta_shopee:'mk-shopee' };
 
 function ehTSP(o){ return TIPOS_TSP.indexOf(o.tipoConteudo) !== -1; }
@@ -1818,6 +1829,7 @@ function seloCupom(o) {
 }
 
 async function carregarFila() {
+  if (!Object.keys(NOMES_GRUPOS_CACHE).length) await carregarNomesGrupos();
   var lista = document.getElementById('fila-lista');
   var status = document.getElementById('fila-status');
   try {
@@ -1895,12 +1907,19 @@ async function carregarFila() {
       }
 
       var mk = MK_TIPO[o.tipoConteudo] || (MK[loja] || '');
+      var org = o.grupoOrigem || o.origem || '';
+      var orgNome = o.grupoOrigemNome || NOMES_GRUPOS_CACHE[org] || '';
+      var origemSelo = '';
+      if (org === 'vitrine') origemSelo = '<span class="fila-origem">🏬 Vitrine</span>';
+      else if (String(org).indexOf('telegram:') === 0) origemSelo = '<span class="fila-origem">✈️ ' + esc(org.replace('telegram:','')) + '</span>';
+      else if (org) origemSelo = '<span class="fila-origem" title="' + esc(org) + '">👥 ' + esc(orgNome || org.split('@')[0]) + '</span>';
 
       return '<div class="fila-card '+mk+'" id="fila-card-'+o.id+'">'
         +'<div class="fila-card-header">'
         +'<span class="fila-id">#'+o.id+'</span>'
         +'<span class="fila-loja">'+titulo+'</span>'
         +'<span class="fila-info">'+data+'</span>'
+        +origemSelo
         +imgBadge
         +'</div>'
         +autoSelo
@@ -2018,23 +2037,32 @@ async function carregarPapeis() {
       if (d && d.papeis) { PAPEIS = d.papeis; PERSIST_SERVER = true; return; }
     }
   } catch(e) {}
+  // Sem cópia local: marcação de grupo é dado de operação e precisa valer em
+  // qualquer device. Se o servidor não responder, não inventamos um estado —
+  // avisamos e deixamos vazio, porque um papel errado em cache silencioso é
+  // pior que a ausência de papel.
   PERSIST_SERVER = false;
-  try { PAPEIS = JSON.parse(localStorage.getItem('tsp-papeis') || '{}'); } catch(e) { PAPEIS = {}; }
+  PAPEIS = {};
   var el = document.getElementById('grupos-persist');
   el.style.display = 'block';
-  el.innerHTML = '<b>Salvando só neste navegador.</b> A rota <code>/mkt/config</code> ainda não existe no servidor, '
-    + 'então o monitor não enxerga essa marcação. Assim que ela for criada, a marcação passa a valer para o robô.';
+  el.innerHTML = '<b>Servidor indisponível.</b> As marcações de fonte/destino vivem no servidor e não puderam ser lidas. '
+    + 'Não altere nada agora — recarregue quando a conexão voltar.';
 }
 
 async function salvarPapeis() {
-  try { localStorage.setItem('tsp-papeis', JSON.stringify(PAPEIS)); } catch(e) {}
-  if (!PERSIST_SERVER) return;
+  if (!PERSIST_SERVER) { alert('Servidor indisponível — a marcação não foi salva.'); return; }
   try {
-    await fetch(SERVER+'/mkt/config', {
+    var r = await fetch(SERVER+'/mkt/config', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ papeis: PAPEIS })
     });
-  } catch(e) {}
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+  } catch(e) {
+    alert('Não foi possível salvar a marcação no servidor: ' + e.message);
+    await carregarPapeis();   // volta ao estado real do servidor
+    renderGrupos();
+  }
 }
 
 async function carregarGrupos() {
