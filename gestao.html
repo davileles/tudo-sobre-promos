@@ -150,6 +150,11 @@
   .sw.on::after{transform:translateX(15px)}
   .cup-del{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-del:hover{color:#e5534b}
+  .cup-copy{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
+  .cup-copy:hover{color:var(--accent)}
+  .cup-copy.ok{color:#34d399}
+  .cup-cod{cursor:pointer}
+  .cup-cod:hover{color:var(--accent)}
   .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
     margin:18px 0 8px;display:flex;align-items:center;gap:10px}
   .cup-grupo-acao{background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);border-radius:6px;
@@ -166,7 +171,7 @@
   .field.disabled{opacity:.4;pointer-events:none}
   label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
   .tag{font-size:9px;font-weight:700;color:var(--muted2);background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1px 5px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
-  input[type=text],input[type=number],input[type=datetime-local],input[type=date],select,textarea{
+  input[type=text],input[type=number],input[type=datetime-local],input[type=date],input[type=time],select,textarea{
     width:100%;background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);
     padding:10px 12px;border-radius:10px;font-size:13px;font-family:'Montserrat',sans-serif;outline:none;transition:border-color .2s}
   input:focus,select:focus,textarea:focus{border-color:var(--accent)}
@@ -273,7 +278,12 @@
   .mon-linha{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
   .mon-campo{display:flex;flex-direction:column;gap:4px}
   .mon-campo label{margin:0}
-  .mon-campo input[type=time],.mon-campo select{padding:7px 9px;font-size:12px;width:auto;min-width:110px}
+  .mon-campo input[type=time],.mon-campo select{padding:8px 10px;font-size:12.5px;width:auto;min-width:118px}
+  input[type=time],input[type=date],input[type=datetime-local]{color-scheme:dark}
+  [data-theme="light"] input[type=time],[data-theme="light"] input[type=date],
+  [data-theme="light"] input[type=datetime-local]{color-scheme:light}
+  input[type=time]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.65}
+  input[type=time]::-webkit-calendar-picker-indicator:hover{opacity:1}
   .mon-lojas{display:flex;gap:6px;flex-wrap:wrap}
   .mon-loja{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--muted);
     background:var(--card);border:1px solid var(--border-ctrl);border-radius:7px;padding:6px 10px;cursor:pointer}
@@ -659,13 +669,6 @@
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
   <div class="grp-resumo" id="grp-resumo"></div>
-  <div class="busca-row">
-    <input type="text" id="busca-grupo" placeholder="Buscar grupo pelo nome" oninput="renderGrupos()"/>
-    <button class="btn btn-copy btn-sm" onclick="carregarGrupos()">↻ Recarregar</button>
-  </div>
-  <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
-
-  <div class="sep"></div>
   <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
     <span>⏱️ Monitoramento dos grupos fonte</span>
     <span style="font-weight:600;text-transform:none;letter-spacing:0" id="mon-agora"></span>
@@ -730,6 +733,15 @@
   </div>
   <p class="send-ok" id="vit-ok"></p>
   <div id="vit-resultado"></div>
+
+  <div class="sep"></div>
+  <div class="sec-label">👥 Grupos do WhatsApp</div>
+  <div class="busca-row">
+    <input type="text" id="busca-grupo" placeholder="Buscar grupo pelo nome" oninput="renderGrupos()"/>
+    <button class="btn btn-copy btn-sm" onclick="carregarGrupos()">↻ Recarregar</button>
+  </div>
+  <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
 </div>
 
 <!-- ════════ TEMPLATES ════════ -->
@@ -1355,19 +1367,43 @@ function cardCupom(c) {
   // Codigo pode estourar a largura da coluna: o title garante a leitura completa.
   return '<div class="cup ' + mk + (on ? '' : ' off') + '" id="cup-' + ch + '">'
     + '<div class="cup-top">'
-      + '<div class="cup-cod" title="' + esc(c.codigo) + '">' + esc(c.codigo) + '</div>'
+      + '<div class="cup-cod" title="Clique para copiar: ' + esc(c.codigo) + '" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)">' + esc(c.codigo) + '</div>'
       + '<div class="cup-val">' + val + '</div>'
     + '</div>'
     + '<div class="cup-regra">' + esc(regraCupom(c)) + '</div>'
     + '<div class="cup-bot">'
       + '<span class="cup-venc ' + v.cls + '">' + v.txt + '</span>'
       + '<span style="display:flex;align-items:center;gap:4px">'
+        + '<button class="cup-copy" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)" title="Copiar código">📋</button>'
         + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
         + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)" '
         + 'title="' + (on ? 'Desativar' : 'Ativar') + '"></button>'
       + '</span>'
     + '</div>'
   + '</div>';
+}
+
+function copiarCupom(el){
+  var cod = el.dataset.cod;
+  var feito = function(){
+    var alvo = el.classList.contains('cup-copy') ? el : el.parentNode.querySelector('.cup-copy');
+    if (!alvo) return;
+    var antes = alvo.textContent;
+    alvo.textContent = '✓'; alvo.classList.add('ok');
+    setTimeout(function(){ alvo.textContent = antes; alvo.classList.remove('ok'); }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cod).then(feito).catch(function(){ copiaFallback(cod, feito); });
+  } else copiaFallback(cod, feito);
+}
+
+// navigator.clipboard exige contexto seguro; o textarea oculto cobre o resto.
+function copiaFallback(texto, feito){
+  var ta = document.createElement('textarea');
+  ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); feito(); } catch(e) {}
+  document.body.removeChild(ta);
 }
 
 function alternarLoja(btn) {
