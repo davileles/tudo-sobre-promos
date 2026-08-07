@@ -53,15 +53,25 @@
   .btn-reconectar:disabled{opacity:.5;cursor:not-allowed}
 
   /* ══ TABS ══ */
-  .main-tabs{display:flex;gap:4px;padding:8px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:70px;z-index:90;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap}
-  .main-tabs::-webkit-scrollbar{display:none}
-  .main-tab{background:transparent;border:1px solid transparent;border-radius:10px;color:var(--muted);font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:700;padding:9px 15px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;gap:6px}
+  /* NAVEGACAO LATERAL — mesmo padrao do painel CDV. Mantem .main-tabs/.main-tab
+     para nao quebrar o switchTab existente. */
+  #shell{display:flex;align-items:flex-start}
+  #shell-main{flex:1;min-width:0}
+  .main-tabs{display:flex;flex-direction:column;gap:2px;width:226px;flex-shrink:0;padding:12px 10px 24px;background:var(--surface);border-bottom:none;border-right:1px solid var(--border);position:sticky;top:70px;height:calc(100vh - 70px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;z-index:90}
+  .main-tabs::-webkit-scrollbar{width:6px}
+  .main-tabs::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .side-group{font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);opacity:.6;padding:15px 12px 5px}
+  .side-group:first-child{padding-top:4px}
+  .side-toggle{display:none}
+  #side-backdrop{display:none}
+  .main-tab{background:transparent;border:1px solid transparent;border-radius:10px;color:var(--muted);font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:700;padding:9px 12px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:9px;width:100%;text-align:left;justify-content:flex-start}
   .main-tab:hover:not(.active){color:var(--text);background:rgba(255,255,255,.05)}
-  .main-tab.active{color:var(--accent);background:rgba(255,165,0,.12);border-color:rgba(255,165,0,.45)}
+  .main-tab.active{color:var(--accent);background:rgba(255,165,0,.12);border-color:rgba(255,165,0,.45);border-left:3px solid var(--accent);padding-left:9px}
   .tab-badge{background:var(--accent);color:#0f0f0f;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:800;line-height:1.5}
 
   /* ══ LAYOUT ══ */
   .wrap{max-width:960px;margin:0 auto;padding:20px 24px 70px}
+  #shell-main .wrap{margin:0 auto}
   .panel{display:none;animation:tabSlide .3s ease both}
   .panel.active{display:block}
   .sec-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
@@ -75,6 +85,37 @@
   .card.mk-outra::before{background:var(--outra)}
   .card-title{font-size:13px;font-weight:700;line-height:1.3}
   .sep{height:1px;background:var(--border);margin:16px 0}
+
+  /* ══ BASE DE CUPONS ══ */
+  .cup{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;transition:opacity .15s}
+  .cup::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--outra)}
+  .cup.mk-amazon::before{background:var(--amazon)}
+  .cup.mk-ml::before{background:var(--ml)}
+  .cup.mk-shopee::before{background:var(--shopee)}
+  .cup.off{opacity:.42}
+  .cup-info{flex:1;min-width:0}
+  .cup-cod{font-size:13.5px;font-weight:800;letter-spacing:.4px;font-family:ui-monospace,'SF Mono',Menlo,monospace}
+  .cup-loja{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px}
+  .cup-regra{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .cup-val{font-size:16px;font-weight:800;color:var(--accent);white-space:nowrap}
+  .cup-venc{font-size:10px;font-weight:700;margin-top:3px;white-space:nowrap}
+  .cup-venc.ok{color:var(--muted)}
+  .cup-venc.perto{color:#f0a03c}
+  .cup-venc.morto{color:#e5534b}
+  .cup-acoes{display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  .sw{position:relative;width:40px;height:22px;border-radius:11px;background:var(--border-ctrl);border:none;cursor:pointer;transition:background .18s;flex-shrink:0;padding:0}
+  .sw::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .18s}
+  .sw.on{background:var(--accent)}
+  .sw.on::after{transform:translateX(18px)}
+  .cup-del{background:transparent;border:none;color:var(--muted2);font-size:14px;cursor:pointer;padding:2px 4px;line-height:1}
+  .cup-del:hover{color:#e5534b}
+  .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px}
+  .cup-grupo:first-child{margin-top:0}
+  .cup-vazio{text-align:center;color:var(--muted);font-size:12.5px;padding:36px 12px}
+  @media(max-width:600px){
+    .cup{flex-wrap:wrap;gap:10px}
+    .cup-info{flex-basis:100%}
+  }
 
   /* ══ FORM ══ */
   .field{display:flex;flex-direction:column}
@@ -196,8 +237,12 @@
   @media(max-width:640px){
     header{padding:10px 14px;gap:10px}
     .ws-bar{padding:8px 14px;font-size:11px}
-    .main-tabs{top:68px;padding:6px 10px}
-    .main-tab{font-size:11.5px;padding:9px 11px}
+    #shell{display:block}
+    .side-toggle{display:flex;align-items:center;gap:7px;position:sticky;top:68px;z-index:95;width:100%;background:var(--surface);border:none;border-bottom:1px solid var(--border);color:var(--text);font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:700;padding:11px 16px;cursor:pointer}
+    .main-tabs{position:fixed;top:0;left:0;width:252px;height:100vh;padding-top:18px;transform:translateX(-100%);transition:transform .22s ease;z-index:200;border-right:1px solid var(--border)}
+    .main-tabs.open{transform:none}
+    #side-backdrop.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199}
+    .main-tab{font-size:12px;padding:10px 12px}
     .wrap{padding:16px 14px 60px}
     .g2{grid-template-columns:1fr}
     .grp{flex-wrap:wrap}
@@ -228,14 +273,22 @@
   <button class="btn-reconectar" id="btn-reconectar" style="display:none" onclick="forcarReconexao()">↺ Reconectar</button>
 </div>
 
-<div class="main-tabs">
+<button class="side-toggle" id="side-toggle" onclick="toggleSidebar()" aria-label="Abrir menu">☰ Menu</button>
+<div id="side-backdrop" onclick="toggleSidebar(false)"></div>
+<div id="shell">
+<div class="main-tabs" id="main-tabs">
+  <div class="side-group">Operação</div>
   <button class="main-tab active" id="tab-fila" onclick="switchTab('fila')">📋 Fila<span class="tab-badge" id="fila-badge" style="display:none">0</span></button>
+  <div class="side-group">Criar mensagem</div>
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
+  <div class="side-group">Cadastros</div>
+  <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
 </div>
 
+<div id="shell-main">
 <div class="wrap">
 
 <!-- ════════ FILA ════════ -->
@@ -530,6 +583,22 @@
   <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
+<!-- ════════ BASE DE CUPONS ════════ -->
+<div class="panel" id="panel-cupons">
+  <div class="fila-bar">
+    <span id="cupons-status">Carregando...</span>
+    <div class="fila-acoes">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
+        <input type="checkbox" id="cupons-so-vigentes" onchange="renderCupons()" style="width:auto;accent-color:var(--accent)"/> só vigentes
+      </label>
+      <button class="btn btn-copy btn-sm" onclick="carregarCupons()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div id="cupons-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
+</div>
+</div>
 </div>
 
 <script>
@@ -556,7 +625,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','grupos'];
+var TABS = ['fila','cupom','oferta','livre','cupons','grupos'];
 function switchTab(name) {
   TABS.forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
@@ -564,6 +633,154 @@ function switchTab(name) {
   });
   if (name === 'fila') carregarFila();
   if (name === 'grupos' && !GRUPOS_CACHE.length) carregarGrupos();
+  if (name === 'cupons') carregarCupons();
+  toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
+  window.scrollTo({ top: 0 });
+}
+
+/* ══════ SIDEBAR (drawer no mobile) ══════ */
+function toggleSidebar(forcar) {
+  var nav = document.getElementById('main-tabs');
+  var bd  = document.getElementById('side-backdrop');
+  if (!nav) return;
+  var abrir = (forcar === undefined) ? !nav.classList.contains('open') : !!forcar;
+  nav.classList.toggle('open', abrir);
+  if (bd) bd.classList.toggle('open', abrir);
+  document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ══════ BASE DE CUPONS ══════ */
+var CUPONS_CACHE = [];
+
+function carregarCupons() {
+  var st = document.getElementById('cupons-status');
+  st.textContent = 'Carregando...';
+  fetch(SERVER + '/cupons/base?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      CUPONS_CACHE = d.itens || [];
+      renderCupons();
+    })
+    .catch(function(e){
+      st.textContent = 'Falha ao carregar.';
+      document.getElementById('cupons-lista').innerHTML =
+        '<div class="cup-vazio">Nao foi possivel falar com o servidor.<br>' + esc(e.message) + '</div>';
+    });
+}
+
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function fmtBRL(n){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+
+// Rotulo de vencimento em linguagem util: o operador quer saber se ainda vale,
+// nao a data ISO.
+function vencimento(iso) {
+  var ms = new Date(iso).getTime() - Date.now();
+  if (isNaN(ms)) return { txt:'sem validade', cls:'ok' };
+  if (ms <= 0)   return { txt:'expirado', cls:'morto' };
+  var h = Math.floor(ms / 3600000);
+  if (h < 1)  return { txt:'expira em ' + Math.max(1, Math.round(ms/60000)) + 'min', cls:'perto' };
+  if (h < 24) return { txt:'expira em ' + h + 'h', cls:'perto' };
+  return { txt:'expira em ' + Math.floor(h/24) + 'd' + (h%24 ? ' ' + (h%24) + 'h' : ''), cls:'ok' };
+}
+
+function regraCupom(c) {
+  var partes = [];
+  if (c.minimo === 0)              partes.push('sem minimo');
+  else if (c.minimo != null)       partes.push('min R$ ' + fmtBRL(c.minimo));
+  if (c.limite != null)            partes.push('teto R$ ' + fmtBRL(c.limite));
+  return partes.join(' · ') || 'sem restricao informada';
+}
+
+function renderCupons() {
+  var soVigentes = document.getElementById('cupons-so-vigentes').checked;
+  var agora = Date.now();
+  var itens = CUPONS_CACHE.filter(function(c){
+    if (!soVigentes) return true;
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+  });
+
+  var vig = CUPONS_CACHE.filter(function(c){
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+  }).length;
+  document.getElementById('cupons-status').textContent =
+    CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)';
+
+  var el = document.getElementById('cupons-lista');
+  if (!itens.length) {
+    el.innerHTML = '<div class="cup-vazio">Nenhum cupom para mostrar.<br>A base e alimentada automaticamente pelos cupons capturados.</div>';
+    return;
+  }
+
+  // Agrupa por loja, alfabetico, e dentro da loja o de maior desconto primeiro.
+  var lojas = {};
+  itens.forEach(function(c){ (lojas[c.loja || 'Outros'] = lojas[c.loja || 'Outros'] || []).push(c); });
+
+  el.innerHTML = Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(loja){
+    var lista = lojas[loja].sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
+    return '<div class="cup-grupo">' + esc(loja) + ' · ' + lista.length + '</div>' + lista.map(cardCupom).join('');
+  }).join('');
+}
+
+function cardCupom(c) {
+  var v   = vencimento(c.validadeAte);
+  var on  = c.ativo !== false;
+  var mk  = MK[c.loja] || 'mk-outra';
+  var val = c.tipo === 'pct' ? fmtBRL(c.valor) + '%' : 'R$ ' + fmtBRL(c.valor);
+  var ch  = esc(c.chave);
+
+  return '<div class="cup ' + mk + (on ? '' : ' off') + '" id="cup-' + ch + '">'
+    + '<div class="cup-info">'
+      + '<div class="cup-loja">' + esc(c.loja) + '</div>'
+      + '<div class="cup-cod">' + esc(c.codigo) + '</div>'
+      + '<div class="cup-regra">' + esc(regraCupom(c)) + '</div>'
+    + '</div>'
+    + '<div style="text-align:right">'
+      + '<div class="cup-val">' + val + '</div>'
+      + '<div class="cup-venc ' + v.cls + '">' + v.txt + '</div>'
+    + '</div>'
+    + '<div class="cup-acoes">'
+      + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)" '
+      + 'title="' + (on ? 'Desativar' : 'Ativar') + '"></button>'
+      + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
+    + '</div>'
+  + '</div>';
+}
+
+function alternarCupom(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  if (!c) return;
+  var novo = !(c.ativo !== false);
+
+  btn.disabled = true;
+  fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ativo: novo })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    c.ativo = novo;          // servidor confirmou: so entao mexe no estado local
+    renderCupons();
+  })
+  .catch(function(e){ alert('Nao foi possivel alterar o cupom: ' + e.message); btn.disabled = false; });
+}
+
+function excluirCupom(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  if (!c) return;
+  if (!confirm('Excluir o cupom ' + c.codigo + ' (' + c.loja + ') da base?\n\nPara so parar de usar, prefira desativar.')) return;
+
+  fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      CUPONS_CACHE = CUPONS_CACHE.filter(function(x){ return x.chave !== chave; });
+      renderCupons();
+    })
+    .catch(function(e){ alert('Nao foi possivel excluir: ' + e.message); });
 }
 
 /* ══════ FAIXA DE MARKETPLACE ══════ */
