@@ -257,6 +257,27 @@
   .grp::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:transparent}
   .grp.is-fonte::before{background:var(--blue)}
   .grp.is-destino::before{background:var(--accent)}
+  .mon{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:9px;position:relative;overflow:hidden}
+  .mon::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--blue)}
+  .mon.off::before{background:var(--muted2)}
+  .mon.off{opacity:.55}
+  .mon-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+  .mon-nome{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mon-estado{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-radius:5px;padding:2px 7px;white-space:nowrap}
+  .mon-estado.on{color:#34d399;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3)}
+  .mon-estado.wait{color:#f0a03c;background:rgba(240,160,60,.12);border:1px solid rgba(240,160,60,.3)}
+  .mon-estado.no{color:#e5534b;background:rgba(229,83,75,.12);border:1px solid rgba(229,83,75,.3)}
+  .mon-linha{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .mon-campo{display:flex;flex-direction:column;gap:4px}
+  .mon-campo label{margin:0}
+  .mon-campo input[type=time],.mon-campo select{padding:7px 9px;font-size:12px;width:auto;min-width:110px}
+  .mon-lojas{display:flex;gap:6px;flex-wrap:wrap}
+  .mon-loja{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--muted);
+    background:var(--card);border:1px solid var(--border-ctrl);border-radius:7px;padding:6px 10px;cursor:pointer}
+  .mon-loja input{width:15px;height:15px;accent-color:var(--accent);margin:0;cursor:pointer}
+  .mon-loja.on{color:var(--text);border-color:var(--accent)}
+  .mon-aviso{font-size:11px;color:#e5534b;margin-top:9px;font-weight:600}
+
   .grp-resumo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   @media(max-width:700px){ .grp-resumo{grid-template-columns:1fr} }
   .grp-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
@@ -640,6 +661,17 @@
     <button class="btn btn-copy btn-sm" onclick="carregarGrupos()">↻ Recarregar</button>
   </div>
   <div id="grupos-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="sep"></div>
+  <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>⏱️ Monitoramento dos grupos fonte</span>
+    <span style="font-weight:600;text-transform:none;letter-spacing:0" id="mon-agora"></span>
+  </div>
+  <div class="aviso">
+    Define <b>quais lojas</b> capturar em cada grupo e <b>em que janela</b>. Horários no fuso de São Paulo,
+    dentro do mesmo dia. <b>Grupo fonte sem cadastro não captura nada.</b>
+  </div>
+  <div id="mon-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- ════════ VITRINE ════════ -->
@@ -786,7 +818,7 @@ function switchTab(name) {
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'fila') carregarFila();
-  if (name === 'grupos' && !GRUPOS_CACHE.length) carregarGrupos();
+  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   if (name === 'cupons') carregarCupons();
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
@@ -806,6 +838,109 @@ function toggleSidebar(forcar) {
   nav.classList.toggle('open', abrir);
   if (bd) bd.classList.toggle('open', abrir);
   document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ══════ MONITORAMENTO ══════ */
+var MON_CACHE = {}, MON_LOJAS = ['Amazon','Shopee'];
+
+function carregarMonitor(){
+  return fetch(SERVER + '/monitor?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      MON_CACHE = d.monitor || {};
+      MON_LOJAS = d.lojas || MON_LOJAS;
+      document.getElementById('mon-agora').textContent = 'agora em SP: ' + (d.agoraSP || '');
+      renderMonitor();
+    })
+    .catch(function(e){
+      document.getElementById('mon-lista').innerHTML = '<div class="cup-vazio">Falha ao carregar: ' + esc(e.message) + '</div>';
+    });
+}
+
+// Estado calculado no navegador so para o rotulo; quem decide de fato e o
+// servidor, no fuso de SP.
+function estadoMonitor(c){
+  if (!c) return { cls:'no', txt:'sem cadastro' };
+  if (c.ativo === false) return { cls:'no', txt:'desativado' };
+  if (!c.lojas || !c.lojas.length) return { cls:'no', txt:'nenhuma loja' };
+  return { cls:'on', txt:'capturando ' + c.lojas.join(' + ') };
+}
+
+function renderMonitor(){
+  var fontes = Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === 'fonte'; });
+  var el = document.getElementById('mon-lista');
+  if (!fontes.length) {
+    el.innerHTML = '<div class="cup-vazio">Nenhum grupo marcado como fonte ainda.</div>';
+    return;
+  }
+  el.innerHTML = fontes.map(function(jid){
+    var c = MON_CACHE[jid];
+    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+    var nome = g ? (g.nome || '(sem nome)') : jid.split('@')[0];
+    var e = estadoMonitor(c);
+    var lojas = (c && c.lojas) || [];
+
+    return '<div class="mon' + (c && c.ativo !== false ? '' : ' off') + '">'
+      + '<div class="mon-top">'
+        + '<span class="mon-nome" title="' + esc(jid) + '">' + esc(nome) + '</span>'
+        + '<span class="mon-estado ' + e.cls + '">' + esc(e.txt) + '</span>'
+      + '</div>'
+      + '<div class="mon-linha">'
+        + '<div class="mon-campo"><label>Lojas</label><div class="mon-lojas">'
+          + MON_LOJAS.map(function(l){
+              var on = lojas.indexOf(l) !== -1;
+              return '<label class="mon-loja' + (on ? ' on' : '') + '">'
+                + '<input type="checkbox" ' + (on ? 'checked' : '') + ' data-jid="' + esc(jid) + '" data-loja="' + esc(l) + '"/>'
+                + esc(l) + '</label>';
+            }).join('')
+        + '</div></div>'
+        + '<div class="mon-campo"><label>Das</label>'
+          + '<input type="time" value="' + esc((c && c.inicio) || '00:00') + '" data-jid="' + esc(jid) + '" data-campo="inicio"/></div>'
+        + '<div class="mon-campo"><label>Até</label>'
+          + '<input type="time" value="' + esc((c && c.fim) || '23:59') + '" data-jid="' + esc(jid) + '" data-campo="fim"/></div>'
+        + '<div class="mon-campo"><label>Dias</label>'
+          + '<select data-jid="' + esc(jid) + '" data-campo="dias">'
+            + '<option value="todos"' + (!c || c.dias !== 'uteis' ? ' selected' : '') + '>Todos os dias</option>'
+            + '<option value="uteis"' + (c && c.dias === 'uteis' ? ' selected' : '') + '>Segunda a sexta</option>'
+          + '</select></div>'
+        + '<div class="mon-campo"><label>Ativo</label>'
+          + '<button class="sw ' + (!c || c.ativo !== false ? 'on' : '') + '" data-jid="' + esc(jid) + '" data-campo="ativo" '
+          + 'onclick="alternarMonitorAtivo(this)"></button></div>'
+        + '<div class="mon-campo" style="justify-content:flex-end">'
+          + '<button class="btn btn-copy btn-sm" style="margin-top:0" data-jid="' + esc(jid) + '" onclick="salvarMonitor(this)">💾 Salvar</button></div>'
+      + '</div>'
+      + (c ? '' : '<div class="mon-aviso">⚠️ Sem cadastro: este grupo não está capturando nada. Configure e salve.</div>')
+    + '</div>';
+  }).join('');
+}
+
+function alternarMonitorAtivo(btn){
+  btn.classList.toggle('on');
+}
+
+function salvarMonitor(btn){
+  var jid = btn.dataset.jid;
+  var raiz = btn.closest('.mon');
+  var lojas = [].slice.call(raiz.querySelectorAll('input[data-loja]'))
+    .filter(function(i){ return i.checked; }).map(function(i){ return i.dataset.loja; });
+  var val = function(campo){ var el = raiz.querySelector('[data-campo="' + campo + '"]'); return el ? el.value : null; };
+
+  btn.disabled = true; btn.textContent = '...';
+  fetch(SERVER + '/monitor/' + encodeURIComponent(jid), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      lojas: lojas, inicio: val('inicio'), fim: val('fim'), dias: val('dias'),
+      ativo: raiz.querySelector('[data-campo="ativo"]').classList.contains('on')
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    MON_CACHE[jid] = d.cfg;
+    renderMonitor();
+  })
+  .catch(function(e){ alert('Não foi possível salvar: ' + e.message); })
+  .finally(function(){ btn.disabled = false; btn.textContent = '💾 Salvar'; });
 }
 
 /* ══════ VITRINE ══════ */
@@ -1955,6 +2090,7 @@ function renderGrupos() {
   });
 
   renderResumoGrupos();
+  renderMonitor();
 
   el.innerHTML = '<div class="sec-label">'+nFonte+' fonte · '+nDest+' destino · '+GRUPOS_CACHE.length+' no total</div>'
     + lista.map(function(g) {
