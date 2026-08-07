@@ -233,6 +233,20 @@
   .grp::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:transparent}
   .grp.is-fonte::before{background:var(--blue)}
   .grp.is-destino::before{background:var(--accent)}
+  .grp-resumo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  @media(max-width:700px){ .grp-resumo{grid-template-columns:1fr} }
+  .grp-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+  .grp-box::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
+  .grp-box.fonte::before{background:var(--blue)}
+  .grp-box.destino::before{background:var(--accent)}
+  .grp-box-tit{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .grp-box-n{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:1px 8px;font-size:10px;color:var(--text)}
+  .grp-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;padding:5px 0;border-bottom:1px dashed var(--border)}
+  .grp-chip:last-child{border-bottom:none}
+  .grp-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .grp-chip button{background:transparent;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0}
+  .grp-chip button:hover{color:#e5534b}
+  .grp-box-vazio{font-size:11.5px;color:var(--muted2);font-style:italic;padding:4px 0}
   .grp-info{flex:1;min-width:0}
   .grp-nome{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .grp-meta{font-size:10.5px;color:var(--muted2);margin-top:3px}
@@ -595,6 +609,7 @@
     A lista vem direto da sessão do WhatsApp — não é preciso copiar ID de grupo.
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
+  <div class="grp-resumo" id="grp-resumo"></div>
   <div class="busca-row">
     <input type="text" id="busca-grupo" placeholder="Buscar grupo pelo nome" oninput="renderGrupos()"/>
     <button class="btn btn-copy btn-sm" onclick="carregarGrupos()">↻ Recarregar</button>
@@ -1588,17 +1603,43 @@ async function carregarGrupos() {
   }
 }
 
+// Resumo fixo no topo: quem e fonte e quem e destino, sem depender da busca.
+// Le PAPEIS (nao a lista filtrada) para nunca esconder um grupo configurado.
+function renderResumoGrupos() {
+  function nomeDe(jid) {
+    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+    return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
+  }
+  function caixa(papel, titulo, vazio) {
+    var jids = Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === papel; });
+    var corpo = jids.length
+      ? jids.map(function(j){
+          return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDe(j)) + '</span>'
+               + '<button onclick="definirPapel(\'' + j + '\',\'off\')" title="Remover deste papel">✕</button></div>';
+        }).join('')
+      : '<div class="grp-box-vazio">' + vazio + '</div>';
+    return '<div class="grp-box ' + papel + '">'
+      + '<div class="grp-box-tit">' + titulo + '<span class="grp-box-n">' + jids.length + '</span></div>'
+      + corpo + '</div>';
+  }
+  document.getElementById('grp-resumo').innerHTML =
+      caixa('fonte',   '📥 Fontes — de onde as ofertas vêm', 'Nenhum grupo marcado: o radar não vai capturar nada.')
+    + caixa('destino', '📤 Destinos — para onde são enviadas', 'Sem destino: as ofertas caem no grupo TSP padrão.');
+}
+
 function renderGrupos() {
   var el = document.getElementById('grupos-lista');
   var busca = (document.getElementById('busca-grupo').value || '').toLowerCase();
   var lista = GRUPOS_CACHE.filter(function(g){ return (g.nome||'').toLowerCase().indexOf(busca) !== -1; });
-  if (!lista.length) { el.innerHTML = '<div class="fila-vazia">Nenhum grupo com esse nome.</div>'; return; }
+  if (!lista.length) { renderResumoGrupos(); el.innerHTML = '<div class="fila-vazia">Nenhum grupo com esse nome.</div>'; return; }
 
   var nFonte = 0, nDest = 0;
   GRUPOS_CACHE.forEach(function(g){
     if (PAPEIS[g.id] === 'fonte') nFonte++;
     if (PAPEIS[g.id] === 'destino') nDest++;
   });
+
+  renderResumoGrupos();
 
   el.innerHTML = '<div class="sec-label">'+nFonte+' fonte · '+nDest+' destino · '+GRUPOS_CACHE.length+' no total</div>'
     + lista.map(function(g) {
