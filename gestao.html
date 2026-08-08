@@ -3021,11 +3021,15 @@ async function limparFilaPendente() {
   try {
     var r = await fetch(SERVER+'/painel/limpar', {
       method: 'POST', headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ confirmar:'sim', tipoConteudo:'cupom_tsp' })
+      // Todos os tipos que a fila exibe — não só cupons. A lista explícita é o
+      // que impede a limpeza de encostar nas emissões CDV.
+      body: JSON.stringify({ confirmar:'sim', tiposConteudo: TIPOS_TSP })
     });
     var d = await r.json();
     if (d.ok) {
-      status.textContent = 'Fila limpa'+(typeof d.removidos==='number' ? ' ('+d.removidos+' rejeitado(s))' : '');
+      status.textContent = d.removidos === 0
+        ? 'Nada para limpar: nenhum item pendente.'
+        : 'Fila limpa ('+d.removidos+' rejeitado(s))';
       setTimeout(carregarFila, 1500);
     } else {
       status.textContent = 'Erro: '+(d.erro||'falha');
