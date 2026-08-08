@@ -394,6 +394,7 @@
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
+  <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
 </div>
 
 <div id="shell-main">
@@ -731,14 +732,19 @@
   </div>
   <div id="mon-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 
-  <div class="sec-label" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+</div>
+
+<!-- ════════ CONEXÃO ════════ -->
+<div class="panel" id="panel-conexao">
+  <div class="aviso">
+    Quem <b>lê</b> os grupos é sempre o número principal — os extras <b>só disparam</b>.
+    Fora de qualquer turno, ou se o número da vez estiver fora do ar, o envio cai no principal.
+    A escala vale só para os disparos do <b>TSP</b> (cupons e ofertas de marketplace).
+  </div>
+
+  <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
     <span>📱 Números de envio</span>
     <span style="font-weight:600;text-transform:none;letter-spacing:0" id="contas-agora"></span>
-  </div>
-  <div class="aviso">
-    Quem <b>lê</b> os grupos é sempre o número principal. Os números extras <b>só disparam</b>, em turnos fixos.
-    Fora de qualquer turno — ou se o número da vez estiver fora do ar — o envio cai no principal.
-    A escala vale só para os disparos do <b>TSP</b> (cupons e ofertas de marketplace).
   </div>
   <div id="contas-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 
@@ -755,8 +761,8 @@
     <p class="send-ok" id="contas-status"></p>
   </div>
 
+  <div class="sec-label">🕐 Escala de turnos</div>
   <div class="card">
-    <div class="card-title" style="margin-bottom:10px">Escala de turnos</div>
     <label class="mon-loja" style="display:inline-flex;margin-bottom:12px" id="turnos-ativo-wrap">
       <input type="checkbox" id="turnos-ativo"/> Rodízio ligado
     </label>
@@ -973,14 +979,16 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','conexao'];
 function switchTab(name) {
   TABS.forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'fila') carregarFila();
-  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); carregarContas(); }
+  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
+  // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
+  if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { carregarCupons(); carregarJanelaCupom(); }
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
