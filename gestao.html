@@ -1532,11 +1532,13 @@ function toggleSidebar(forcar) {
 // Links /g/<slug> que revezam entre varios grupos. A contagem de membros vem do
 // proxy, que a busca no Baileys — aqui e so leitura e edicao.
 var DIST_PROXY = 'https://cdv-proxy-production.up.railway.app';
+// Base publica dos links — quem manda e o proxy (GG_HOSTS), nao o front.
+var DIST_BASE  = DIST_PROXY + '/g/';
 var DIST_CACHE = [];
 var DIST_SEL   = [];     // grupos do formulario: [{jid, nome, ativo}]
 var DIST_EDIT  = null;   // slug em edicao (null = criando)
 
-function distUrl(slug){ return DIST_PROXY + '/g/' + slug; }
+function distUrl(slug){ return DIST_BASE + slug; }
 
 function distMsg(txt, erro){
   var el = document.getElementById('dist-ok');
@@ -1553,6 +1555,7 @@ async function carregarDist(){
     var d = await r.json();
     if (!d.ok) throw new Error(d.erro || 'falha');
     DIST_CACHE = d.links || [];
+    if (d.base) DIST_BASE = d.base;
     var totalCliques = DIST_CACHE.reduce(function(s,l){ return s + (l.cliques||0); }, 0);
     st.textContent = DIST_CACHE.length + ' link(s) · ' + totalCliques + ' clique(s) no total';
     renderDist();
