@@ -830,6 +830,72 @@
 
 <!-- ════════ BASE DE CUPONS ════════ -->
 <div class="panel" id="panel-cupons">
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">Janela de publicação dos cupons <span class="tag" style="text-transform:none">vale para o auto-envio, horário de Brasília</span></p>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Das</label><input type="time" id="jc-inicio" value="08:00"/></div>
+      <div class="field"><label>Até</label><input type="time" id="jc-fim" value="21:00"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Dias</label>
+        <select id="jc-dias">
+          <option value="todos">Todos os dias</option>
+          <option value="uteis">Segunda a sexta</option>
+        </select>
+      </div>
+      <div class="field"><label>Intervalo mínimo <span class="tag">segundos entre cupons</span></label>
+        <input type="number" id="jc-intervalo" min="0" max="3600" step="5" value="90"/></div>
+    </div>
+    <button class="btn" id="jc-btn" onclick="salvarJanelaCupom()">Salvar janela</button>
+    <p class="send-ok" id="jc-status"></p>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">Criar cupom à mão <span class="tag" style="text-transform:none">entra na base igual a um capturado</span></p>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field loja-wrap">
+        <label>Loja</label>
+        <select id="nc-loja" onchange="toggleLojaNovoCupom()">
+          <option value="Amazon">Amazon</option>
+          <option value="Magazine Luiza">Magazine Luiza</option>
+          <option value="Mercado Livre">Mercado Livre</option>
+          <option value="Shopee">Shopee</option>
+          <option value="__outro__">Outra loja...</option>
+        </select>
+        <input type="text" id="nc-loja-custom" class="loja-custom" placeholder="Digite o nome da loja"/>
+      </div>
+      <div class="field"><label>Código</label>
+        <input type="text" id="nc-codigo" placeholder="Ex: EXTRA10"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Tipo de desconto</label>
+        <select id="nc-tipo" onchange="toggleLimiteNovoCupom()">
+          <option value="pct">Percentual (%)</option>
+          <option value="reais">Valor fixo (R$)</option>
+        </select>
+      </div>
+      <div class="field"><label>Valor</label>
+        <input type="number" id="nc-valor" min="0" step="0.01" placeholder="Ex: 12"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Compra mínima (R$) <span class="tag">0 = sem mínimo</span></label>
+        <input type="number" id="nc-minimo" min="0" step="0.01" placeholder="Ex: 79"/></div>
+      <div class="field" id="nc-limiteField"><label>Teto de desconto (R$) <span class="tag">opcional</span></label>
+        <input type="number" id="nc-limite" min="0" step="0.01" placeholder="Ex: 60"/></div>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Vence em <span class="tag">vazio = 24h a partir de agora</span></label>
+      <input type="datetime-local" id="nc-validade"/>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Observação <span class="tag">opcional</span></label>
+      <input type="text" id="nc-obs" placeholder="Ex: só no app"/>
+    </div>
+    <button class="btn" id="nc-btn" onclick="criarCupomManual()">Criar cupom</button>
+    <p class="send-ok" id="nc-status"></p>
+  </div>
+
   <div class="fila-bar">
     <span id="cupons-status">Carregando...</span>
     <div class="fila-acoes">
@@ -878,7 +944,7 @@ function switchTab(name) {
   });
   if (name === 'fila') carregarFila();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
-  if (name === 'cupons') carregarCupons();
+  if (name === 'cupons') { carregarCupons(); carregarJanelaCupom(); }
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
     (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
@@ -1319,6 +1385,117 @@ function restaurarPadrao(){
 
 /* ══════ BASE DE CUPONS ══════ */
 var CUPONS_CACHE = [];
+
+/* ══════ JANELA DE PUBLICACAO DOS CUPONS ══════ */
+// A janela vive no radar_config do servidor (nunca em storage local): o
+// auto-envio roda no Railway e precisa ler o mesmo valor que o painel mostra.
+function carregarJanelaCupom() {
+  return fetch(SERVER + '/mkt/config?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var j = d.janelaCupom || {};
+      document.getElementById('jc-inicio').value    = j.inicio || '08:00';
+      document.getElementById('jc-fim').value       = j.fim || '21:00';
+      document.getElementById('jc-dias').value      = j.dias === 'uteis' ? 'uteis' : 'todos';
+      document.getElementById('jc-intervalo').value = j.intervaloSeg != null ? j.intervaloSeg : 90;
+    })
+    .catch(function(){});
+}
+
+function salvarJanelaCupom() {
+  var btn = document.getElementById('jc-btn');
+  var s   = document.getElementById('jc-status');
+  var payload = { janelaCupom: {
+    inicio: document.getElementById('jc-inicio').value,
+    fim:    document.getElementById('jc-fim').value,
+    dias:   document.getElementById('jc-dias').value,
+    intervaloSeg: Number(document.getElementById('jc-intervalo').value) || 0
+  }};
+  btn.disabled = true; s.className='send-ok'; s.textContent = 'Salvando...';
+  fetch(SERVER + '/mkt/config', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var j = d.janelaCupom || payload.janelaCupom;
+    s.textContent = '✓ Cupons publicam das ' + j.inicio + ' às ' + j.fim
+      + (j.dias === 'uteis' ? ', de segunda a sexta' : ', todos os dias')
+      + ' · intervalo de ' + j.intervaloSeg + 's.';
+  })
+  .catch(function(e){ s.className='send-ok send-err'; s.textContent = 'Não salvou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
+}
+
+/* ══════ CRIAR CUPOM A MAO ══════ */
+function toggleLojaNovoCupom() {
+  var sel = document.getElementById('nc-loja');
+  var inp = document.getElementById('nc-loja-custom');
+  if (sel.value === '__outro__') { inp.classList.add('visible'); inp.focus(); }
+  else { inp.classList.remove('visible'); inp.value = ''; }
+}
+
+function toggleLimiteNovoCupom() {
+  // Teto só faz sentido em cupom percentual: em valor fixo o próprio valor é o teto.
+  var pct = document.getElementById('nc-tipo').value === 'pct';
+  var f = document.getElementById('nc-limiteField');
+  f.classList.toggle('disabled', !pct);
+  if (!pct) document.getElementById('nc-limite').value = '';
+}
+
+function criarCupomManual() {
+  var btn = document.getElementById('nc-btn');
+  var s   = document.getElementById('nc-status');
+  var sel = document.getElementById('nc-loja');
+  var loja = sel.value === '__outro__'
+    ? document.getElementById('nc-loja-custom').value.trim()
+    : sel.value;
+  var codigo = document.getElementById('nc-codigo').value.trim();
+  var valor  = Number(document.getElementById('nc-valor').value);
+
+  if (!loja)   { s.className='send-ok send-err'; s.textContent='Informe a loja.'; return; }
+  if (!codigo) { s.className='send-ok send-err'; s.textContent='Informe o código do cupom.'; return; }
+  if (!(valor > 0)) { s.className='send-ok send-err'; s.textContent='O valor precisa ser maior que zero.'; return; }
+
+  var minimoRaw = document.getElementById('nc-minimo').value;
+  var limiteRaw = document.getElementById('nc-limite').value;
+  var corpo = {
+    loja: loja,
+    codigo: codigo.toUpperCase(),
+    tipo: document.getElementById('nc-tipo').value,
+    valor: valor,
+    minimo: minimoRaw === '' ? null : Number(minimoRaw),
+    limite: limiteRaw === '' ? null : Number(limiteRaw),
+    observacao: document.getElementById('nc-obs').value.trim() || null
+  };
+
+  // O campo é lido como horário de Brasília, igual ao agendamento de envio.
+  var venc = document.getElementById('nc-validade').value;
+  if (venc) {
+    var dt = parseDatetimeAsSP(venc);
+    if (!dt || isNaN(dt.getTime())) { s.className='send-ok send-err'; s.textContent='Data de validade inválida.'; return; }
+    corpo.validadeAte = dt.toISOString();
+  }
+
+  btn.disabled = true; s.className='send-ok'; s.textContent='Criando...';
+  fetch(SERVER + '/cupons/base', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error((d.erros && d.erros[0] && d.erros[0].erro) || d.erro || 'falhou');
+    s.textContent = '✓ ' + corpo.codigo + ' na base de ' + loja + '.';
+    document.getElementById('nc-codigo').value = '';
+    document.getElementById('nc-valor').value = '';
+    document.getElementById('nc-minimo').value = '';
+    document.getElementById('nc-limite').value = '';
+    document.getElementById('nc-validade').value = '';
+    document.getElementById('nc-obs').value = '';
+    carregarCupons();
+  })
+  .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não criou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
+}
 
 function carregarCupons() {
   var st = document.getElementById('cupons-status');
