@@ -543,6 +543,7 @@
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
+  <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
   <div class="side-group">Resultados</div>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
@@ -891,6 +892,73 @@
   </div>
   <div id="mon-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 
+</div>
+
+<!-- ════════ DISTRIBUIDOR ════════ -->
+<div class="panel" id="panel-dist">
+  <div class="aviso">
+    Um <b>link único</b> que reveza entre vários grupos: cada clique manda a pessoa para um grupo diferente,
+    respeitando o limite de membros. O número conectado precisa ser <b>admin</b> de cada grupo para o convite ser gerado.
+  </div>
+
+  <div class="fila-bar">
+    <span id="dist-status">Carregando…</span>
+    <div class="fila-acoes">
+      <button class="btn btn-copy btn-sm" onclick="distSincronizar()">🔄 Sincronizar contagens</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarDist()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" id="dist-form-titulo" style="margin-bottom:12px">Novo link</div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Nome <span class="tag">uso interno</span></label>
+        <input type="text" id="dist-nome" placeholder="Ex: Campanha Instagram"/></div>
+      <div class="field"><label>Slug <span class="tag">vai na URL</span></label>
+        <input type="text" id="dist-slug" placeholder="promo01"/></div>
+    </div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Distribuição</label>
+        <select id="dist-modo">
+          <option value="aleatorio">Aleatório</option>
+          <option value="sequencial">Encher um por vez</option>
+          <option value="igual" selected>Igualmente (rodízio)</option>
+        </select></div>
+      <div class="field"><label>Limite por grupo <span class="tag">teto do WhatsApp: 1024</span></label>
+        <input type="number" id="dist-limite" value="1010" min="1" max="1024"/></div>
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Link de fallback <span class="tag">usado quando todos encherem</span></label>
+      <input type="text" id="dist-fallback" placeholder="https://…"/></div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Título do preview <span class="tag">opcional</span></label>
+        <input type="text" id="dist-og-titulo" placeholder="Entre no grupo de promoções"/></div>
+      <div class="field"><label>Descrição do preview <span class="tag">opcional</span></label>
+        <input type="text" id="dist-og-desc" placeholder="Toque para entrar no grupo"/></div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px">Grupos deste link</div>
+    <div class="field sel-box" style="position:relative;margin-bottom:10px">
+      <label>Adicionar grupo</label>
+      <input type="text" id="dist-add" autocomplete="off" placeholder="Digite parte do nome do grupo…"
+             oninput="distSugerir()" onfocus="distSugerir()"/>
+      <div class="sug" id="dist-sug"></div>
+    </div>
+    <div id="dist-sel"></div>
+
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" style="flex:1;margin-top:0" onclick="salvarDist()">💾 Salvar link</button>
+      <button class="btn btn-copy btn-sm" onclick="novoDist()">+ Novo</button>
+    </div>
+    <p class="send-ok" id="dist-ok"></p>
+  </div>
+
+  <div class="sec-label">Links cadastrados</div>
+  <div id="dist-lista"></div>
 </div>
 
 <!-- ════════ CONEXÃO ════════ -->
@@ -1423,7 +1491,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','conexao','comissao','trafego'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -1434,6 +1502,8 @@ function switchTab(name) {
   });
   if (name === 'fila') carregarFila();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
+  // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
+  if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
@@ -1457,6 +1527,283 @@ function toggleSidebar(forcar) {
   if (bd) bd.classList.toggle('open', abrir);
   document.body.style.overflow = abrir ? 'hidden' : '';
 }
+
+/* ══════ DISTRIBUIDOR DE GRUPOS ══════ */
+// Links /g/<slug> que revezam entre varios grupos. A contagem de membros vem do
+// proxy, que a busca no Baileys — aqui e so leitura e edicao.
+var DIST_PROXY = 'https://cdv-proxy-production.up.railway.app';
+var DIST_CACHE = [];
+var DIST_SEL   = [];     // grupos do formulario: [{jid, nome, ativo}]
+var DIST_EDIT  = null;   // slug em edicao (null = criando)
+
+function distUrl(slug){ return DIST_PROXY + '/g/' + slug; }
+
+function distMsg(txt, erro){
+  var el = document.getElementById('dist-ok');
+  el.style.color = erro ? 'var(--red)' : 'var(--green)';
+  el.textContent = txt;
+  if (txt) setTimeout(function(){ if (el.textContent === txt) el.textContent = ''; }, 6000);
+}
+
+async function carregarDist(){
+  var st = document.getElementById('dist-status');
+  st.textContent = 'Carregando…';
+  try {
+    var r = await fetch(DIST_PROXY + '/gg/links?t=' + Date.now(), { cache:'no-cache' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    DIST_CACHE = d.links || [];
+    var totalCliques = DIST_CACHE.reduce(function(s,l){ return s + (l.cliques||0); }, 0);
+    st.textContent = DIST_CACHE.length + ' link(s) · ' + totalCliques + ' clique(s) no total';
+    renderDist();
+  } catch(e){
+    st.textContent = 'Não foi possível carregar os links.';
+    document.getElementById('dist-lista').innerHTML =
+      '<div class="aviso"><b>Erro:</b> ' + esc(e.message) + '</div>';
+  }
+}
+
+function distBarra(pct, cheio){
+  var cor = cheio ? 'var(--red)' : (pct > 80 ? 'var(--accent)' : 'var(--green)');
+  return '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:5px">'
+    + '<div style="height:100%;width:' + Math.min(pct,100) + '%;background:' + cor + '"></div></div>';
+}
+
+function renderDist(){
+  var el = document.getElementById('dist-lista');
+  if (!DIST_CACHE.length){
+    el.innerHTML = '<div class="aviso">Nenhum link cadastrado ainda. Crie o primeiro no formulário acima.</div>';
+    return;
+  }
+  el.innerHTML = DIST_CACHE.map(function(l){
+    var rotulo = { igual:'Igualmente (rodízio)', sequencial:'Encher um por vez', aleatorio:'Aleatório' }[l.modo] || l.modo;
+    var grupos = (l.grupos||[]).map(function(g){
+      var pct = l.limite ? Math.round((g.ocupacao / l.limite) * 100) : 0;
+      var alerta = g.erro ? '<div style="color:var(--red);font-size:10.5px;margin-top:3px">⚠️ ' + esc(g.erro)
+          + ' <a href="#" onclick="distRenovar(\'' + esc(l.slug) + '\',\'' + esc(g.jid) + '\');return false" style="color:var(--accent)">renovar convite</a></div>' : '';
+      var selo = g.cheio ? '<span style="color:var(--red);font-weight:700">CHEIO</span>'
+               : (g.ativo ? '' : '<span style="color:var(--muted2)">pausado</span>');
+      return '<div style="padding:8px 0;border-bottom:1px dashed var(--border)">'
+        + '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">'
+        + '<span style="font-size:12px;font-weight:600;flex:1">' + esc(g.nome || g.jid) + '</span>'
+        + selo
+        + '<span style="font-size:11px;color:var(--muted)">' + (g.membros==null?'—':g.ocupacao) + ' / ' + l.limite + '</span>'
+        + '<span style="font-size:11px;color:var(--muted2)">' + (g.cliques||0) + ' cliques</span>'
+        + '</div>' + distBarra(pct, g.cheio) + alerta + '</div>';
+    }).join('');
+    var origens = Object.keys(l.origens||{}).sort().map(function(o){
+      return esc(o) + ': ' + l.origens[o];
+    }).join(' · ');
+    return '<div class="card">'
+      + '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px">'
+      +   '<span class="card-title" style="flex:1">' + esc(l.nome) + (l.ativo?'':' <span style="color:var(--muted2);font-weight:500">(pausado)</span>') + '</span>'
+      +   '<span style="font-size:11px;color:var(--muted)">' + esc(rotulo) + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'
+      +   '<code style="font-size:11.5px;background:var(--surface2);padding:5px 9px;border-radius:6px;flex:1;min-width:180px;word-break:break-all">' + esc(distUrl(l.slug)) + '</code>'
+      +   '<button class="btn btn-copy btn-sm" onclick="distCopiar(\'' + esc(l.slug) + '\')">📋 Copiar</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'
+      +   '<b>' + (l.cliques||0) + '</b> cliques · <b>' + l.disponiveis + '</b> grupo(s) com vaga'
+      +   (origens ? ' · ' + origens : '') + '</div>'
+      + grupos
+      + '<div class="btn-row" style="margin-top:12px">'
+      +   '<button class="btn btn-copy btn-sm" onclick="editarDist(\'' + esc(l.slug) + '\')">✏️ Editar</button>'
+      +   '<button class="btn btn-copy btn-sm" onclick="distSincronizar(\'' + esc(l.slug) + '\')">🔄 Sincronizar</button>'
+      +   '<button class="btn btn-rej btn-sm" onclick="excluirDist(\'' + esc(l.slug) + '\')">🗑️ Excluir</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function distCopiar(slug){
+  var url = distUrl(slug);
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ distMsg('Link copiado!'); });
+  else {
+    var ta = document.createElement('textarea'); ta.value = url;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); distMsg('Link copiado!');
+  }
+}
+
+/* ── formulário ── */
+function novoDist(){
+  DIST_EDIT = null; DIST_SEL = [];
+  document.getElementById('dist-form-titulo').textContent = 'Novo link';
+  document.getElementById('dist-nome').value = '';
+  document.getElementById('dist-slug').value = '';
+  document.getElementById('dist-slug').disabled = false;
+  document.getElementById('dist-modo').value = 'igual';
+  document.getElementById('dist-limite').value = 1010;
+  document.getElementById('dist-fallback').value = '';
+  document.getElementById('dist-og-titulo').value = '';
+  document.getElementById('dist-og-desc').value = '';
+  renderDistSel(); distMsg('');
+}
+
+function editarDist(slug){
+  var l = DIST_CACHE.find(function(x){ return x.slug === slug; });
+  if (!l) return;
+  DIST_EDIT = slug;
+  DIST_SEL = (l.grupos||[]).map(function(g){ return { jid:g.jid, nome:g.nome, ativo:g.ativo }; });
+  document.getElementById('dist-form-titulo').textContent = 'Editando: ' + l.nome;
+  document.getElementById('dist-nome').value = l.nome || '';
+  document.getElementById('dist-slug').value = slug;
+  document.getElementById('dist-slug').disabled = true;
+  document.getElementById('dist-modo').value = l.modo || 'igual';
+  document.getElementById('dist-limite').value = l.limite || 1010;
+  document.getElementById('dist-fallback').value = l.fallback || '';
+  document.getElementById('dist-og-titulo').value = l.ogTitulo || '';
+  document.getElementById('dist-og-desc').value = l.ogDesc || '';
+  renderDistSel(); distMsg('');
+  window.scrollTo({ top: 0, behavior:'smooth' });
+}
+
+function distSugerir(){
+  var termo = document.getElementById('dist-add').value.trim().toLowerCase();
+  var box = document.getElementById('dist-sug');
+  if (!GRUPOS_CACHE.length){
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Carregando grupos do WhatsApp…</div>';
+    box.style.display = 'block'; return;
+  }
+  var jaTem = {}; DIST_SEL.forEach(function(g){ jaTem[g.jid] = true; });
+  var lista = GRUPOS_CACHE.filter(function(g){
+    return !jaTem[g.id] && (!termo || (g.nome||'').toLowerCase().indexOf(termo) >= 0);
+  }).slice(0, 12);
+  if (!lista.length){ box.style.display = 'none'; return; }
+  box.innerHTML = lista.map(function(g){
+    return '<div onclick="distAdd(\'' + esc(g.id) + '\')" style="padding:9px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)">'
+      + esc(g.nome || '(sem nome)') + '</div>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+function distAdd(jid){
+  var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+  if (!g) return;
+  if (!DIST_SEL.some(function(x){ return x.jid === jid; }))
+    DIST_SEL.push({ jid: jid, nome: g.nome, ativo: true });
+  document.getElementById('dist-add').value = '';
+  document.getElementById('dist-sug').style.display = 'none';
+  renderDistSel();
+}
+
+function distRemoverSel(jid){
+  DIST_SEL = DIST_SEL.filter(function(x){ return x.jid !== jid; });
+  renderDistSel();
+}
+
+// Ordem importa no modo "encher um por vez": a lista e percorrida de cima para baixo.
+function distMover(jid, delta){
+  var i = DIST_SEL.findIndex(function(x){ return x.jid === jid; });
+  var j = i + delta;
+  if (i < 0 || j < 0 || j >= DIST_SEL.length) return;
+  var tmp = DIST_SEL[i]; DIST_SEL[i] = DIST_SEL[j]; DIST_SEL[j] = tmp;
+  renderDistSel();
+}
+
+function distTogglePausa(jid){
+  var g = DIST_SEL.find(function(x){ return x.jid === jid; });
+  if (g) { g.ativo = g.ativo === false; renderDistSel(); }
+}
+
+function renderDistSel(){
+  var el = document.getElementById('dist-sel');
+  if (!DIST_SEL.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted2);padding:6px 0">Nenhum grupo selecionado.</div>';
+    return;
+  }
+  el.innerHTML = DIST_SEL.map(function(g, i){
+    return '<div class="grp-chip">'
+      + '<span style="flex:1' + (g.ativo === false ? ';opacity:.45' : '') + '" title="' + esc(g.jid) + '">'
+      +   (i+1) + '. ' + esc(g.nome || g.jid) + '</span>'
+      + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distMover(\'' + esc(g.jid) + '\',-1)">↑</button>'
+      + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distMover(\'' + esc(g.jid) + '\',1)">↓</button>'
+      + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distTogglePausa(\'' + esc(g.jid) + '\')">'
+      +   (g.ativo === false ? '▶' : '⏸') + '</button>'
+      + '<button class="btn btn-rej btn-sm" style="padding:3px 8px" onclick="distRemoverSel(\'' + esc(g.jid) + '\')">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+async function salvarDist(){
+  var slug = (DIST_EDIT || document.getElementById('dist-slug').value).trim().toLowerCase();
+  if (!/^[a-z0-9\-_]{1,40}$/.test(slug)) return distMsg('Slug inválido — use apenas a-z, 0-9, - e _', true);
+  if (!DIST_SEL.length) return distMsg('Adicione pelo menos um grupo.', true);
+  distMsg('Salvando… (buscando convites no WhatsApp)');
+  try {
+    var r = await fetch(DIST_PROXY + '/gg/links', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        slug: slug,
+        nome: document.getElementById('dist-nome').value.trim() || slug,
+        modo: document.getElementById('dist-modo').value,
+        limite: Number(document.getElementById('dist-limite').value) || 1010,
+        fallback: document.getElementById('dist-fallback').value.trim(),
+        ogTitulo: document.getElementById('dist-og-titulo').value.trim(),
+        ogDesc: document.getElementById('dist-og-desc').value.trim(),
+        ativo: true,
+        grupos: DIST_SEL,
+      })
+    });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    if (d.avisos && d.avisos.length) distMsg('Salvo, mas: ' + d.avisos.join(' | '), true);
+    else distMsg('Link salvo!');
+    novoDist();
+    await carregarDist();
+  } catch(e){ distMsg('Erro: ' + e.message, true); }
+}
+
+async function excluirDist(slug){
+  if (!confirm('Excluir o link "' + slug + '"? Quem já tiver o link antigo cai no fallback.')) return;
+  try {
+    var r = await fetch(DIST_PROXY + '/gg/links/excluir', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ slug: slug })
+    });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    if (DIST_EDIT === slug) novoDist();
+    distMsg('Link excluído.');
+    await carregarDist();
+  } catch(e){ distMsg('Erro: ' + e.message, true); }
+}
+
+async function distSincronizar(slug){
+  var st = document.getElementById('dist-status');
+  st.textContent = 'Sincronizando com o WhatsApp…';
+  try {
+    var r = await fetch(DIST_PROXY + '/gg/sync', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(slug ? { slug: slug } : {})
+    });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    distMsg(d.atualizados + ' grupo(s) atualizado(s).');
+    await carregarDist();
+  } catch(e){ st.textContent = 'Falha ao sincronizar.'; distMsg('Erro: ' + e.message, true); }
+}
+
+async function distRenovar(slug, jid){
+  distMsg('Renovando convite…');
+  try {
+    var r = await fetch(DIST_PROXY + '/gg/convite', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ slug: slug, jid: jid })
+    });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    distMsg('Convite renovado.');
+    await carregarDist();
+  } catch(e){ distMsg('Erro: ' + e.message, true); }
+}
+
+document.addEventListener('click', function(e){
+  var box = document.getElementById('dist-sug');
+  if (!box) return;
+  if (e.target.id !== 'dist-add' && !box.contains(e.target)) box.style.display = 'none';
+});
 
 /* ══════ MONITORAMENTO ══════ */
 var MON_CACHE = {}, MON_LOJAS = ['Amazon','Shopee'];
