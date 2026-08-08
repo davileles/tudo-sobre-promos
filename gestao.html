@@ -577,6 +577,7 @@
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-12')">ML 12%</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-15')">ML 15%</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'ML-18')">ML 18%</button>
+        <button class="preset-btn" onclick="aplicarPreset(this,'ML-20')">ML 20%</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'SH-30')">SH R$30</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'SH-90')">SH R$90</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'SH-COMBO')">Combo SH</button>
@@ -1329,6 +1330,10 @@
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">Criar cupom à mão <span class="tag" style="text-transform:none">entra na base igual a um capturado</span></p>
+    <div style="margin-bottom:14px">
+      <p class="presets-label">Padrões rápidos <span class="tag" style="text-transform:none">preenchem loja, valor, mínimo e teto — o código fica com você</span></p>
+      <div class="presets" id="nc-presets"></div>
+    </div>
     <div class="g2" style="margin-bottom:12px">
       <div class="field loja-wrap">
         <label>Loja</label>
@@ -1425,7 +1430,7 @@ function switchTab(name) {
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
-  if (name === 'cupons') { carregarCupons(); carregarJanelaCupom(); }
+  if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
     (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
@@ -2072,6 +2077,51 @@ function salvarJanelaCupom() {
 }
 
 /* ══════ CRIAR CUPOM A MAO ══════ */
+// Os botões saem do mesmo PRESETS da aba Cupom. O combo da Shopee fica de fora:
+// ele é um formato de mensagem, não um cupom com valor para gravar na base.
+function renderPresetsCupom() {
+  var el = document.getElementById('nc-presets');
+  if (!el || el.dataset.pronto) return;
+  el.innerHTML = Object.keys(PRESETS).filter(function(k){ return !PRESETS[k]._combo; })
+    .map(function(k){
+      var p = PRESETS[k];
+      var det = p.tipo === 'pct' ? p.valor + '%' : 'R$ ' + p.valor;
+      var regra = (p.minimo ? 'mín R$ ' + p.minimo : 'sem mínimo')
+                + (p.limite ? ' · teto R$ ' + p.limite : '');
+      return '<button class="preset-btn" title="' + esc(p.loja + ' · ' + det + ' · ' + regra) + '"'
+        + ' onclick="aplicarPresetCupom(this,\'' + k + '\')">' + esc(p.rotulo || k) + '</button>';
+    }).join('');
+  el.dataset.pronto = '1';
+}
+
+function aplicarPresetCupom(btn, key) {
+  var p = PRESETS[key];
+  if (!p || p._combo) return;
+  var jaAtivo = btn.classList.contains('active');
+  document.querySelectorAll('#nc-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (jaAtivo) {   // segundo clique limpa, igual ao comportamento da aba Cupom
+    document.getElementById('nc-valor').value = '';
+    document.getElementById('nc-minimo').value = '';
+    document.getElementById('nc-limite').value = '';
+    toggleLimiteNovoCupom();
+    return;
+  }
+  btn.classList.add('active');
+  var sel = document.getElementById('nc-loja');
+  var achou = false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === p.loja) { sel.value = p.loja; achou = true; break; }
+  }
+  if (!achou) { sel.value = '__outro__'; document.getElementById('nc-loja-custom').value = p.loja; }
+  toggleLojaNovoCupom();
+  document.getElementById('nc-tipo').value   = p.tipo;
+  document.getElementById('nc-valor').value  = p.valor;
+  document.getElementById('nc-minimo').value = p.minimo || '';
+  document.getElementById('nc-limite').value = p.limite || '';
+  toggleLimiteNovoCupom();
+  document.getElementById('nc-codigo').focus();
+}
+
 function toggleLojaNovoCupom() {
   var sel = document.getElementById('nc-loja');
   var inp = document.getElementById('nc-loja-custom');
@@ -2135,6 +2185,7 @@ function criarCupomManual() {
     document.getElementById('nc-limite').value = '';
     document.getElementById('nc-validade').value = '';
     document.getElementById('nc-obs').value = '';
+    document.querySelectorAll('#nc-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
     carregarCupons();
   })
   .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não criou: ' + e.message; })
@@ -2338,15 +2389,19 @@ function marcarLoja(pid) {
 }
 
 /* ══════ PRESETS ══════ */
+// Padrões que as lojas repetem. Usados nos dois lugares: na aba Cupom (montar a
+// mensagem) e no "Criar cupom à mão" da Base de Cupons — mesma fonte, para um
+// padrão novo não precisar ser cadastrado em dois sítios.
 var PRESETS = {
-  'ML-12': { loja:'Mercado Livre', tipo:'pct', valor:'12', minimo:'79', limite:'60' },
-  'ML-15': { loja:'Mercado Livre', tipo:'pct', valor:'15', minimo:'79', limite:'60' },
-  'ML-18': { loja:'Mercado Livre', tipo:'pct', valor:'18', minimo:'79', limite:'60' },
-  'SH-30': { loja:'Shopee', tipo:'reais', valor:'30', minimo:'299', limite:'' },
-  'SH-90': { loja:'Shopee', tipo:'reais', valor:'90', minimo:'899', limite:'' },
-  'SH-COMBO': { _combo: true },
-  'AZ-10A': { loja:'Amazon', tipo:'pct', valor:'10', minimo:'100', limite:'50' },
-  'AZ-10B': { loja:'Amazon', tipo:'pct', valor:'10', minimo:'300', limite:'100' }
+  'ML-12': { rotulo:'ML 12%', loja:'Mercado Livre', tipo:'pct', valor:'12', minimo:'79', limite:'60' },
+  'ML-15': { rotulo:'ML 15%', loja:'Mercado Livre', tipo:'pct', valor:'15', minimo:'79', limite:'60' },
+  'ML-18': { rotulo:'ML 18%', loja:'Mercado Livre', tipo:'pct', valor:'18', minimo:'79', limite:'60' },
+  'ML-20': { rotulo:'ML 20%', loja:'Mercado Livre', tipo:'pct', valor:'20', minimo:'79', limite:'60' },
+  'SH-30': { rotulo:'SH R$30', loja:'Shopee', tipo:'reais', valor:'30', minimo:'299', limite:'' },
+  'SH-90': { rotulo:'SH R$90', loja:'Shopee', tipo:'reais', valor:'90', minimo:'899', limite:'' },
+  'SH-COMBO': { rotulo:'Combo SH', _combo: true },
+  'AZ-10A': { rotulo:'AZ 10% (R$50)', loja:'Amazon', tipo:'pct', valor:'10', minimo:'100', limite:'50' },
+  'AZ-10B': { rotulo:'AZ 10% (R$100)', loja:'Amazon', tipo:'pct', valor:'10', minimo:'300', limite:'100' }
 };
 var _activePreset = null;
 function aplicarPreset(btn, key) {
