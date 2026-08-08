@@ -1814,7 +1814,9 @@ function renderCensoGrafico(){
   });
 
   var av = document.getElementById('censo-gr-aviso');
-  av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)';
+  var nAgr = serie.filter(function(p){ return p.agregado; }).length;
+  av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)'
+    + (nAgr ? ' · ' + nAgr + ' ponto(s) do histórico importado só têm o total somado — sem quebra por grupo' : '');
 }
 
 function distSugerir(){
