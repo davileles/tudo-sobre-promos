@@ -548,6 +548,7 @@
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
   <div class="side-group">Cadastros</div>
   <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine</button>
+  <button class="main-tab" id="tab-listas" onclick="switchTab('listas')">🔁 Listas de reenvio</button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
@@ -1318,6 +1319,75 @@
 </div>
 
 <!-- ════════ VITRINE ════════ -->
+<div class="panel" id="panel-listas">
+  <div class="aviso">
+    Conjuntos de produtos que já venderam bem e você quer <b>reenviar de tempos em tempos</b>.
+    O disparo sai <b>um produto por vez</b>, respeitando o intervalo definido — nunca em rajada.
+    Preço, link de afiliado e cupom são resolvidos <b>no instante de cada envio</b>.
+  </div>
+
+  <div class="fila-bar">
+    <span id="lst-status">Carregando…</span>
+    <div class="fila-acoes">
+      <button class="btn btn-copy btn-sm" onclick="novaLista()">+ Nova lista</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarListas()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="card" id="lst-form" style="display:none">
+    <div class="card-title" id="lst-form-titulo" style="margin-bottom:12px">Nova lista</div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Nome da lista</label>
+        <input type="text" id="lst-nome" placeholder="Ex: Campeões de venda — cozinha"/></div>
+      <div class="field"><label>Intervalo entre postagens <span class="tag">minutos</span></label>
+        <input type="number" id="lst-intervalo" value="20" min="1" max="720"/></div>
+    </div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Cupom</label>
+        <select id="lst-cupom-modo" onchange="lstToggleCupom()">
+          <option value="auto">Automático — melhor cupom que servir em cada produto</option>
+          <option value="fixo">Sempre este cupom</option>
+          <option value="nenhum">Sem cupom</option>
+        </select></div>
+      <div class="field" id="lst-cupom-fixo-wrap" style="display:none">
+        <label>Qual cupom</label><select id="lst-cupom-codigo"></select></div>
+    </div>
+
+    <div class="sec-label" style="margin-top:4px">Agendamento <span class="tag">opcional</span></div>
+    <div class="mon-linha" style="margin-bottom:12px">
+      <div class="mon-campo"><label>Ligado</label>
+        <button class="sw" id="lst-ag-ativo" onclick="this.classList.toggle('on')"></button></div>
+      <div class="mon-campo"><label>Hora</label>
+        <input type="time" id="lst-ag-hora" value="09:00"/></div>
+      <div class="mon-campo" style="flex:1;min-width:230px"><label>Dias da semana</label>
+        <div class="mon-lojas" id="lst-ag-dias"></div></div>
+    </div>
+
+    <div class="sec-label">Produtos da lista</div>
+    <div class="field sel-box" style="position:relative;margin-bottom:10px">
+      <label>Adicionar da vitrine</label>
+      <input type="text" id="lst-add" autocomplete="off" placeholder="Digite parte do nome do produto…"
+             oninput="lstSugerir()" onfocus="lstSugerir()"/>
+      <div class="sug" id="lst-sug"></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-4px 0 10px;line-height:1.5">
+      Só aparecem produtos já cadastrados na <b>Vitrine</b>. Cole os links sem sua tag de afiliado lá —
+      a conversão para o seu link acontece a cada envio.
+    </p>
+    <div id="lst-sel"></div>
+
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" style="flex:1;margin-top:0" onclick="salvarLista()">💾 Salvar lista</button>
+      <button class="btn btn-copy btn-sm" onclick="cancelarFormLista()">Cancelar</button>
+    </div>
+    <p class="send-ok" id="lst-ok"></p>
+  </div>
+
+  <div id="lst-lista"></div>
+</div>
+
 <div class="panel" id="panel-vitrine">
   <div class="aviso">
     Produtos que você quer manter à mão. Preço e estoque são consultados <b>no momento do disparo</b> —
@@ -1525,7 +1595,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','listas','cupons','templates','grupos','dist','conexao','comissao','trafego'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -1541,6 +1611,12 @@ function switchTab(name) {
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
+  if (name === 'listas') {
+    // Precisa da vitrine (nomes dos produtos) e dos cupons (select do modo fixo).
+    (VIT_CACHE.length ? Promise.resolve() : carregarVitrine())
+      .then(function(){ return CUPONS_CACHE.length ? null : carregarCupons(); })
+      .then(carregarListas);
+  }
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
     (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
@@ -2303,6 +2379,281 @@ function salvarTurnos() {
 
 /* ══════ VITRINE ══════ */
 var VIT_CACHE = [], VIT_SEL = {};
+
+/* ══════ LISTAS DE REENVIO ══════ */
+var LST_CACHE = [];
+var LST_SEL   = [];      // produtos do formulario: [{asin, nome}]
+var LST_EDIT  = null;    // id em edicao (null = nova)
+var LST_TIMER = null;
+var DIAS_SEM  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function lstMsg(txt, erro){
+  var el = document.getElementById('lst-ok');
+  el.style.color = erro ? 'var(--red)' : 'var(--green)';
+  el.textContent = txt;
+  if (txt) setTimeout(function(){ if (el.textContent === txt) el.textContent = ''; }, 6000);
+}
+
+function carregarListas(){
+  return fetch(SERVER + '/listas?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      LST_CACHE = d.listas || [];
+      var rodando = LST_CACHE.filter(function(l){ return l.execucao; }).length;
+      document.getElementById('lst-status').textContent =
+        LST_CACHE.length + ' lista(s)' + (rodando ? ' · ' + rodando + ' em disparo' : '');
+      renderListas();
+      // Enquanto houver disparo em andamento, o painel se atualiza sozinho.
+      if (LST_TIMER) clearTimeout(LST_TIMER);
+      if (rodando) LST_TIMER = setTimeout(carregarListas, 20000);
+    })
+    .catch(function(e){
+      document.getElementById('lst-status').textContent = 'Falha: ' + e.message;
+      document.getElementById('lst-lista').innerHTML = '<div class="cup-vazio">Sem resposta do servidor.</div>';
+    });
+}
+
+function renderListas(){
+  var el = document.getElementById('lst-lista');
+  if (!LST_CACHE.length){
+    el.innerHTML = '<div class="cup-vazio">Nenhuma lista ainda. Crie a primeira em “+ Nova lista”.</div>';
+    return;
+  }
+  el.innerHTML = LST_CACHE.map(function(l){
+    var ex = l.execucao;
+    var cupom = l.cupomModo === 'auto' ? 'cupom automático'
+              : l.cupomModo === 'fixo' ? 'cupom ' + esc(l.cupomCodigo || '?') : 'sem cupom';
+    var agenda = (l.agenda && l.agenda.ativo && l.agenda.diasSemana.length)
+      ? l.agenda.diasSemana.slice().sort().map(function(d){ return DIAS_SEM[d]; }).join(', ') + ' às ' + esc(l.agenda.hora)
+      : 'sem agendamento';
+    var sumiram = l.itens.filter(function(i){ return i.sumiu; }).length;
+
+    var progresso = '';
+    if (ex){
+      var feitos = ex.indice, tot = l.produtos.length;
+      var pct = tot ? Math.round(feitos / tot * 100) : 0;
+      var prox = ex.pausada ? 'pausada'
+        : 'próximo ' + new Date(ex.proximoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      progresso = '<div style="margin:10px 0">'
+        + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:5px">'
+        +   '▶ ' + feitos + '/' + tot + ' · ' + ex.enviados.length + ' enviado(s)'
+        +   (ex.pulados.length ? ' · ' + ex.pulados.length + ' pulado(s)' : '')
+        +   (ex.falhas.length ? ' · <span style="color:var(--red)">' + ex.falhas.length + ' falha(s)</span>' : '')
+        +   ' · ' + prox + '</div>'
+        + '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden">'
+        +   '<div style="height:100%;width:' + pct + '%;background:var(--green)"></div></div>'
+        + '</div>';
+    }
+
+    var acoes = ex
+      ? (ex.pausada
+          ? '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'retomar\')">▶ Retomar</button>'
+          : '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'pausar\')">⏸ Pausar</button>')
+        + '<button class="btn btn-rej btn-sm" onclick="acaoLista(\'' + l.id + '\',\'cancelar\')">⏹ Cancelar</button>'
+      : '<button class="btn btn-sm" style="margin-top:0" onclick="dispararLista(\'' + l.id + '\')">🚀 Disparar agora</button>'
+        + '<button class="btn btn-copy btn-sm" onclick="editarLista(\'' + l.id + '\')">✏️ Editar</button>'
+        + '<button class="btn btn-rej btn-sm" onclick="excluirLista(\'' + l.id + '\')">🗑️ Excluir</button>';
+
+    var duracao = l.produtos.length > 1
+      ? Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10 + 'h de duração'
+      : 'envio único';
+
+    return '<div class="card">'
+      + '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">'
+      +   '<span class="card-title" style="flex:1">' + esc(l.nome)
+      +     (l.ativo ? '' : ' <span style="color:var(--muted2);font-weight:500">(desativada)</span>') + '</span>'
+      +   (ex ? '<span class="mon-estado on">em disparo</span>' : '')
+      + '</div>'
+      + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">'
+      +   '<b>' + l.produtos.length + '</b> produto(s) · a cada <b>' + l.intervaloMin + ' min</b> · ' + duracao + '</div>'
+      + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">' + cupom + ' · ' + agenda + '</div>'
+      + (l.ultimoDisparo ? '<div style="font-size:11px;color:var(--muted2)">último disparo: '
+          + new Date(l.ultimoDisparo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
+      + (sumiram ? '<div class="mon-aviso">⚠️ ' + sumiram + ' produto(s) não estão mais na vitrine e serão pulados.</div>' : '')
+      + progresso
+      + '<div class="btn-row" style="margin-top:12px">' + acoes + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+/* ── Formulário ── */
+function lstDiasHtml(sel){
+  return DIAS_SEM.map(function(nome, i){
+    var on = (sel || []).indexOf(i) !== -1;
+    return '<label class="mon-loja' + (on ? ' on' : '') + '">'
+      + '<input type="checkbox" data-dia="' + i + '" ' + (on ? 'checked' : '') + '/>' + nome + '</label>';
+  }).join('');
+}
+
+function lstToggleCupom(){
+  var fixo = document.getElementById('lst-cupom-modo').value === 'fixo';
+  document.getElementById('lst-cupom-fixo-wrap').style.display = fixo ? 'flex' : 'none';
+  if (fixo){
+    var s = document.getElementById('lst-cupom-codigo');
+    var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
+  }
+}
+
+function novaLista(){
+  LST_EDIT = null; LST_SEL = [];
+  document.getElementById('lst-form-titulo').textContent = 'Nova lista';
+  document.getElementById('lst-nome').value = '';
+  document.getElementById('lst-intervalo').value = 20;
+  document.getElementById('lst-cupom-modo').value = 'auto';
+  document.getElementById('lst-ag-ativo').classList.remove('on');
+  document.getElementById('lst-ag-hora').value = '09:00';
+  document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml([]);
+  document.getElementById('lst-form').style.display = 'block';
+  lstToggleCupom(); renderLstSel(); lstMsg('');
+  window.scrollTo({ top: 0, behavior:'smooth' });
+}
+
+function editarLista(id){
+  var l = LST_CACHE.find(function(x){ return x.id === id; });
+  if (!l) return;
+  LST_EDIT = id;
+  LST_SEL = l.itens.map(function(i){ return { asin:i.asin, nome:i.nome }; });
+  document.getElementById('lst-form-titulo').textContent = 'Editando: ' + l.nome;
+  document.getElementById('lst-nome').value = l.nome;
+  document.getElementById('lst-intervalo').value = l.intervaloMin;
+  document.getElementById('lst-cupom-modo').value = l.cupomModo;
+  document.getElementById('lst-ag-ativo').classList.toggle('on', !!(l.agenda && l.agenda.ativo));
+  document.getElementById('lst-ag-hora').value = (l.agenda && l.agenda.hora) || '09:00';
+  document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml((l.agenda && l.agenda.diasSemana) || []);
+  document.getElementById('lst-form').style.display = 'block';
+  lstToggleCupom();
+  if (l.cupomModo === 'fixo') document.getElementById('lst-cupom-codigo').value = l.cupomCodigo || '';
+  renderLstSel(); lstMsg('');
+  window.scrollTo({ top: 0, behavior:'smooth' });
+}
+
+function cancelarFormLista(){ document.getElementById('lst-form').style.display = 'none'; LST_EDIT = null; }
+
+function lstSugerir(){
+  var termo = document.getElementById('lst-add').value.trim().toLowerCase();
+  var box = document.getElementById('lst-sug');
+  if (!VIT_CACHE.length){
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Vitrine vazia — cadastre os produtos na aba 🏬 Vitrine.</div>';
+    box.style.display = 'block'; return;
+  }
+  var jaTem = {}; LST_SEL.forEach(function(p){ jaTem[p.asin] = true; });
+  var lista = VIT_CACHE.filter(function(p){
+    return !jaTem[p.asin] && (!termo || (p.nome||'').toLowerCase().indexOf(termo) >= 0);
+  }).slice(0, 12);
+  if (!lista.length){ box.style.display = 'none'; return; }
+  box.innerHTML = lista.map(function(p){
+    return '<div onclick="lstAdd(\'' + esc(p.asin) + '\')" style="padding:9px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)">'
+      + esc(p.nome) + ' <span style="color:var(--muted2)">· ' + esc(p.loja || 'Amazon') + '</span></div>';
+  }).join('');
+  box.style.display = 'block';
+}
+
+function lstAdd(asin){
+  var p = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  if (!p) return;
+  if (!LST_SEL.some(function(x){ return x.asin === asin; })) LST_SEL.push({ asin:asin, nome:p.nome });
+  document.getElementById('lst-add').value = '';
+  document.getElementById('lst-sug').style.display = 'none';
+  renderLstSel();
+}
+
+function lstRemover(asin){
+  LST_SEL = LST_SEL.filter(function(x){ return x.asin !== asin; });
+  renderLstSel();
+}
+
+// Ordem importa: o disparo percorre a lista de cima para baixo.
+function lstMover(asin, delta){
+  var i = LST_SEL.findIndex(function(x){ return x.asin === asin; });
+  var j = i + delta;
+  if (i < 0 || j < 0 || j >= LST_SEL.length) return;
+  var t = LST_SEL[i]; LST_SEL[i] = LST_SEL[j]; LST_SEL[j] = t;
+  renderLstSel();
+}
+
+function renderLstSel(){
+  var el = document.getElementById('lst-sel');
+  if (!LST_SEL.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted2);padding:6px 0">Nenhum produto ainda.</div>';
+    return;
+  }
+  var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
+  el.innerHTML = LST_SEL.map(function(p, i){
+    return '<div class="grp-chip">'
+      + '<span style="flex:1">' + (i+1) + '. ' + esc(p.nome) + '</span>'
+      + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
+      + '<button onclick="lstMover(\'' + esc(p.asin) + '\',1)" title="Descer">↓</button>'
+      + '<button onclick="lstRemover(\'' + esc(p.asin) + '\')" title="Remover">✕</button>'
+      + '</div>';
+  }).join('')
+  + '<div style="font-size:11px;color:var(--muted2);margin-top:8px">'
+  + LST_SEL.length + ' produto(s) · duração estimada '
+  + (Math.round((LST_SEL.length - 1) * intervalo / 60 * 10) / 10) + 'h</div>';
+}
+
+function salvarLista(){
+  var nome = document.getElementById('lst-nome').value.trim();
+  if (!nome) return lstMsg('Dê um nome para a lista.', true);
+  if (!LST_SEL.length) return lstMsg('Adicione ao menos um produto.', true);
+
+  var dias = [].slice.call(document.querySelectorAll('#lst-ag-dias input[data-dia]'))
+    .filter(function(i){ return i.checked; }).map(function(i){ return Number(i.dataset.dia); });
+  var agAtivo = document.getElementById('lst-ag-ativo').classList.contains('on');
+  if (agAtivo && !dias.length) return lstMsg('Escolha ao menos um dia da semana para o agendamento.', true);
+
+  var modo = document.getElementById('lst-cupom-modo').value;
+  var corpo = {
+    id: LST_EDIT || undefined,
+    nome: nome,
+    produtos: LST_SEL.map(function(p){ return p.asin; }),
+    intervaloMin: Number(document.getElementById('lst-intervalo').value) || 20,
+    cupomModo: modo,
+    cupomCodigo: modo === 'fixo' ? document.getElementById('lst-cupom-codigo').value : null,
+    agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
+  };
+
+  fetch(SERVER + '/listas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      lstMsg('✓ Lista salva.');
+      cancelarFormLista(); carregarListas();
+    })
+    .catch(function(e){ lstMsg('Não foi possível salvar: ' + e.message, true); });
+}
+
+function dispararLista(id){
+  var l = LST_CACHE.find(function(x){ return x.id === id; });
+  if (!l) return;
+  var horas = Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10;
+  if (!confirm('Disparar "' + l.nome + '"?\n\n' + l.produtos.length + ' produto(s), um a cada '
+    + l.intervaloMin + ' min — cerca de ' + horas + 'h até o último.')) return;
+  fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/disparar', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      carregarListas();
+    })
+    .catch(function(e){ alert('Não foi possível disparar: ' + e.message); });
+}
+
+function acaoLista(id, acao){
+  if (acao === 'cancelar' && !confirm('Cancelar o disparo? Os produtos que ainda não saíram não serão enviados.')) return;
+  fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/' + acao, { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (!d.ok) throw new Error(d.erro || 'falhou'); carregarListas(); })
+    .catch(function(e){ alert('Falhou: ' + e.message); });
+}
+
+function excluirLista(id){
+  var l = LST_CACHE.find(function(x){ return x.id === id; });
+  if (!confirm('Excluir a lista "' + (l ? l.nome : id) + '"? Os produtos continuam na vitrine.')) return;
+  fetch(SERVER + '/listas/' + encodeURIComponent(id), { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(){ carregarListas(); })
+    .catch(function(e){ alert('Falhou: ' + e.message); });
+}
 
 function carregarVitrine(){
   return fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
