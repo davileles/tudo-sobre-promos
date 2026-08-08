@@ -259,6 +259,19 @@ textarea.out:focus{outline:none}
 <!-- OFERTA -->
 <div class="panel" id="panel-oferta">
   <div class="card">
+    <p class="card-title" style="margin-bottom:12px">Buscar produto pelo link <span class="tag" style="text-transform:none">Amazon, Mercado Livre, Shopee ou Magalu</span></p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Link do produto</label>
+      <input type="text" id="o-busca-link" placeholder="https://..." onkeydown="if(event.key==='Enter'){event.preventDefault();buscarProduto();}"/>
+    </div>
+    <button class="btn" id="o-busca-btn" onclick="buscarProduto()">Buscar e preencher</button>
+    <p class="send-ok" id="o-busca-status"></p>
+    <div class="field" id="o-cupom-vinculo" style="display:none;margin-top:14px">
+      <label>Vincular cupom da base <span class="tag">so aparecem os vigentes desta loja</span></label>
+      <select id="o-cupom-sel" onchange="vincularCupom()"></select>
+    </div>
+  </div>
+  <div class="card">
     <div class="field" style="margin-bottom:12px">
       <label>Gatilho <span class="tag">opcional</span></label>
       <input type="text" id="o-gatilho" placeholder="Ex: Corre que e por tempo limitado!"/>
@@ -573,6 +586,115 @@ function gerarCupom() {
   mostrar('c-msg','c-result','c-ok', msg);
 }
 
+// ── BUSCA DE PRODUTO POR LINK ─────────────────────────
+// Preco, titulo e disponibilidade vem do servidor (API/pagina da loja), nunca
+// digitados a mao: e a mesma fonte que o radar automatico usa. O link volta ja
+// com a etiqueta de afiliado da conta.
+var _produtoBuscado = null;
+
+function _fetchTimeout(url, opts, ms) {
+  // AbortSignal.timeout nao existe em WebView antiga — controller manual.
+  opts = opts || {};
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, ms || 45000);
+  opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(function(){ clearTimeout(t); });
+}
+
+async function buscarProduto() {
+  var link = document.getElementById('o-busca-link').value.trim();
+  var s = document.getElementById('o-busca-status');
+  var btn = document.getElementById('o-busca-btn');
+  if (!link) { s.className='send-ok send-err'; s.textContent='Cole o link do produto.'; return; }
+
+  btn.disabled = true;
+  s.className='send-ok'; s.textContent='Consultando a loja...';
+  try {
+    var r = await _fetchTimeout(SERVER+'/mkt/montar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ link: link })
+    }, 60000);
+    var d = await r.json();
+    if (!d.ok) {
+      s.className='send-ok send-err';
+      s.textContent = 'Nao deu: ' + (d.erro || 'falha na consulta');
+      return;
+    }
+
+    _produtoBuscado = d;
+    var p = d.produto;
+
+    document.getElementById('o-nome').value     = p.titulo || '';
+    document.getElementById('o-original').value = p.precoDe ? p.precoDe.toFixed(2) : '';
+    document.getElementById('o-final').value    = p.preco ? p.preco.toFixed(2) : '';
+    document.getElementById('o-link').value     = p.link || link;
+
+    // Loja: usa a opcao do select quando existe, senao cai em "Outra loja".
+    var sel = document.getElementById('o-loja');
+    var achou = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === d.loja) { sel.value = d.loja; achou = true; break; }
+    }
+    if (!achou) { sel.value = '__outro__'; document.getElementById('o-loja-custom').value = d.loja; }
+    toggleLojaCustom('o');
+
+    preencherCuponsVinculo(d.cupons || []);
+
+    var avisos = [];
+    if (!p.disponivel) avisos.push('produto sem estoque');
+    if (!p.precoDe)    avisos.push('sem preco de tabela — preencha o "De:" a mao');
+    s.className = avisos.length ? 'send-ok send-err' : 'send-ok';
+    s.textContent = (avisos.length ? '\u26a0\ufe0f ' : '\u2713 ')
+      + (p.titulo || 'Produto').slice(0, 60)
+      + ' — R$ ' + fmt(p.preco)
+      + (avisos.length ? ' (' + avisos.join('; ') + ')' : '');
+  } catch(e) {
+    s.className='send-ok send-err'; s.textContent='Sem resposta do servidor.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function preencherCuponsVinculo(cupons) {
+  var wrap = document.getElementById('o-cupom-vinculo');
+  var sel  = document.getElementById('o-cupom-sel');
+  sel.innerHTML = '<option value="">Sem cupom</option>';
+  if (!cupons.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  cupons.forEach(function(c, i) {
+    var op = document.createElement('option');
+    op.value = String(i);
+    op.textContent = c.codigo + ' — ' + (c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmt(c.valor))
+      + ' (economia de R$ ' + fmt(c.descontoAplicado) + ')';
+    sel.appendChild(op);
+  });
+  sel._cupons = cupons;
+  wrap.style.display = 'flex';
+}
+
+function vincularCupom() {
+  var sel = document.getElementById('o-cupom-sel');
+  var c = sel.value === '' ? null : (sel._cupons || [])[Number(sel.value)];
+  if (!c) {
+    document.getElementById('o-cupom').value = '';
+    document.getElementById('o-cupomValor').value = '';
+  } else {
+    document.getElementById('o-cupom').value = c.codigo;
+    document.getElementById('o-tipo').value = c.tipo === 'reais' ? 'reais' : 'pct';
+    // Cupom percentual com teto: converte para o valor fixo que ele realmente
+    // rende neste preco, senao a mensagem prometeria um desconto que o teto corta.
+    if (c.tipo === 'pct' && c.limite != null && (Number(c.valor) * Number(document.getElementById('o-final').value || 0) / 100) > Number(c.limite)) {
+      document.getElementById('o-tipo').value = 'reais';
+      document.getElementById('o-cupomValor').value = Number(c.descontoAplicado).toFixed(2);
+    } else {
+      document.getElementById('o-cupomValor').value = c.valor;
+    }
+  }
+  toggleCupomValor();
+}
+
 function toggleCupomValor() {
   var tem = document.getElementById('o-cupom').value.trim() !== '';
   document.getElementById('o-cupomValorField').classList.toggle('disabled', !tem);
@@ -588,8 +710,13 @@ function gerarOferta() {
   var cupomVal = parseFloat(document.getElementById('o-cupomValor').value) || 0;
   var loja = getLoja('o');
   var link = document.getElementById('o-link').value.trim();
-  var preco = finalVal;
-  if (cupom && cupomVal > 0) preco = tipoCupom==='pct' ? original*(100-cupomVal)/100 : original-cupomVal;
+  // O cupom incide sobre o preco que o cliente ja veria na loja (o final), nao
+  // sobre o de tabela: aplicar no original anunciava um "Por:" acima do real
+  // sempre que o produto ja estava com desconto.
+  var base = finalVal || original;
+  var preco = base;
+  if (cupom && cupomVal > 0) preco = tipoCupom==='pct' ? base*(100-cupomVal)/100 : base-cupomVal;
+  if (preco < 0) preco = 0;
   var gatilho = document.getElementById('o-gatilho').value.trim();
   var msg = '';
   if (gatilho) msg += '`🚨 '+gatilho+'`\n\n';
@@ -841,6 +968,17 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     } else {
       var payload = { mensagem: texto, grupo: 'tsp' };
       if (agendarEm) payload.agendarEm = agendarEm;
+      // Oferta montada pela busca por link sai com card de preview, igual as do
+      // radar. So no envio imediato: agendamento guarda apenas o texto.
+      if (!agendarEm && msgId === 'o-msg' && _produtoBuscado
+          && _produtoBuscado.produto.link === document.getElementById('o-link').value.trim()) {
+        payload.preview = {
+          link: _produtoBuscado.produto.link,
+          titulo: _produtoBuscado.produto.titulo,
+          descricao: 'R$ ' + fmt(_produtoBuscado.produto.preco) + ' \u00b7 ' + _produtoBuscado.loja,
+          imagemUrl: _produtoBuscado.produto.imagemUrl,
+        };
+      }
       r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     }
     var d = await r.json();
