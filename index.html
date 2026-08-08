@@ -1356,6 +1356,7 @@
       para reenviar quando quiser.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
+    <div id="vit-cad-erros" style="display:none;margin-top:8px;border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:10px 12px;background:rgba(248,113,113,.05)"></div>
   </div>
 
   <!-- ─── 2. Disparos ─── -->
@@ -2835,6 +2836,16 @@ function atualizarBarraVitrine(){
   document.getElementById('vit-btn-disparar').textContent = '🚀 Montar disparo com ' + n;
 }
 
+var VIT_FALHAS = [];
+
+// Recadastrar 18 links para acertar 9 e um desperdicio: devolve so os que falharam.
+function reporFalhasVitrine(){
+  if (!VIT_FALHAS.length) return;
+  document.getElementById('vit-links').value = VIT_FALHAS.join('\n');
+  document.getElementById('vit-cad-erros').style.display = 'none';
+  document.getElementById('vit-links').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
 // destino: 'so' = fica so na base | 'unico' = abre o form em envio unico |
 // 'salva' = abre o mesmo form no modo lista salva. A decisao e tomada aqui em
 // cima, junto com os links, e nao depois de ja ter cadastrado.
@@ -2843,7 +2854,9 @@ function cadastrarVitrine(destino){
   var cupom = document.getElementById('vit-cupom-novo').value || null;
   var ok = document.getElementById('vit-cad-ok');
   if (!texto) { ok.className = 'send-ok send-err'; ok.textContent = 'Cole ao menos um link.'; return; }
-  ok.className = 'send-ok'; ok.textContent = 'Resolvendo links...';
+  document.getElementById('vit-cad-erros').style.display = 'none';
+  ok.className = 'send-ok';
+  ok.textContent = 'Resolvendo ' + texto.split('\n').filter(function(l){ return l.trim(); }).length + ' link(s)…';
 
   fetch(SERVER + '/vitrine', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -2852,10 +2865,30 @@ function cadastrarVitrine(destino){
   .then(function(r){ return r.json(); })
   .then(function(d){
     var salvos = d.salvos || [];
-    var msg = salvos.length + ' cadastrado(s)';
-    if ((d.erros || []).length) msg += ' · ' + d.erros.length + ' falhou: ' + d.erros.map(function(e){ return e.erro; }).join('; ');
-    ok.className = (d.erros && d.erros.length) ? 'send-ok send-err' : 'send-ok';
-    ok.textContent = msg;
+    var erros  = d.erros || [];
+    ok.className = erros.length ? 'send-ok send-err' : 'send-ok';
+    ok.textContent = salvos.length + ' cadastrado(s)'
+      + (erros.length ? ' · ' + erros.length + ' com problema (detalhe abaixo)' : '');
+
+    // Motivo colado ao link que falhou. Juntar tudo num paragrafo so escondia
+    // qual dos 18 links era o problema.
+    var box = document.getElementById('vit-cad-erros');
+    if (!erros.length) { box.style.display = 'none'; box.innerHTML = ''; }
+    else {
+      box.style.display = 'block';
+      box.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">'
+        + erros.length + ' link(s) não entraram na base</div>'
+        + erros.map(function(e){
+            return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
+              + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
+              + esc(e.linha || '(linha vazia)') + '</div>'
+              + '<div style="color:var(--red)">↳ ' + esc(e.erro || 'falhou') + '</div>'
+            + '</div>';
+          }).join('')
+        + '<button class="btn btn-copy btn-sm" style="margin-top:8px" onclick="reporFalhasVitrine()">↩ Devolver só estes links ao campo</button>';
+      // Guarda as linhas para o botao de reenvio, sem depender do textarea.
+      VIT_FALHAS = erros.map(function(e){ return e.linha; }).filter(Boolean);
+    }
     if (salvos.length) document.getElementById('vit-links').value = '';
 
     return carregarVitrine().then(function(){
