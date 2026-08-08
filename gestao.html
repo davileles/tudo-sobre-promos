@@ -2563,10 +2563,12 @@ function gerarCupom() {
 // valores saem da base — não são digitados — então a mensagem não pode divergir
 // do que o pipeline usa para calcular preço final nas ofertas.
 function ordenarCupons(a, b) {
-  // Percentual antes de valor fixo, e maior desconto primeiro: quem lê a lista
-  // quer bater o olho no melhor cupom.
-  if (a.tipo !== b.tipo) return a.tipo === 'pct' ? -1 : 1;
-  return Number(b.valor) - Number(a.valor);
+  // Do mais novo para o mais antigo na base. 'capturadoEm' é a data de criação
+  // e sobrevive às atualizações do registro — 'atualizadoEm' muda a cada
+  // re-captura do mesmo código e faria um cupom velho pular para o topo.
+  var ta = new Date(a.capturadoEm || a.atualizadoEm || 0).getTime() || 0;
+  var tb = new Date(b.capturadoEm || b.atualizadoEm || 0).getTime() || 0;
+  return tb - ta;
 }
 
 function linhaCombo(c) {
