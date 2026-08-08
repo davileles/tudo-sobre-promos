@@ -1336,7 +1336,7 @@
     <div class="card-title" style="margin-bottom:10px">Cadastrar produtos</div>
     <div class="field">
       <label>Links <span class="tag">um por linha</span></label>
-      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;https://link.amazon/xxxx" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;https://www.mercadolivre.com.br/.../p/MLBXXXXXXXX&#10;https://shopee.com.br/product/XXXX/XXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;Nome | https://www.magazineluiza.com.br/... | 1299,00 | 1899,00" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
     </div>
     <div class="field" style="margin-top:10px">
       <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
@@ -2813,7 +2813,11 @@ function excluirLista(id){
 function carregarVitrine(){
   return fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ VIT_CACHE = d.itens || []; renderVitrine(); })
+    .then(function(d){
+      VIT_CACHE = d.itens || [];
+      if (d.ttlPrecoMagalu) VIT_TTL_MAGALU = d.ttlPrecoMagalu;
+      renderVitrine();
+    })
     .catch(function(e){
       document.getElementById('vit-status').textContent = 'Falha: ' + e.message;
       document.getElementById('vit-lista').innerHTML = '<div class="cup-vazio">Sem resposta do servidor.</div>';
@@ -2851,6 +2855,42 @@ function opcoesCupom(){
   }).join('');
 }
 
+// Horas que o preco informado a mao para a Magalu continua valendo. O servidor
+// manda o valor real no GET /vitrine; este e so o palpite ate a primeira carga.
+var VIT_TTL_MAGALU = 24;
+
+// So a Magalu nao tem consulta de preco no disparo (sem API e com 403 para IP de
+// datacenter). Entao e a unica loja em que o painel precisa mostrar o preco
+// salvo e avisar quando ele venceu.
+function precoVitrine(i){
+  if ((i.loja || '') !== 'Magazine Luiza') return '';
+  if (i.preco == null) {
+    return '<span class="vit-cupom" style="background:rgba(255,90,90,.15);color:var(--red)">sem preço</span>';
+  }
+  var txt = 'R$ ' + Number(i.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  var idadeH = i.precoEm ? (Date.now() - new Date(i.precoEm).getTime()) / 3600000 : Infinity;
+  var vencido = idadeH > VIT_TTL_MAGALU;
+  return '<span class="vit-cupom" title="' + (i.precoEm ? 'informado em ' + new Date(i.precoEm).toLocaleString('pt-BR') : 'sem data')
+    + '"' + (vencido ? ' style="background:rgba(255,90,90,.15);color:var(--red)"' : '') + '>'
+    + esc(txt) + (vencido ? ' · vencido' : '') + '</span>';
+}
+
+// Preco e "de" na mesma caixa: sao um par, e digitar em dois prompts seguidos
+// para cada produto e atrito puro.
+function editarPrecoVitrine(btn){
+  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
+  var atual = (i.preco != null ? String(i.preco).replace('.', ',') : '')
+            + (i.precoDe != null ? ' | ' + String(i.precoDe).replace('.', ',') : '');
+  var novo = prompt('Preço da Magazine Luiza (o "de" é opcional, depois da barra):\n\nEx: 1299,00 | 1899,00', atual);
+  if (novo === null) return;
+  var nums = (novo.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:[.,]\d{2})?/g) || []).map(function(v){
+    return v.indexOf(',') >= 0 ? Number(v.replace(/\./g,'').replace(',','.')) : Number(v);
+  }).filter(function(v){ return isFinite(v) && v > 0; });
+  if (!nums.length) { alert('Não consegui ler nenhum valor.'); return; }
+  var preco = Math.min.apply(null, nums), maior = Math.max.apply(null, nums);
+  salvarCampoVitrine(i.asin, { preco: preco, precoDe: maior > preco ? maior : null });
+}
+
 function renderVitrine(){
   ['vit-cupom-novo'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
@@ -2872,9 +2912,12 @@ function renderVitrine(){
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
         + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
       + '</div>'
+      + precoVitrine(i)
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
       + '<div class="vit-acoes">'
         + '<button data-asin="' + esc(i.asin) + '" onclick="editarNomeVitrine(this)" title="Renomear">✎</button>'
+        + ((i.loja || '') === 'Magazine Luiza'
+            ? '<button data-asin="' + esc(i.asin) + '" onclick="editarPrecoVitrine(this)" title="Editar preço">💲</button>' : '')
         + '<button data-asin="' + esc(i.asin) + '" onclick="vincularCupomVitrine(this)" title="Vincular cupom">🎫</button>'
         + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
       + '</div>'
