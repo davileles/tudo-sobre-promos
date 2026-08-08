@@ -1595,6 +1595,7 @@ function renderContas() {
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
             + SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr') + '">QR</a>'
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
+          + (ehPrinc ? '' : '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="excluirConta(\'' + esc(c.id) + '\')">Excluir</button>')
         + '</div></div>'
       + '</div>'
     + '</div>';
@@ -1622,6 +1623,24 @@ function conectarContaNova() {
       window.open(SERVER + '/contas/' + encodeURIComponent(id) + '/qr', '_blank');
       s.textContent = '✓ Escaneie o QR na aba que abriu. Depois use Atualizar.';
       setTimeout(carregarContas, 8000);
+    })
+    .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
+}
+
+// Apaga as credenciais e desvincula o aparelho. Pareamento que deu errado fica
+// cadastrado para sempre sem isto — e ainda aparece como opção de turno.
+function excluirConta(id) {
+  if (!confirm('Excluir a conexão "' + id + '"?\n\nO aparelho é desvinculado do WhatsApp, as credenciais são apagadas e os turnos que usavam esse número são descartados. Para usá-lo de novo será preciso parear pelo QR.')) return;
+  var s = document.getElementById('contas-status');
+  s.className='send-ok'; s.textContent='Excluindo ' + id + '...';
+  fetch(SERVER + '/contas/' + encodeURIComponent(id), { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      s.textContent = '✓ ' + id + ' removida'
+        + (d.desvinculou ? ' e desvinculada do WhatsApp.' : '. O aparelho pode ter ficado na lista de dispositivos conectados — remova pelo celular.')
+        + (d.turnosRemovidos ? ' ' + d.turnosRemovidos + ' turno(s) descartado(s).' : '');
+      carregarContas();
     })
     .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
 }
