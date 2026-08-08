@@ -966,6 +966,23 @@
     <div id="censo-lista"></div>
   </div>
 
+  <div class="card" id="censo-gr-card" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span class="card-title" style="flex:1">📈 Evolução de membros</span>
+      <select id="censo-gr-modo" onchange="renderCensoGrafico()" style="max-width:150px">
+        <option value="total">Total somado</option>
+        <option value="grupos">Por grupo</option>
+      </select>
+      <select id="censo-gr-dias" onchange="carregarCensoHist()" style="max-width:120px">
+        <option value="30">30 dias</option>
+        <option value="90" selected>90 dias</option>
+        <option value="365">1 ano</option>
+      </select>
+    </div>
+    <div style="position:relative;height:230px"><canvas id="censo-chart"></canvas></div>
+    <div id="censo-gr-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
+  </div>
+
   <div class="sec-label">Links cadastrados</div>
   <div id="dist-lista"></div>
 </div>
@@ -1512,7 +1529,7 @@ function switchTab(name) {
   if (name === 'fila') carregarFila();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
-  if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); }
+  if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); carregarCensoHist(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
@@ -1726,7 +1743,79 @@ async function carregarCenso(forcar){
   }
 }
 
-function censoAtualizar(){ carregarCenso(true); }
+function censoAtualizar(){ carregarCenso(true).then(carregarCensoHist); }
+
+/* ══════ GRÁFICO DE EVOLUÇÃO ══════ */
+// Série montada a partir das medições das 06:00 guardadas no servidor. Um ponto
+// por dia; dia sem medição simplesmente não existe na série (não vira zero).
+var CENSO_HIST = null;
+var CENSO_CHART = null;
+var CENSO_CORES = ['#ff9900','#22c55e','#3b82f6','#f4654a','#a855f7','#eab308',
+                   '#14b8a6','#ec4899','#84cc16','#06b6d4','#f97316','#8b5cf6'];
+
+async function carregarCensoHist(){
+  var card = document.getElementById('censo-gr-card');
+  if (!card) return;
+  var dias = document.getElementById('censo-gr-dias').value || '90';
+  try {
+    var r = await fetch(SERVER + '/grupos/censo/historico?dias=' + dias + '&t=' + Date.now(), { cache:'no-cache' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    CENSO_HIST = d;
+    // Um único ponto não desenha evolução nenhuma: só mostra o card a partir do segundo dia.
+    card.style.display = (d.serie && d.serie.length >= 2) ? 'block' : 'none';
+    if (card.style.display === 'block') renderCensoGrafico();
+  } catch(e){ card.style.display = 'none'; }
+}
+
+function renderCensoGrafico(){
+  if (!CENSO_HIST || typeof Chart === 'undefined') return;
+  var modo   = document.getElementById('censo-gr-modo').value;
+  var serie  = CENSO_HIST.serie || [];
+  var labels = serie.map(function(p){ return p.dia.slice(8,10) + '/' + p.dia.slice(5,7); });
+  var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
+  var grade  = escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+  var texto  = escuro ? '#9aa0aa' : '#6b7280';
+  var ds;
+
+  if (modo === 'total'){
+    ds = [{ label:'Total', data: serie.map(function(p){ return p.total; }),
+            borderColor:'#ff9900', backgroundColor:'rgba(255,153,0,.14)',
+            fill:true, tension:.3, pointRadius:2, borderWidth:2 }];
+  } else {
+    ds = (CENSO_HIST.grupos || []).map(function(g, i){
+      return { label: g.nome || g.jid.split('@')[0],
+               data: serie.map(function(p){ return p.grupos[g.jid]; }),
+               borderColor: CENSO_CORES[i % CENSO_CORES.length],
+               backgroundColor:'transparent', fill:false, tension:.3,
+               pointRadius:2, borderWidth:2, spanGaps:true };
+    });
+  }
+
+  var ctx = document.getElementById('censo-chart');
+  if (CENSO_CHART) CENSO_CHART.destroy();
+  CENSO_CHART = new Chart(ctx, {
+    type:'line',
+    data:{ labels: labels, datasets: ds },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display: modo !== 'total', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
+        tooltip:{ callbacks:{ label:function(it){
+          return it.dataset.label + ': ' + (it.parsed.y == null ? '—' : it.parsed.y.toLocaleString('pt-BR'));
+        } } }
+      },
+      scales:{
+        x:{ grid:{ color:grade }, ticks:{ color:texto, maxTicksLimit:10, font:{ size:10 } } },
+        y:{ grid:{ color:grade }, ticks:{ color:texto, font:{ size:10 } } }
+      }
+    }
+  });
+
+  var av = document.getElementById('censo-gr-aviso');
+  av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)';
+}
 
 function distSugerir(){
   var termo = document.getElementById('dist-add').value.trim().toLowerCase();
