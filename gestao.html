@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Gestão TSP — Tudo Sobre Promos</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0f0f0f;--surface:#1a1a1a;--card:#222222;--card-deep:#151515;
@@ -356,6 +357,154 @@
     .grp-papeis button{flex:1}
   }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ══════ PAINEL DE RESULTADOS ══════ */
+/* CSS original do painel.html, escopado em .res-scope. As unicas 5 classes que
+   colidiam com o gestao (card, active, ok, err, spinner) ficam contidas aqui.
+   Variaveis de cor de mesmo nome sao herdadas do :root do gestao — por isso o
+   tema claro vale tambem nesta area; so as exclusivas do painel viram alias. */
+.res-scope{
+  --surface2: var(--card);
+  --orange: var(--accent);
+  --brown: var(--accent2);
+}
+/* ── HEADER ── */
+.res-scope header{
+  background: var(--surface); border-bottom: 3px solid var(--orange);
+  padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.res-scope .logo-wrap{ display: flex; align-items: center; gap: 10px; }
+.res-scope .logo-text{ font-size: 15px; font-weight: 800; }
+.res-scope .logo-text span{ color: var(--orange); }
+.res-scope .logo-text small{ display: block; font-size: 10px; font-weight: 500; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.res-scope .header-right{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.res-scope .badge{ background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 11px; color: var(--muted); font-weight: 500; }
+.res-scope .badge strong{ color: var(--text); }
+.res-scope #status-dot{ width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: middle; }
+.res-scope #status-dot.loading{ background: var(--orange); animation: pulse 1s infinite; }
+.res-scope #status-dot.ok{ background: var(--green); }
+.res-scope #status-dot.error{ background: var(--red); }
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.4} }
+.res-scope #status-label{ font-size: 11px; color: var(--muted); font-weight: 500; }
+.res-scope .refresh-btn{
+  background: transparent; border: 1px solid var(--orange); border-radius: 6px;
+  color: var(--orange); font-size: 11px; font-weight: 700; padding: 5px 12px; cursor: pointer;
+  font-family: 'Montserrat', sans-serif; transition: background .15s, color .15s;
+}
+.res-scope .refresh-btn:hover{ background: var(--orange); color: #000; }
+/* ── TABS ── */
+.res-scope .tabs{ display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; overflow-x: auto; }
+.res-scope .tab{
+  padding: 12px 20px; font-size: 12px; font-weight: 700; color: var(--muted);
+  cursor: pointer; border: none; background: none; border-bottom: 3px solid transparent;
+  white-space: nowrap; transition: color .15s, border-color .15s;
+  font-family: 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.res-scope .tab:hover{ color: var(--orange); }
+.res-scope .tab.active{ color: var(--orange); border-bottom-color: var(--orange); }
+/* ── PAGES ── */
+.res-scope .page{ display: none; padding: 20px 32px; width: 100%; box-sizing: border-box; }
+.res-scope .page.active{ display: block; }
+.res-scope .page > *{ box-sizing: border-box; }
+/* ── SECTION TITLE ── */
+.res-scope .section-title{
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--orange); margin-bottom: 12px; margin-top: 24px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.res-scope .section-title:first-child{ margin-top: 0; }
+/* ── GENERIC GRID ── */
+.res-scope .grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+.res-scope .grid-3{ display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+.res-scope .grid-auto{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 12px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+/* ── CARDS ── */
+.res-scope .card{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.res-scope .card-label{ font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+.res-scope .card-main{ font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 4px; color: var(--orange); }
+.res-scope .card-sub{ font-size: 12px; color: var(--muted); margin-bottom: 12px; font-weight: 500; }
+.res-scope .card-row{ display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.res-scope .card-row-label{ color: var(--muted); font-weight: 500; }
+.res-scope .card-row-val{ font-weight: 700; }
+.res-scope .up{ color: var(--green); }
+.res-scope .down{ color: var(--red); }
+.res-scope .blue{ color: var(--blue); }
+.res-scope .purple{ color: var(--purple); }
+/* ── PLATFORM CARDS ── */
+.res-scope .plat-card{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; position: relative; overflow: hidden; }
+.res-scope .plat-card::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.res-scope .p-amazon::before{ background: #ff9900; }
+.res-scope .p-ml::before{ background: #f5c518; }
+.res-scope .p-shopee::before{ background: #f4654a; }
+.res-scope .plat-name{ font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.res-scope .plat-val{ font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.res-scope .p-amazon .plat-val{ color: #ff9900; }
+.res-scope .p-ml .plat-val{ color: #f5c518; }
+.res-scope .p-shopee .plat-val{ color: #f4654a; }
+.res-scope .plat-row{ display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-top: 1px solid var(--border); font-weight: 500; }
+.res-scope .plat-row-label{ color: var(--muted); }
+.res-scope .plat-row span{ font-weight: 700; }
+/* ── STAT MINI ── */
+.res-scope .stat-mini{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.res-scope .stat-mini-label{ font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+.res-scope .stat-mini-val{ font-size: 24px; font-weight: 800; margin-bottom: 2px; }
+.res-scope .stat-mini-compare{ display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.res-scope .smc-label{ font-size: 10px; color: var(--muted); display: block; margin-bottom: 2px; font-weight: 600; }
+.res-scope .smc-val{ font-size: 12px; font-weight: 700; }
+/* ── CHART CARDS ── */
+.res-scope .chart-card{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; box-sizing: border-box; width: 100%; }
+.res-scope .chart-label{ font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--orange); margin-bottom: 14px; }
+.res-scope .chart-wrap{ position: relative; height: 190px; }
+.res-scope .grid-3 .chart-card{ margin-bottom: 0; }
+/* ── LOADING OVERLAY ── */
+.res-scope #loading-overlay{
+  position: fixed; inset: 0; background: #0f0f0fcc; display: flex;
+  align-items: center; justify-content: center; z-index: 999; flex-direction: column; gap: 16px;
+}
+.res-scope #loading-overlay.hidden{ display: none; }
+.res-scope .spinner{ width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--orange); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin{ to { transform: rotate(360deg); } }
+.res-scope .loading-text{ font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+/* ── MOBILE ── */
+@media (max-width: 640px){
+.res-scope .grid-2, .res-scope .grid-3{ grid-template-columns: 1fr; }
+.res-scope .card-main{ font-size: 24px; }
+.res-scope .page{ padding: 14px 16px; }
+.res-scope header{ padding: 12px 16px; }
+}
+/* ── LOGIN ── */
+.res-scope #login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
+.res-scope .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;display:flex;flex-direction:column}
+.res-scope .login-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+.res-scope .login-title span{color:var(--orange)}
+.res-scope .login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:26px}
+.res-scope .login-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.res-scope .login-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:10px;font-size:14px;font-family:'Montserrat',sans-serif;outline:none;transition:border-color .2s;margin-bottom:14px}
+.res-scope .login-input:focus{border-color:var(--orange)}
+.res-scope .login-input.codigo{text-align:center;letter-spacing:10px;font-size:20px;font-weight:800}
+.res-scope .login-btn{width:100%;background:var(--orange);border:none;color:#111;padding:12px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;transition:opacity .2s;margin-bottom:10px}
+.res-scope .login-btn:hover{opacity:.85}
+.res-scope .login-btn:disabled{opacity:.5;cursor:not-allowed}
+.res-scope .login-link{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:'Montserrat',sans-serif;text-decoration:underline}
+.res-scope .login-msg{font-size:12px;font-weight:700;text-align:center;min-height:18px;margin-bottom:6px}
+.res-scope .login-msg.err{color:var(--red)}
+.res-scope .login-msg.ok{color:var(--green)}
+.res-scope #app-content{display:none}
+
+/* ── AJUSTES DA IMPORTACAO ──────────────────────────────────────────────────
+   O painel era uma pagina inteira; aqui ele e uma aba dentro do gestao. Login
+   e overlay eram 'position:fixed' cobrindo a tela toda — passam a ficar
+   contidos na aba, e cada .page ja e o proprio painel da aba. */
+.res-scope #login-screen{ position:static; inset:auto; z-index:auto; background:transparent;
+  min-height:auto; padding:32px 0; }
+.res-scope #loading-overlay{ position:relative; inset:auto; background:transparent;
+  padding:48px 0; z-index:auto; }
+.res-scope .page{ display:block; padding:0; }
+/* O cabecalho do painel repetia o nome da ferramenta, que o gestao ja mostra.
+   Fica so a faixa de status / data de referencia / atualizar. */
+.res-scope header{ background:transparent; border-bottom:1px solid var(--border);
+  padding:0 0 12px; margin-bottom:16px; }
+.res-scope .logo-wrap{ display:none; }
+
 </style>
 </head>
 <body>
@@ -395,6 +544,9 @@
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
+  <div class="side-group">Resultados</div>
+  <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
+  <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
 </div>
 
 <div id="shell-main">
@@ -775,6 +927,287 @@
   </div>
 </div>
 
+<!-- ════════ RESULTADOS: COMISSÃO ════════ -->
+<div class="panel res-scope" id="panel-comissao">
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title"><span>Tudo Sobre Promos</span></div>
+    <div class="login-sub">Painel de Resultados &middot; acesso restrito</div>
+
+    <div id="etapa-email">
+      <div class="login-label">E-mail</div>
+      <input class="login-input" id="login-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+      <div class="login-msg" id="login-msg"></div>
+      <button class="login-btn" id="login-btn" onclick="enviarCodigo()">Enviar código</button>
+    </div>
+
+    <div id="etapa-codigo" style="display:none">
+      <div class="login-label">Código enviado por e-mail</div>
+      <input class="login-input codigo" id="login-codigo" type="text" inputmode="numeric" maxlength="6" placeholder="000000"/>
+      <div class="login-msg" id="login-msg2"></div>
+      <button class="login-btn" id="login-btn2" onclick="validarCodigo()">Entrar</button>
+      <button class="login-link" onclick="voltarEmail()">Usar outro e-mail</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="app-content" style="display:none">
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Carregando planilha...</div>
+  </div>
+  <header>
+    <div class="logo-wrap"><div class="logo-text"><span>Tudo Sobre Promos</span><small>Painel de Resultados</small></div></div>
+    <div class="header-right">
+      <div class="badge"><span id="status-dot" class="loading"></span><span id="status-label">Carregando...</span></div>
+      <div class="badge">Ref: <strong id="ref-dia">—</strong></div>
+      <button class="refresh-btn" onclick="loadAll()">↻ Atualizar</button>
+    </div>
+  </header>
+<div id="page-comissao" class="page active">
+
+  <div class="section-title">Total acumulado no mês — vs. mesmo período do mês anterior</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">Comissão total</div>
+      <div class="card-main" id="c-total-cur">—</div>
+      <div class="card-sub" id="c-total-sub">Mês atual</div>
+      <div class="card-row"><span class="card-row-label">Mês anterior (mesmo dia)</span><span class="card-row-val" id="c-total-prev">—</span></div>
+      <div class="card-row"><span class="card-row-label">Variação</span><span class="card-row-val" id="c-total-var">—</span></div>
+      <div class="card-row"><span class="card-row-label">Média dos meses anteriores</span><span class="card-row-val" id="c-total-avg">—</span></div>
+      <div class="card-row"><span class="card-row-label">Var. vs. média</span><span class="card-row-val" id="c-total-var2">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Comissão por membro — Σ(comissão_dia ÷ membros_dia)</div>
+      <div class="card-main blue" id="c-cpm-cur">—</div>
+      <div class="card-sub" id="c-cpm-sub">Mês atual</div>
+      <div class="card-row"><span class="card-row-label">Mês anterior (mesmo dia)</span><span class="card-row-val" id="c-cpm-prev">—</span></div>
+      <div class="card-row"><span class="card-row-label">Variação</span><span class="card-row-val" id="c-cpm-var">—</span></div>
+      <div class="card-row"><span class="card-row-label">Média dos meses anteriores</span><span class="card-row-val" id="c-cpm-avg">—</span></div>
+      <div class="card-row"><span class="card-row-label">Var. vs. média</span><span class="card-row-val" id="c-cpm-var2">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Por plataforma — acumulado até o mesmo dia</div>
+  <div class="grid-3">
+    <div class="plat-card p-amazon">
+      <div class="plat-name">Amazon</div>
+      <div class="plat-val" id="p-amazon-cur">—</div>
+      <div class="plat-row"><span class="plat-row-label">Mês anterior</span><span id="p-amazon-prev">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Variação</span><span id="p-amazon-var">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Média geral</span><span id="p-amazon-avg">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Var. vs. média</span><span id="p-amazon-var2">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Cliques</span><span id="p-amazon-cliques">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Ticket médio/clique</span><span id="p-amazon-ticket">—</span></div>
+    </div>
+    <div class="plat-card p-ml">
+      <div class="plat-name">Mercado Livre</div>
+      <div class="plat-val" id="p-ml-cur">—</div>
+      <div class="plat-row"><span class="plat-row-label">Mês anterior</span><span id="p-ml-prev">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Variação</span><span id="p-ml-var">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Média geral</span><span id="p-ml-avg">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Var. vs. média</span><span id="p-ml-var2">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Cliques</span><span id="p-ml-cliques">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Ticket médio/clique</span><span id="p-ml-ticket">—</span></div>
+    </div>
+    <div class="plat-card p-shopee">
+      <div class="plat-name">Shopee</div>
+      <div class="plat-val" id="p-shopee-cur">—</div>
+      <div class="plat-row"><span class="plat-row-label">Mês anterior</span><span id="p-shopee-prev">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Variação</span><span id="p-shopee-var">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Média geral</span><span id="p-shopee-avg">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Var. vs. média</span><span id="p-shopee-var2">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Cliques</span><span id="p-shopee-cliques">—</span></div>
+      <div class="plat-row"><span class="plat-row-label">Ticket médio/clique</span><span id="p-shopee-ticket">—</span></div>
+    </div>
+  </div>
+
+    <div class="section-title">Investimento em tráfego vs. crescimento de comissão</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">Só anúncio</div>
+      <div class="card-main" id="roi-saldo-anuncio">—</div>
+      <div class="card-sub">Crescimento de comissão − gasto em anúncio</div>
+      <div class="card-row"><span class="card-row-label">Comissão mês atual</span><span class="card-row-val" id="roi-comis-cur">—</span></div>
+      <div class="card-row"><span class="card-row-label">Comissão mês anterior (mesmo dia)</span><span class="card-row-val" id="roi-comis-prev">—</span></div>
+      <div class="card-row"><span class="card-row-label">Crescimento de comissão</span><span class="card-row-val" id="roi-crescimento-comis">—</span></div>
+      <div class="card-row"><span class="card-row-label">Gasto em anúncio no mês</span><span class="card-row-val" id="roi-gasto-anuncio">—</span></div>
+      <div class="card-row"><span class="card-row-label">Cobertura do investimento</span><span class="card-row-val" id="roi-cobertura-anuncio">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Anúncio + estrategista</div>
+      <div class="card-main" id="roi-saldo-total">—</div>
+      <div class="card-sub">Crescimento de comissão − investimento total</div>
+      <div class="card-row"><span class="card-row-label">Comissão mês atual</span><span class="card-row-val" id="roi-comis-cur2">—</span></div>
+      <div class="card-row"><span class="card-row-label">Comissão mês anterior (mesmo dia)</span><span class="card-row-val" id="roi-comis-prev2">—</span></div>
+      <div class="card-row"><span class="card-row-label">Crescimento de comissão</span><span class="card-row-val" id="roi-crescimento-comis2">—</span></div>
+      <div class="card-row"><span class="card-row-label">Gasto total (anúncio + estrategista)</span><span class="card-row-val" id="roi-gasto-total">—</span></div>
+      <div class="card-row"><span class="card-row-label">Cobertura do investimento</span><span class="card-row-val" id="roi-cobertura-total">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Comissão diária por plataforma — mês anterior + mês atual</div>
+  <div class="chart-card" style="margin-bottom:14px">
+    <div class="chart-label" id="chart-comis-label">Barras empilhadas · R$</div>
+    <div class="chart-wrap"><canvas id="chart-comis-diaria"></canvas></div>
+  </div>
+
+  <div class="section-title" id="section-diaria-plat">Comissão diária por plataforma — mês atual</div>
+  <div class="grid-3">
+    <div class="chart-card" style="margin-bottom:0">
+      <div class="chart-label" style="color:#ff9900">Amazon · R$/dia</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-diaria-amazon"></canvas></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:0">
+      <div class="chart-label" style="color:#f5c518">Mercado Livre · R$/dia</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-diaria-ml"></canvas></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:0">
+      <div class="chart-label" style="color:#f4654a">Shopee · R$/dia</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-diaria-shopee"></canvas></div>
+    </div>
+  </div>
+  <div style="margin-bottom:14px"></div>
+
+  <div class="section-title">Evolução mensal — comissão</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Comissão total por mês (R$)</div>
+      <div class="chart-wrap"><canvas id="chart-mes-comis-total"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Comissão por membro por mês (R$)</div>
+      <div class="chart-wrap"><canvas id="chart-mes-comis-cpm"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-top:14px">
+    <div class="chart-label">Membros, gasto em anúncio e comissão por mês</div>
+    <div class="chart-wrap"><canvas id="chart-mes-resumo"></canvas></div>
+  </div>
+
+</div>
+
+</div>
+</div>
+
+<!-- ════════ RESULTADOS: TRÁFEGO PAGO ════════ -->
+<div class="panel res-scope" id="panel-trafego">
+<div id="page-trafego" class="page">
+
+  <div class="section-title">Dia anterior — crescimento e expectativa</div>
+  <div class="grid-auto">
+    <div class="card">
+      <div class="card-label">Crescimento de membros</div>
+      <div class="card-main" id="t-cresc-dia">—</div>
+      <div class="card-sub">Dia anterior</div>
+      <div class="card-row"><span class="card-row-label">Expectativa (gasto ÷ 1,5)</span><span class="card-row-val" id="t-cresc-expec">—</span></div>
+      <div class="card-row"><span class="card-row-label">Variação vs. expectativa</span><span class="card-row-val" id="t-cresc-var-expec">—</span></div>
+      <div class="card-row"><span class="card-row-label">Gasto em anúncio</span><span class="card-row-val" id="t-gasto-dia">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Retenção do dia anterior</div>
+      <div class="card-main blue" id="t-ret-dia">—</div>
+      <div class="card-sub">Crescimento real ÷ cliques totais</div>
+      <div class="card-row"><span class="card-row-label">Cliques totais (anúncio+conteúdo+bio)</span><span class="card-row-val" id="t-cliques-total-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Cliques no anúncio</span><span class="card-row-val" id="t-cliques-anuncio-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Cliques em conteúdo</span><span class="card-row-val" id="t-cliques-conteudo-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Cliques na bio</span><span class="card-row-val" id="t-cliques-bio-dia">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Custo por clique (anúncio)</div>
+      <div class="card-main" style="color:var(--orange)" id="t-cpc-dia">—</div>
+      <div class="card-sub">Gasto anúncio ÷ cliques anúncio</div>
+      <div class="card-row"><span class="card-row-label">Custo por membro</span><span class="card-row-val" id="t-cpm-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Custo total/clique (+ estrategista)</span><span class="card-row-val purple" id="t-cpc2-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Gasto estrategista</span><span class="card-row-val" id="t-gasto-estrat-dia">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Mês atual — acumulado e expectativa</div>
+  <div class="grid-auto">
+    <div class="card">
+      <div class="card-label">Crescimento total no mês</div>
+      <div class="card-main" id="t-cresc-mes">—</div>
+      <div class="card-sub" id="t-cresc-mes-sub">Membros novos</div>
+      <div class="card-row"><span class="card-row-label">Expectativa do mês (Σgasto ÷ 1,5)</span><span class="card-row-val" id="t-expec-mes">—</span></div>
+      <div class="card-row"><span class="card-row-label">Variação vs. expectativa</span><span class="card-row-val" id="t-var-expec-mes">—</span></div>
+      <div class="card-row"><span class="card-row-label">Média diária real</span><span class="card-row-val" id="t-avg-cresc-mes">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Membros totais</div>
+      <div class="card-main" id="t-membros-atual">—</div>
+      <div class="card-sub">Último registro</div>
+      <div class="card-row"><span class="card-row-label">Seguidores Instagram</span><span class="card-row-val" id="t-seguidores">—</span></div>
+      <div class="card-row"><span class="card-row-label">Crescimento seguidores (dia ant.)</span><span class="card-row-val" id="t-seg-cresc-dia">—</span></div>
+      <div class="card-row"><span class="card-row-label">Crescimento seguidores (mês)</span><span class="card-row-val" id="t-seg-cresc-mes">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Médias do mês — custo</div>
+      <div class="card-main" style="color:var(--orange)" id="t-avg-cpc-mes">—</div>
+      <div class="card-sub">Custo médio/clique anúncio no mês</div>
+      <div class="card-row"><span class="card-row-label">Custo médio/membro no mês</span><span class="card-row-val" id="t-avg-cpm-mes">—</span></div>
+      <div class="card-row"><span class="card-row-label">Retenção média no mês</span><span class="card-row-val blue" id="t-avg-ret-mes">—</span></div>
+      <div class="card-row"><span class="card-row-label">Gasto total em anúncios</span><span class="card-row-val" id="t-gasto-total-mes">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Evolução de membros — últimos 60 dias</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Membros totais</div>
+      <div class="chart-wrap"><canvas id="chart-membros"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Crescimento diário</div>
+      <div class="chart-wrap"><canvas id="chart-crescimento"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Custo e retenção — últimos 60 dias</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Custo por clique (R$)</div>
+      <div class="chart-wrap"><canvas id="chart-cpc"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Retenção diária (%)</div>
+      <div class="chart-wrap"><canvas id="chart-retencao"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Seguidores Instagram — últimos 60 dias</div>
+  <div class="chart-card">
+    <div class="chart-label">Evolução de seguidores</div>
+    <div class="chart-wrap"><canvas id="chart-seguidores"></canvas></div>
+  </div>
+  <div class="section-title">Investimento diário — últimos 60 dias</div>
+  <div class="chart-card">
+    <div class="chart-label">Gasto em anúncio por dia (R$)</div>
+    <div class="chart-wrap"><canvas id="chart-gasto-diario"></canvas></div>
+  </div>
+
+  <div class="section-title">Evolução mensal — tráfego</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">Crescimento de membros por mês</div>
+      <div class="chart-wrap"><canvas id="chart-mes-crescimento"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Total de membros no fim de cada mês</div>
+      <div class="chart-wrap"><canvas id="chart-mes-membros-total"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-label">Gasto em tráfego por mês (R$)</div>
+    <div class="chart-wrap"><canvas id="chart-mes-gasto-trafego"></canvas></div>
+  </div>
+
+</div>
+
+</div>
+
 <!-- ════════ VITRINE ════════ -->
 <div class="panel" id="panel-vitrine">
   <div class="aviso">
@@ -979,8 +1412,11 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','conexao'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','conexao','comissao','trafego'];
 function switchTab(name) {
+  // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
+  // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
+  if (name === 'trafego' && typeof lerSessao === 'function' && !lerSessao()) name = 'comissao';
   TABS.forEach(function(id) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
@@ -995,6 +1431,7 @@ function switchTab(name) {
     (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
   }
   if (name === 'templates') carregarTemplates();
+  if (name === 'comissao' || name === 'trafego') resAbrir(name);
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
 }
@@ -2776,6 +3213,1119 @@ setInterval(function(){
   atualizarBadge();
   if (document.getElementById('panel-fila').classList.contains('active')) carregarFila();
 }, 30000);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PAINEL DE RESULTADOS — importado de painel.html
+   Nao ha colisao de IDs nem de nomes de funcao com o restante do gestao
+   (conferido antes da importacao); so o CSS precisou de escopo.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// ─────────────────────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────────────────────
+const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbz4GZg6RMDJuSQmx2naQDMDgMhVZnZ7WKilvm5HbcZ6fsv2lvZexqL4sGr7_3r92e_L/exec';
+
+// ─────────────────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────────────────
+function parseCSV(text) {
+  return text.trim().split('\n').map(line => {
+    const cells = []; let cur = '', inQ = false;
+    for (const c of line) {
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  s = String(s).replace(/"/g, '').trim();
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if ((m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/))) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+function dateKey(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+}
+
+function fmtDate(d) {
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function numVal(s) {
+  if (s === null || s === undefined || s === '') return 0;
+  s = String(s).replace(/"/g,'').trim();
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g,'').replace(',','.');
+  else s = s.replace(',','.');
+  return parseFloat(s) || 0;
+}
+
+const R  = v => 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R4 = R; // alias — 2 casas decimais
+const N0 = v => Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
+const N1 = v => Number(v).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const PCT = v => N1(v) + '%';
+
+function pctVar(cur, base) {
+  if (!base) return { str: '—', cls: '' };
+  const p = (cur / base - 1) * 100;
+  return { str: (p >= 0 ? '+' : '') + p.toFixed(1) + '%', cls: p >= 0 ? 'up' : 'down' };
+}
+
+function set(id, val, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  if (cls !== undefined) {
+    el.className = cls ? 'card-row-val ' + cls : 'card-row-val';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  FETCH
+// ─────────────────────────────────────────────────────────
+async function fetchSheet(sheet) {
+  const res = await fetch(`${APPS_SCRIPT}?sheet=${sheet}`);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  if (text.length < 10 || text.includes('not found')) throw new Error('Aba não encontrada: ' + sheet);
+  return text;
+}
+
+// ─────────────────────────────────────────────────────────
+//  PARSERS
+// ─────────────────────────────────────────────────────────
+// Comissionamento: "Data","Plataforma","Cliques","Vendas","Comissao"
+function parseComissionamento(csv) {
+  const rows = parseCSV(csv);
+  const result = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[0]);
+    const plat = (r[1] || '').replace(/"/g,'').trim();
+    const cliques = numVal(r[2]);
+    const vendas  = numVal(r[3]);
+    const com     = numVal(r[4]);
+    if (d && plat) result.push({ date: d, plat, cliques, vendas, com });
+  }
+  return result;
+}
+
+// Tráfego: cols C-J → Data, Membros, CliqAnuncio, CliqConteudo, CliqBio, Seguidores, GastoAnuncio, GastoEstrat
+function parseTrafego(csv) {
+  const rows = parseCSV(csv);
+  if (rows.length < 2) return [];
+  const hdr = rows[0].map(h => h.replace(/"/g,'').trim().toLowerCase());
+
+  // Tenta por nome de coluna, fallback para posição fixa
+  const idx = (names, fallback) => {
+    for (const n of names) {
+      const i = hdr.findIndex(h => h.includes(n));
+      if (i >= 0) return i;
+    }
+    return fallback;
+  };
+
+  const iData    = idx(['data'],        0);
+  const iMembros = idx(['membro'],      1);
+  const iCliqAnu = idx(['anúncio','anuncio'], 2);
+  const iCliqCon = idx(['conteúdo','conteudo'], 3);
+  const iCliqBio = idx(['bio'],         4);
+  const iSeg     = idx(['seguidor','instagram'], 5);
+  const iGastoA  = idx(['gasto em anúncio','gasto anuncio','gasto em an'], 6);
+  const iGastoE  = idx(['estrateg'],   7);
+
+  const result = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[iData]);
+    if (!d) continue;
+    const membros = numVal(r[iMembros]);
+    if (membros < 10) continue;
+    result.push({
+      date:        d,
+      membros:     membros,
+      cliqAnuncio: numVal(r[iCliqAnu]),
+      cliqConteudo:numVal(r[iCliqCon]),
+      cliqBio:     numVal(r[iCliqBio]),
+      seguidores:  numVal(r[iSeg]),
+      gastoAnuncio:numVal(r[iGastoA]),
+      gastoEstrat: numVal(r[iGastoE]),
+    });
+  }
+  return result.sort((a,b) => a.date - b.date);
+}
+
+// ─────────────────────────────────────────────────────────
+//  PROCESS
+// ─────────────────────────────────────────────────────────
+function processAll(comisRaw, trafRows) {
+  // ── Agrupa comissão por data+plataforma ──
+  const comisMap = {};
+  for (const r of comisRaw) {
+    const k = dateKey(r.date);
+    if (!comisMap[k]) comisMap[k] = { date: r.date, amazon: 0, ml: 0, shopee: 0, cliqAmazon: 0, cliqML: 0, cliqShopee: 0 };
+    const p = r.plat.toLowerCase();
+    if (p.includes('amazon'))        { comisMap[k].amazon    += r.com;    comisMap[k].cliqAmazon += r.cliques; }
+    else if (p.includes('mercado'))  { comisMap[k].ml        += r.com;    comisMap[k].cliqML     += r.cliques; }
+    else if (p.includes('shopee'))   { comisMap[k].shopee    += r.com;    comisMap[k].cliqShopee += r.cliques; }
+  }
+  const comisDays = Object.values(comisMap).sort((a,b) => a.date - b.date);
+  comisDays.forEach(d => d.total = d.amazon + d.ml + d.shopee);
+
+  // ── Trafego map ──
+  const trafMap = {};
+  for (const r of trafRows) trafMap[dateKey(r.date)] = r;
+
+  // ── Referência: último dia com comissão ──
+  const refDate   = comisDays[comisDays.length - 1]?.date || new Date();
+  const refDay    = refDate.getDate();
+  const curMonth  = refDate.getMonth();
+  const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
+
+  // ── Helper: soma campo de comissão até dia X de mês M ──
+  function cumComis(month, upToDay, field) {
+    return comisDays
+      .filter(d => d.date.getMonth() === month && d.date.getDate() <= upToDay)
+      .reduce((s,d) => s + d[field], 0);
+  }
+
+  // ── Helper: soma cliques até dia X de mês M ──
+  function cumCliques(month, upToDay, field) {
+    return comisDays
+      .filter(d => d.date.getMonth() === month && d.date.getDate() <= upToDay)
+      .reduce((s,d) => s + d[field], 0);
+  }
+
+  // ── Todos os meses exceto o atual (para médias) ──
+  const allMonths = [...new Set(comisDays.map(d => d.date.getMonth()))].filter(m => m !== curMonth);
+
+  function avgMonths(field) {
+    if (!allMonths.length) return 0;
+    return allMonths.map(m => cumComis(m, refDay, field)).reduce((a,b) => a+b, 0) / allMonths.length;
+  }
+
+  // ── CPM = Σ(comissão_dia / membros_dia) ──
+  function calcCPM(month, upToDay) {
+    let sum = 0;
+    for (const d of comisDays) {
+      if (d.date.getMonth() !== month || d.date.getDate() > upToDay) continue;
+      const t = trafMap[dateKey(d.date)];
+      if (t && t.membros > 0) sum += d.total / t.membros;
+    }
+    return sum;
+  }
+  const cpmCur  = calcCPM(curMonth,  refDay);
+  const cpmPrev = calcCPM(prevMonth, refDay);
+  const cpmAvg  = allMonths.length
+    ? allMonths.map(m => calcCPM(m, refDay)).reduce((a,b) => a+b,0) / allMonths.length
+    : 0;
+
+  // ── Tráfego: último e penúltimo dia com dados ──
+  const trafValid = trafRows.filter(r => r.membros > 0);
+  const lastT  = trafValid[trafValid.length - 1] || null;
+  const prevT  = trafValid[trafValid.length - 2] || null;
+
+  // Crescimento: diferença de membros entre dias consecutivos
+  function crescimento(cur, prev) {
+    if (!cur || !prev) return 0;
+    return cur.membros - prev.membros;
+  }
+  const crescDia  = crescimento(lastT, prevT);
+
+  // ── Tráfego do mês atual ──
+  const trafMes = trafRows.filter(r => r.date.getMonth() === curMonth && r.membros > 0);
+  const trafMesOrdenado = [...trafMes].sort((a,b) => a.date - b.date);
+
+  // Crescimento do mês = membros último dia - membros primeiro dia do mês
+  const crescMes = trafMesOrdenado.length >= 2
+    ? trafMesOrdenado[trafMesOrdenado.length-1].membros - trafMesOrdenado[0].membros
+    : 0;
+
+  // Gasto total em anúncio no mês
+  const gastoMesTotal = trafMes.reduce((s,r) => s + r.gastoAnuncio, 0);
+  const expecMes = gastoMesTotal / 1.5;
+
+  // Médias do mês
+  function avgMes(arr, fn) {
+    const vals = arr.map(fn).filter(v => v > 0);
+    return vals.length ? vals.reduce((a,b) => a+b,0) / vals.length : 0;
+  }
+  const avgCPCMes = avgMes(trafMes, r => r.cliqAnuncio > 0 ? r.gastoAnuncio / r.cliqAnuncio : 0);
+  const avgCPMMes = avgMes(
+    trafMesOrdenado.slice(1).map((r,i) => ({ r, prev: trafMesOrdenado[i] })),
+    ({ r, prev }) => {
+      const c = r.membros - prev.membros;
+      return c > 0 ? r.gastoAnuncio / c : 0;
+    }
+  );
+  const avgRetMes = avgMes(trafMes, r => {
+    const total = r.cliqAnuncio + r.cliqConteudo + r.cliqBio;
+    const k = dateKey(r.date);
+    const t2 = trafMap[k];
+    if (!t2 || !total) return 0;
+    // crescimento desse dia específico
+    const idx2 = trafValid.findIndex(x => dateKey(x.date) === k);
+    if (idx2 <= 0) return 0;
+    const c = trafValid[idx2].membros - trafValid[idx2-1].membros;
+    return c > 0 ? (c / total) * 100 : 0;
+  });
+
+  // Seguidores
+  const segAtual = lastT ? lastT.seguidores : 0;
+  const segPrev  = prevT ? prevT.seguidores : 0;
+  const segCrescDia = segAtual - segPrev;
+  const segInicioMes = trafMesOrdenado.length ? trafMesOrdenado[0].seguidores : segAtual;
+  const segCrescMes  = segAtual - segInicioMes;
+
+  // CPC e CPM do último dia
+  const cpcDia  = lastT && lastT.cliqAnuncio > 0 ? lastT.gastoAnuncio / lastT.cliqAnuncio : 0;
+  const cpmDia  = lastT && crescDia > 0 ? lastT.gastoAnuncio / crescDia : 0;
+  const cpc2Dia = lastT && lastT.cliqAnuncio > 0
+    ? (lastT.gastoAnuncio + lastT.gastoEstrat) / lastT.cliqAnuncio
+    : 0;
+
+  // Retenção do dia
+  const cliqTotalDia = lastT ? lastT.cliqAnuncio + lastT.cliqConteudo + lastT.cliqBio : 0;
+  const retDia = cliqTotalDia > 0 && crescDia > 0 ? (crescDia / cliqTotalDia) * 100 : 0;
+
+  // Expectativa do dia anterior
+  const expecDia = lastT ? lastT.gastoAnuncio / 1.5 : 0;
+
+  // Média diária de crescimento no mês
+  const avgCrescMes = trafMes.length > 1 ? crescMes / (trafMes.length - 1) : 0;
+
+  // ── Chart data: 01 do mês anterior → dia atual ──
+  const prevMonthNum = curMonth === 0 ? 11 : curMonth - 1;
+  const prevMonthYear = curMonth === 0 ? refDate.getFullYear() - 1 : refDate.getFullYear();
+  const cutoff = new Date(prevMonthYear, prevMonthNum, 1); // dia 01 do mês anterior
+
+  const chartDays = comisDays.filter(d => d.date >= cutoff && d.date <= refDate).map(d => {
+    const k = dateKey(d.date);
+    const t = trafMap[k] || {};
+    const idx2 = trafValid.findIndex(x => dateKey(x.date) === k);
+    const cres = idx2 > 0 ? trafValid[idx2].membros - trafValid[idx2-1].membros : 0;
+    const cliTot = (t.cliqAnuncio||0) + (t.cliqConteudo||0) + (t.cliqBio||0);
+    return {
+      label:        fmtDate(d.date),
+      amazon:       d.amazon,
+      ml:           d.ml,
+      shopee:       d.shopee,
+      cliqAmazon:   d.cliqAmazon || 0,
+      cliqML:       d.cliqML     || 0,
+      cliqShopee:   d.cliqShopee || 0,
+      membros:      t.membros || 0,
+      crescimento:  cres,
+      cpc:          t.cliqAnuncio > 0 ? (t.gastoAnuncio||0) / t.cliqAnuncio : null,
+      cpc2:         t.cliqAnuncio > 0 ? ((t.gastoAnuncio||0) + (t.gastoEstrat||0)) / t.cliqAnuncio : null,
+      retencao:     cliTot > 0 && cres > 0 ? (cres / cliTot) * 100 : null,
+      seguidores:   t.seguidores || null,
+    };
+  });
+
+  // ── Gasto em tráfego no mês atual (até refDay) ──
+  const gastoAnuncioMesCalc = trafRows
+    .filter(r => r.date.getMonth() === curMonth && r.date.getDate() <= refDay)
+    .reduce((s, r) => s + r.gastoAnuncio, 0);
+  const gastoEstratMesCalc = trafRows
+    .filter(r => r.date.getMonth() === curMonth && r.date.getDate() <= refDay)
+    .reduce((s, r) => s + r.gastoEstrat, 0);
+  const gastoTotalMesCalc = gastoAnuncioMesCalc + gastoEstratMesCalc;
+
+  // ── Dados mensais agregados ──
+  const nomeMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const mesesDisponiveis = [...new Set(comisDays.map(d => d.date.getMonth() + '-' + d.date.getFullYear()))]
+    .map(s => { const [m,y] = s.split('-'); return { mes: +m, ano: +y }; })
+    .sort((a,b) => a.ano !== b.ano ? a.ano - b.ano : a.mes - b.mes);
+
+  const monthlyData = mesesDisponiveis.map(({ mes, ano }) => {
+    const isCurrent = mes === curMonth && ano === refDate.getFullYear();
+    const diasMes = comisDays.filter(d => d.date.getMonth() === mes && d.date.getFullYear() === ano);
+    const totalComis = diasMes.reduce((s,d) => s + d.total, 0);
+
+    // CPM mensal = Σ(comissão_dia / membros_dia)
+    let cpmMes = 0;
+    for (const d of diasMes) {
+      const t = trafMap[dateKey(d.date)];
+      if (t && t.membros > 0) cpmMes += d.total / t.membros;
+    }
+
+    // Tráfego do mês
+    const trafMesRows = trafRows.filter(r => r.date.getMonth() === mes && r.date.getFullYear() === ano)
+      .sort((a,b) => a.date - b.date);
+    const gastoAnuncioMes = trafMesRows.reduce((s,r) => s + r.gastoAnuncio, 0);
+    const gastoEstratMes  = trafMesRows.reduce((s,r) => s + r.gastoEstrat,  0);
+    const gastoTotalMes   = gastoAnuncioMes + gastoEstratMes;
+
+    // Membros no fim do mês (último registro do mês)
+    const membrosUltimo = trafMesRows.length ? trafMesRows[trafMesRows.length-1].membros : 0;
+    // Membros no início do mês (primeiro registro)
+    const membrosPrimeiro = trafMesRows.length ? trafMesRows[0].membros : 0;
+    const crescMensal = membrosUltimo - membrosPrimeiro;
+
+    return {
+      label: nomeMes[mes] + (isCurrent ? '*' : ''),
+      totalComis, cpmMes,
+      gastoAnuncioMes, gastoTotalMes,
+      membrosUltimo, crescMensal,
+      isCurrent,
+    };
+  });
+
+  return {
+    refDate, refDay,
+    comissao: {
+      curTotal:   cumComis(curMonth,  refDay, 'total'),
+      prevTotal:  cumComis(prevMonth, refDay, 'total'),
+      avgTotal:   avgMonths('total'),
+      curAmazon:  cumComis(curMonth,  refDay, 'amazon'),
+      prevAmazon: cumComis(prevMonth, refDay, 'amazon'),
+      avgAmazon:  avgMonths('amazon'),
+      curML:      cumComis(curMonth,  refDay, 'ml'),
+      prevML:     cumComis(prevMonth, refDay, 'ml'),
+      avgML:      avgMonths('ml'),
+      curShopee:  cumComis(curMonth,  refDay, 'shopee'),
+      prevShopee: cumComis(prevMonth, refDay, 'shopee'),
+      avgShopee:  avgMonths('shopee'),
+      cliqAmazon: cumCliques(curMonth, refDay, 'cliqAmazon'),
+      cliqML:     cumCliques(curMonth, refDay, 'cliqML'),
+      cliqShopee: cumCliques(curMonth, refDay, 'cliqShopee'),
+      cpmCur, cpmPrev, cpmAvg,
+      gastoAnuncioMes: gastoAnuncioMesCalc,
+      gastoTotalMes:   gastoTotalMesCalc,
+    },
+    trafego: {
+      lastT, prevT,
+      crescDia, expecDia,
+      cliqTotalDia, retDia, cpcDia, cpmDia, cpc2Dia,
+      crescMes, expecMes, avgCrescMes, gastoMesTotal,
+      avgCPCMes, avgCPMMes, avgRetMes,
+      segAtual, segCrescDia, segCrescMes,
+      membrosAtual: lastT ? lastT.membros : 0,
+    },
+    chartDays,
+    monthlyData,
+    trafChartMap: Object.fromEntries(
+      chartDays.map(r => {
+        const parts = r.label.split('/');
+        const d = new Date(refDate.getFullYear(), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+        const k = dateKey(d);
+        const t = trafMap[k] || {};
+        return [r.label, { gastoAnuncio: t.gastoAnuncio||0, gastoEstrat: t.gastoEstrat||0 }];
+      })
+    ),
+  };
+}
+
+// ─────────────────────────────────────────────────────────
+//  RENDER COMISSÃO
+// ─────────────────────────────────────────────────────────
+function renderComissao(S) {
+  const C = S.comissao;
+  const mes = S.refDate.toLocaleDateString('pt-BR', { month: 'long' });
+  const mesLabel = mes.charAt(0).toUpperCase() + mes.slice(1) + ' · dias 1–' + S.refDay;
+
+  document.getElementById('ref-dia').textContent =
+    String(S.refDay).padStart(2,'0') + '/' + String(S.refDate.getMonth()+1).padStart(2,'0');
+  document.getElementById('c-total-sub').textContent = mesLabel;
+  document.getElementById('c-cpm-sub').textContent   = mesLabel;
+
+  document.getElementById('c-total-cur').textContent = R(C.curTotal);
+  set('c-total-prev', R(C.prevTotal));
+  const v1 = pctVar(C.curTotal, C.prevTotal); set('c-total-var', v1.str, v1.cls);
+  set('c-total-avg', R(C.avgTotal));
+  const v2 = pctVar(C.curTotal, C.avgTotal); set('c-total-var2', v2.str, v2.cls);
+
+  document.getElementById('c-cpm-cur').textContent = R(C.cpmCur);
+  set('c-cpm-prev', R(C.cpmPrev));
+  const v3 = pctVar(C.cpmCur, C.cpmPrev); set('c-cpm-var', v3.str, v3.cls);
+  set('c-cpm-avg', R(C.cpmAvg));
+  const v4 = pctVar(C.cpmCur, C.cpmAvg); set('c-cpm-var2', v4.str, v4.cls);
+
+  function fillPlat(pfx, cur, prev, avg, cliques) {
+    document.getElementById('p-'+pfx+'-cur').textContent = R(cur);
+    document.getElementById('p-'+pfx+'-prev').textContent = R(prev);
+    document.getElementById('p-'+pfx+'-avg').textContent = R(avg);
+    const va = pctVar(cur, prev), vb = pctVar(cur, avg);
+    const ea = document.getElementById('p-'+pfx+'-var');
+    const eb = document.getElementById('p-'+pfx+'-var2');
+    if (ea) { ea.textContent = va.str; ea.className = va.cls; }
+    if (eb) { eb.textContent = vb.str; eb.className = vb.cls; }
+    document.getElementById('p-'+pfx+'-cliques').textContent = N0(cliques);
+    document.getElementById('p-'+pfx+'-ticket').textContent  = cliques > 0 ? R(cur / cliques) : '—';
+  }
+  fillPlat('amazon', C.curAmazon, C.prevAmazon, C.avgAmazon, C.cliqAmazon);
+  fillPlat('ml',     C.curML,     C.prevML,     C.avgML,     C.cliqML);
+  fillPlat('shopee', C.curShopee, C.prevShopee, C.avgShopee, C.cliqShopee);
+
+  // ── Investimento vs. crescimento de comissão ──
+  const crescComis = C.curTotal - C.prevTotal;
+  const saldoAnuncio = crescComis - C.gastoAnuncioMes;
+  const saldoTotal   = crescComis - C.gastoTotalMes;
+
+  // Card anúncio
+  const elSaldoA = document.getElementById('roi-saldo-anuncio');
+  if (elSaldoA) {
+    elSaldoA.textContent = R(saldoAnuncio);
+    elSaldoA.className = 'card-main ' + (saldoAnuncio >= 0 ? 'up' : 'down');
+  }
+  set('roi-comis-cur',          R(C.curTotal));
+  set('roi-comis-prev',         R(C.prevTotal));
+  set('roi-crescimento-comis',  R(crescComis));
+  set('roi-gasto-anuncio',      R(C.gastoAnuncioMes));
+  const cobA = pctVar(crescComis, C.gastoAnuncioMes);
+  set('roi-cobertura-anuncio',  cobA.str, cobA.cls);
+
+  // Card total
+  const elSaldoT = document.getElementById('roi-saldo-total');
+  if (elSaldoT) {
+    elSaldoT.textContent = R(saldoTotal);
+    elSaldoT.className = 'card-main ' + (saldoTotal >= 0 ? 'up' : 'down');
+  }
+  set('roi-comis-cur2',         R(C.curTotal));
+  set('roi-comis-prev2',        R(C.prevTotal));
+  set('roi-crescimento-comis2', R(crescComis));
+  set('roi-gasto-total',        R(C.gastoTotalMes));
+  const cobT = pctVar(crescComis, C.gastoTotalMes);
+  set('roi-cobertura-total',    cobT.str, cobT.cls);
+}
+
+// ─────────────────────────────────────────────────────────
+//  RENDER TRÁFEGO
+// ─────────────────────────────────────────────────────────
+function renderTrafego(S) {
+  const T = S.trafego;
+  const H = T.lastT;
+  if (!H) return;
+
+  // Dia anterior
+  const sinal = v => (v >= 0 ? '+' : '') + N0(v);
+  set('t-cresc-dia', sinal(T.crescDia));
+  set('t-cresc-expec', N1(T.expecDia));
+  const ve = pctVar(T.crescDia, T.expecDia); set('t-cresc-var-expec', ve.str, ve.cls);
+  set('t-gasto-dia', R(H.gastoAnuncio));
+
+  set('t-ret-dia', PCT(T.retDia));
+  document.getElementById('t-ret-dia').className = 'card-main blue';
+  set('t-cliques-total-dia',   N0(T.cliqTotalDia));
+  set('t-cliques-anuncio-dia', N0(H.cliqAnuncio));
+  set('t-cliques-conteudo-dia',N0(H.cliqConteudo));
+  set('t-cliques-bio-dia',     N0(H.cliqBio));
+
+  document.getElementById('t-cpc-dia').textContent = T.cpcDia > 0 ? R(T.cpcDia) : '—';
+  set('t-cpm-dia',        T.cpmDia  > 0 ? R(T.cpmDia)  : '—');
+  set('t-cpc2-dia',       T.cpc2Dia > 0 ? R(T.cpc2Dia) : '—');
+  set('t-gasto-estrat-dia', R(H.gastoEstrat));
+
+  // Mês
+  set('t-cresc-mes', sinal(T.crescMes));
+  document.getElementById('t-cresc-mes-sub').textContent =
+    S.refDate.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
+  set('t-expec-mes', N1(T.expecMes));
+  const vm = pctVar(T.crescMes, T.expecMes); set('t-var-expec-mes', vm.str, vm.cls);
+  set('t-avg-cresc-mes', '+' + N1(T.avgCrescMes) + '/dia');
+
+  set('t-membros-atual', N0(T.membrosAtual));
+  set('t-seguidores',    N0(T.segAtual));
+  set('t-seg-cresc-dia', (T.segCrescDia >= 0 ? '+' : '') + N0(T.segCrescDia));
+  set('t-seg-cresc-mes', (T.segCrescMes >= 0 ? '+' : '') + N0(T.segCrescMes));
+
+  document.getElementById('t-avg-cpc-mes').textContent = T.avgCPCMes > 0 ? R(T.avgCPCMes) : '—';
+  set('t-avg-cpm-mes',    T.avgCPMMes  > 0 ? R(T.avgCPMMes)  : '—');
+  set('t-avg-ret-mes',    T.avgRetMes  > 0 ? PCT(T.avgRetMes) : '—');
+  set('t-gasto-total-mes', R(T.gastoMesTotal));
+}
+
+// ─────────────────────────────────────────────────────────
+//  CHARTS
+// ─────────────────────────────────────────────────────────
+let charts = {};
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = '#2e2e2e';
+Chart.defaults.font.family = "'Montserrat', sans-serif";
+Chart.defaults.font.size = 11;
+
+function mk(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, cfg);
+}
+
+function renderCharts(S) {
+  const D = S.chartDays;
+  const labels = D.map(r => r.label);
+
+  // Label de período nos gráficos
+  const meses = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const prevM = S.refDate.getMonth() === 0 ? 11 : S.refDate.getMonth() - 1;
+  const curM  = S.refDate.getMonth();
+  const periodoLabel = '01/' + meses[prevM] + ' → ' + String(S.refDay).padStart(2,'0') + '/' + meses[curM];
+  const elLabel = document.getElementById('chart-comis-label');
+  if (elLabel) elLabel.textContent = 'Barras empilhadas · R$ · ' + periodoLabel;
+
+  mk('chart-comis-diaria', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Amazon',      data: D.map(r => r.amazon),  backgroundColor: '#ff990099', stack: 's' },
+      { label: 'Mercado Livre',data: D.map(r => r.ml),     backgroundColor: '#f5c51899', stack: 's' },
+      { label: 'Shopee',      data: D.map(r => r.shopee),  backgroundColor: '#f4654a99', stack: 's' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + c.raw.toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + v }}}
+    }
+  });
+
+  mk('chart-membros', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Membros', data: D.map(r => r.membros || null),
+      borderColor: '#ffa500', backgroundColor: '#ffa50018', fill: true, tension: 0.3, pointRadius: 0 }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  mk('chart-crescimento', {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Crescimento', data: D.map(r => r.crescimento || 0), backgroundColor: '#c63b0099' }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }},
+      scales: { x: { grid: { display: false }}}
+    }
+  });
+
+  mk('chart-cpc', {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Só anúncio',   data: D.map(r => r.cpc),  borderColor: '#ffa500', tension: 0.3, pointRadius: 0, spanGaps: false },
+      { label: 'Anún.+Estrat.',data: D.map(r => r.cpc2), borderColor: '#a78bfa', tension: 0.3, pointRadius: 0, spanGaps: false },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + v.toFixed(2) }}}
+    }
+  });
+
+  mk('chart-retencao', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Retenção %', data: D.map(r => r.retencao),
+      borderColor: '#60a5fa', backgroundColor: '#60a5fa12', fill: true, tension: 0.3, pointRadius: 0, spanGaps: false }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + (c.raw||0).toFixed(1) + '%' }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => v + '%' }}}
+    }
+  });
+
+  mk('chart-seguidores', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Seguidores', data: D.map(r => r.seguidores),
+      borderColor: '#a78bfa', backgroundColor: '#a78bfa18', fill: true, tension: 0.3, pointRadius: 0, spanGaps: false }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  // ── Gráfico de investimento diário ──
+  mk('chart-gasto-diario', {
+    type: 'bar',
+    data: { labels, datasets: [
+      {
+        label: 'Anúncio',
+        data: D.map(r => {
+          const t = S.trafChartMap ? S.trafChartMap[r.label] : null;
+          return t ? t.gastoAnuncio : null;
+        }),
+        backgroundColor: '#f97316aa',
+        borderColor: '#f97316',
+        borderWidth: 1,
+        spanGaps: false,
+      },
+      {
+        label: 'Estrategista',
+        data: D.map(r => {
+          const t = S.trafChartMap ? S.trafChartMap[r.label] : null;
+          return t ? t.gastoEstrat : null;
+        }),
+        backgroundColor: '#a78bfa88',
+        borderColor: '#a78bfa',
+        borderWidth: 1,
+        spanGaps: false,
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#ccc', font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => 'R$' + N0(v) } }
+      }
+    }
+  });
+
+  // ── Gráficos diários por plataforma — mês atual ──
+  const curMonth2 = S.refDate.getMonth();
+  const curYear2  = S.refDate.getFullYear();
+  const daysCurMonth = S.chartDays.filter(r => {
+    // re-parse label back to month (labels are "DD/MM")
+    const parts = r.label.split('/');
+    const m = parseInt(parts[1], 10) - 1;
+    const y = S.refDate.getFullYear(); // approximation (works within same year)
+    // Use original date from chartDays if available; fallback: match by month
+    return m === curMonth2;
+  });
+  const labelsDay = daysCurMonth.map(r => r.label);
+
+  function mkDailyPlatChart(id, field, cliqField, color) {
+    const data      = daysCurMonth.map(r => r[field]    || 0);
+    const cliqData  = daysCurMonth.map(r => r[cliqField] || null);
+    const avg       = data.length ? data.reduce((a,b)=>a+b,0)/data.length : 0;
+    mk(id, {
+      type: 'bar',
+      data: { labels: labelsDay, datasets: [
+        {
+          type: 'bar',
+          label: 'Comissão (R$)',
+          data,
+          backgroundColor: data.map(v => v >= avg ? color + 'cc' : color + '66'),
+          borderColor:     color,
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'Cliques',
+          data: cliqData,
+          borderColor: '#60a5fa',
+          backgroundColor: '#60a5fa22',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#60a5fa',
+          tension: 0.3,
+          fill: false,
+          spanGaps: false,
+          yAxisID: 'y2',
+        },
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#888' } },
+          tooltip: { callbacks: {
+            label: c => c.datasetIndex === 0
+              ? ' R$ ' + (c.raw||0).toFixed(2)
+              : ' ' + (c.raw||0).toLocaleString('pt-BR') + ' cliques',
+          }},
+        },
+        scales: {
+          x:  { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 } }},
+          y:  { position: 'left',  ticks: { callback: v => 'R$' + v.toFixed(0) }, grid: { color: '#2e2e2e' }},
+          y2: { position: 'right', ticks: { callback: v => v }, grid: { display: false },
+                title: { display: true, text: 'Cliques', color: '#60a5fa', font: { size: 9 } }},
+        },
+      },
+    });
+  }
+
+  mkDailyPlatChart('chart-diaria-amazon', 'amazon', 'cliqAmazon', '#ff9900');
+  mkDailyPlatChart('chart-diaria-ml',     'ml',     'cliqML',     '#f5c518');
+  mkDailyPlatChart('chart-diaria-shopee', 'shopee', 'cliqShopee', '#f4654a');
+
+  // Update section label with current month name
+  const nomeMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const elSecDia = document.getElementById('section-diaria-plat');
+  if (elSecDia) elSecDia.textContent = 'Comissão diária por plataforma — ' + nomeMeses[curMonth2];
+
+  // ── Gráficos mensais ──
+  const M = S.monthlyData;
+  const mLabels = M.map(r => r.label);
+
+  mk('chart-mes-comis-total', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [{
+      label: 'Comissão total',
+      data: M.map(r => r.totalComis),
+      backgroundColor: M.map(r => r.isCurrent ? '#ffa500cc' : '#ffa50055'),
+      borderColor:     M.map(r => r.isCurrent ? '#ffa500'   : '#ffa50088'),
+      borderWidth: 1,
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + c.raw.toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-comis-cpm', {
+    type: 'line',
+    data: { labels: mLabels, datasets: [{
+      label: 'Comissão/membro',
+      data: M.map(r => r.cpmMes),
+      borderColor: '#60a5fa', backgroundColor: '#60a5fa18',
+      fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#60a5fa',
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + v.toFixed(2) }}}
+    }
+  });
+
+  mk('chart-mes-resumo', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        type: 'bar',
+        label: 'Comissão total (R$)',
+        data: M.map(r => r.totalComis),
+        backgroundColor: '#ffa500cc',
+        borderColor: '#ffa500',
+        borderWidth: 1,
+        yAxisID: 'y',
+      },
+      {
+        type: 'bar',
+        label: 'Gasto em anúncio (R$)',
+        data: M.map(r => r.gastoAnuncioMes),
+        backgroundColor: '#a78bfacc',
+        borderColor: '#a78bfa',
+        borderWidth: 1,
+        yAxisID: 'y',
+      },
+      {
+        type: 'line',
+        label: 'Membros totais',
+        data: M.map(r => r.membrosUltimo),
+        borderColor: '#60a5fa',
+        backgroundColor: '#60a5fa22',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#60a5fa',
+        tension: 0.3,
+        fill: false,
+        yAxisID: 'y2',
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 }, color: '#ccc' } },
+        tooltip: { callbacks: {
+          label: c => c.dataset.yAxisID === 'y2'
+            ? ' ' + (c.raw||0).toLocaleString('pt-BR') + ' membros'
+            : ' R$ ' + (c.raw||0).toFixed(2),
+        }},
+      },
+      scales: {
+        x:  { grid: { display: false }},
+        y:  { position: 'left',  ticks: { callback: v => 'R$' + N0(v) }, grid: { color: '#2e2e2e' }},
+        y2: { position: 'right', ticks: { callback: v => N0(v) }, grid: { display: false },
+              title: { display: true, text: 'Membros', color: '#60a5fa', font: { size: 9 } }},
+      },
+    }
+  });
+
+  mk('chart-mes-crescimento', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [{
+      label: 'Novos membros',
+      data: M.map(r => r.crescMensal),
+      backgroundColor: M.map(r => r.isCurrent ? '#c63b00cc' : '#c63b0055'),
+      borderColor:     M.map(r => r.isCurrent ? '#c63b00'   : '#c63b0088'),
+      borderWidth: 1,
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+' + N0(c.raw) + ' membros' }}},
+      scales: { x: { grid: { display: false }}}
+    }
+  });
+
+  mk('chart-mes-membros-total', {
+    type: 'line',
+    data: { labels: mLabels, datasets: [{
+      label: 'Total de membros',
+      data: M.map(r => r.membrosUltimo),
+      borderColor: '#ffa500', backgroundColor: '#ffa50018',
+      fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#ffa500',
+    }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => N0(c.raw) + ' membros' }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-gasto-trafego', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Anúncio',
+        data: M.map(r => r.gastoAnuncioMes),
+        backgroundColor: M.map(r => r.isCurrent ? '#f97316cc' : '#f9731655'),
+        borderColor:     M.map(r => r.isCurrent ? '#f97316'   : '#f9731688'),
+        borderWidth: 1,
+        stack: 's',
+      },
+      {
+        label: 'Estrategista',
+        data: M.map(r => r.gastoTotalMes - r.gastoAnuncioMes),
+        backgroundColor: M.map(r => r.isCurrent ? '#a78bfacc' : '#a78bfa55'),
+        borderColor:     M.map(r => r.isCurrent ? '#a78bfa'   : '#a78bfa88'),
+        borderWidth: 1,
+        stack: 's',
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: '#ccc', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: c => ' R$ ' + (c.raw||0).toFixed(2),
+            footer: items => {
+              const total = items.reduce((s, it) => s + (it.raw||0), 0);
+              return 'Total: R$ ' + total.toFixed(2);
+            },
+          },
+        },
+      },
+      scales: { x: { stacked: true, grid: { display: false }}, y: { stacked: true, ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+
+  mk('chart-mes-invest-comis', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Comissão total',
+        data: M.map(r => r.totalComis),
+        backgroundColor: '#ffa50066', borderColor: '#ffa500', borderWidth: 1,
+      },
+      {
+        label: 'Gasto anúncio',
+        data: M.map(r => r.gastoAnuncioMes),
+        backgroundColor: '#f87171aa', borderColor: '#f87171', borderWidth: 1,
+      },
+      {
+        label: 'Gasto total (+ estrategista)',
+        data: M.map(r => r.gastoTotalMes),
+        backgroundColor: '#a78bfa44', borderColor: '#a78bfa', borderWidth: 1,
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+
+  // Saldo mensal: crescimento de comissão - investimento
+  mk('chart-mes-saldo', {
+    type: 'bar',
+    data: { labels: mLabels, datasets: [
+      {
+        label: 'Saldo vs. anúncio',
+        data: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          return r.totalComis - prevComis - r.gastoAnuncioMes;
+        }),
+        backgroundColor: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          const s = r.totalComis - prevComis - r.gastoAnuncioMes;
+          return s >= 0 ? '#34d39966' : '#f8717166';
+        }),
+        borderColor: M.map((r, i) => {
+          const prevComis = i === 0 ? 0 : M[i-1].totalComis;
+          const s = r.totalComis - prevComis - r.gastoAnuncioMes;
+          return s >= 0 ? '#34d399' : '#f87171';
+        }),
+        borderWidth: 1,
+        label: 'Saldo (crescimento comissão − anúncio)',
+      },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' R$ ' + (c.raw||0).toFixed(2) }}},
+      scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => 'R$' + N0(v) }}}
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+//  NAVIGATION
+// ─────────────────────────────────────────────────────────
+let currentPage = 'comissao';
+let STATE = null;
+
+// A navegacao entre Comissao e Trafego agora e das abas do gestao (switchTab).
+// Esta funcao so guarda a pagina corrente e redesenha os graficos: canvas em
+// aba escondida mede 0px de altura, entao o Chart.js precisa ser redesenhado ao
+// aparecer, senao o grafico sai achatado.
+function showPage(name) {
+  currentPage = name;
+  if (STATE) renderCharts(STATE);
+}
+
+// ─────────────────────────────────────────────────────────
+//  STATUS
+// ─────────────────────────────────────────────────────────
+function setStatus(state, msg) {
+  document.getElementById('status-dot').className = state;
+  document.getElementById('status-label').textContent = msg;
+}
+
+// ─────────────────────────────────────────────────────────
+//  MAIN LOAD
+// ─────────────────────────────────────────────────────────
+async function loadAll() {
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  setStatus('loading', 'Carregando planilha...');
+  try {
+    const [comisText, trafText] = await Promise.all([
+      fetchSheet('comissionamento'),
+      fetchSheet('trafego'),
+    ]);
+
+    const comisRaw = parseComissionamento(comisText);
+    const trafRows = parseTrafego(trafText);
+
+    if (comisRaw.length < 3)  throw new Error('Comissão insuficiente (' + comisRaw.length + ' linhas)');
+    if (trafRows.length < 3)  throw new Error('Tráfego insuficiente (' + trafRows.length + ' linhas)');
+
+    STATE = processAll(comisRaw, trafRows);
+    setStatus('ok', 'Atualizado · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  } catch (e) {
+    console.error('Erro ao carregar:', e.message);
+    setStatus('error', 'Erro: ' + e.message);
+    document.getElementById('loading-overlay').classList.add('hidden');
+    return;
+  }
+
+  renderComissao(STATE);
+  renderTrafego(STATE);
+  renderCharts(STATE);
+  document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+// ── LOGIN (OTP por e-mail via proxy CDV) ─────────────────────────────────────
+const AUTH_PROXY = 'https://cdv-proxy-production.up.railway.app';
+const AUTH_KEY   = 'tsp_auth';
+const AUTH_TTL   = 24 * 60 * 60 * 1000; // 24h
+let _authEmail = '';
+
+function _msg(id, texto, tipo){ var el=document.getElementById(id); el.textContent=texto||''; el.className='login-msg '+(tipo||''); }
+
+function lerSessao(){
+  try{
+    var s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    if(!s || !s.ts) return null;
+    if(Date.now() - s.ts > AUTH_TTL){ localStorage.removeItem(AUTH_KEY); return null; }
+    return s;
+  }catch(e){ return null; }
+}
+
+
+
+async function enviarCodigo(){
+  var email = document.getElementById('login-email').value.trim().toLowerCase();
+  var btn   = document.getElementById('login-btn');
+  if(!email || email.indexOf('@') < 0){ _msg('login-msg','Digite um e-mail válido.','err'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try{
+    var r = await fetch(AUTH_PROXY + '/admin/enviar-codigo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email, app: 'tsp' })
+    });
+    var d = await r.json();
+    if(d.ok){
+      _authEmail = email;
+      document.getElementById('etapa-email').style.display  = 'none';
+      document.getElementById('etapa-codigo').style.display = 'block';
+      _msg('login-msg2', d.dev ? 'Modo dev: código no log do servidor.' : 'Código enviado para ' + email, 'ok');
+      document.getElementById('login-codigo').focus();
+    } else {
+      _msg('login-msg', d.motivo === 'nao_autorizado' ? 'E-mail sem autorização de acesso.' : 'Não foi possível enviar o código.', 'err');
+    }
+  }catch(e){ _msg('login-msg','Erro de conexão. Tente novamente.','err'); }
+  btn.disabled = false; btn.textContent = 'Enviar código';
+}
+
+async function validarCodigo(){
+  var codigo = document.getElementById('login-codigo').value.trim();
+  var btn    = document.getElementById('login-btn2');
+  if(codigo.length < 6){ _msg('login-msg2','Digite os 6 dígitos.','err'); return; }
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  try{
+    var r = await fetch(AUTH_PROXY + '/admin/verificar-codigo', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: _authEmail, codigo: codigo })
+    });
+    var d = await r.json();
+    if(d.ok){
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: d.email, ts: Date.now() }));
+      abrirPainel();
+      return;
+    }
+    var msgs = { expirado:'Código expirado. Solicite outro.', invalido:'Código incorreto.', nao_encontrado:'Solicite um novo código.', nao_autorizado:'E-mail sem autorização de acesso.' };
+    _msg('login-msg2', msgs[d.motivo] || 'Não foi possível validar.', 'err');
+  }catch(e){ _msg('login-msg2','Erro de conexão. Tente novamente.','err'); }
+  btn.disabled = false; btn.textContent = 'Entrar';
+}
+
+function voltarEmail(){
+  document.getElementById('etapa-codigo').style.display = 'none';
+  document.getElementById('etapa-email').style.display  = 'block';
+  document.getElementById('login-codigo').value = '';
+  _msg('login-msg',''); _msg('login-msg2','');
+}
+
+document.getElementById('login-email').addEventListener('keydown', function(e){ if(e.key==='Enter') enviarCodigo(); });
+document.getElementById('login-codigo').addEventListener('keydown', function(e){ if(e.key==='Enter') validarCodigo(); });
+
+// ── ENTRADA PELA ABA RESULTADOS ─────────────────────────────────────────────
+// Nada carrega no boot: a planilha so e buscada quando o operador abre a aba,
+// e uma vez so — reabrir a aba nao refaz a consulta (use o botao Atualizar).
+var _resCarregado = false;
+
+function resAbrir(qual) {
+  if (!lerSessao()) {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-content').style.display  = 'none';
+    return;
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display  = 'block';
+  if (!_resCarregado) { _resCarregado = true; loadAll(); }
+  else showPage(qual);
+}
+
+function abrirPainel(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display  = 'block';
+  if (!_resCarregado) { _resCarregado = true; loadAll(); }
+}
+
 </script>
 </body>
 </html>
