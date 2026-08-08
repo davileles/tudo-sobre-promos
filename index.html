@@ -556,6 +556,7 @@
   <div class="side-group">Resultados</div>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
+  <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
 </div>
 
 <div id="shell-main">
@@ -1458,6 +1459,77 @@
 </div>
 
 <!-- ════════ TEMPLATES ════════ -->
+<!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
+<div class="panel" id="panel-config">
+  <div class="aviso">
+    Identidade da <b>sua operação</b>: links de afiliado, rodapés das mensagens, grupos especiais e bloqueios do Telegram.
+    Tudo que você salvar aqui vale na hora para o auto-envio, a fila e os geradores — sem reiniciar nada.
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🏷️ Marca</p>
+    <div class="field"><label>Nome da operação <span class="tag">aparece no painel</span></label>
+      <input type="text" id="cfg-nome" placeholder="Tudo Sobre Promos"/></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">💸 Links de afiliado <span class="tag" style="text-transform:none">é para onde vai a sua comissão</span></p>
+    <div class="aviso" style="margin-bottom:12px">
+      Loja com o campo <b>vazio</b> fica sem o bloco "RESGATE O CUPOM AQUI" e <b>fora do auto-envio</b> de cupons.
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Amazon</label><input type="url" id="cfg-af-amazon" placeholder="https://amzn.to/…"/></div>
+      <div class="field"><label>Mercado Livre</label><input type="url" id="cfg-af-ml" placeholder="https://meli.la/…"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Shopee — página de cupons <span class="tag">cupom sem código</span></label><input type="url" id="cfg-af-shopee-sem" placeholder="https://s.shopee.com.br/…"/></div>
+      <div class="field"><label>Shopee — oferta <span class="tag">cupom com código</span></label><input type="url" id="cfg-af-shopee-com" placeholder="https://s.shopee.com.br/…"/></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Magazine Luiza</label><input type="url" id="cfg-af-magalu" placeholder="https://magazineluiza.onelink.me/…"/></div>
+      <div class="field"><label>Zé Delivery</label><input type="url" id="cfg-af-ze" placeholder="https://ze.onelink.me/…"/></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">✍️ Rodapés das mensagens</p>
+    <div class="aviso" style="margin-bottom:12px">
+      Texto anexado ao final de cada mensagem. Use crase (<b>`texto`</b>) para o estilo monoespaçado do WhatsApp.
+      Deixe vazio para não anexar nada.
+    </div>
+    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">auto-envio e gerador de cupom</span></label>
+      <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
+    <div class="field" style="margin-bottom:12px"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
+      <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
+    <div class="field"><label>Rodapé do grupo só-cupons <span class="tag">convite cruzado — substitui o rodapé de cupom na cópia enviada a esse grupo</span></label>
+      <textarea id="cfg-rod-cruzado" rows="2" spellcheck="false"></textarea></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">👥 Grupos especiais</p>
+    <div class="aviso" style="margin-bottom:12px">
+      <b>Padrão</b> recebe os envios quando nenhum destino está marcado. <b>Só-cupons</b> recebe cópia de todo cupom com o
+      rodapé cruzado. <b>Operador</b> recebe avisos internos (falhas, resumos) — nunca use um grupo de clientes.
+    </div>
+    <div class="field" style="margin-bottom:12px"><label>Grupo padrão de envio</label><select id="cfg-gr-padrao"></select></div>
+    <div class="field" style="margin-bottom:12px"><label>Grupo só-cupons</label><select id="cfg-gr-cupons"></select></div>
+    <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">📵 Telegram — canais ignorados</p>
+    <div class="aviso" style="margin-bottom:12px">
+      A captura aceita qualquer canal da conta conectada; esta lista é o bloqueio. Um por linha —
+      pode ser parte do nome/usuário do canal ou o ID numérico.
+    </div>
+    <div class="field"><label>Bloqueios</label>
+      <textarea id="cfg-tg-ignorados" rows="3" spellcheck="false" placeholder="canalindesejado&#10;123456789"></textarea></div>
+  </div>
+
+  <button class="btn" id="cfg-btn" onclick="cfgSalvar()">Salvar configurações</button>
+  <p class="send-ok" id="cfg-status"></p>
+</div>
+
 <div class="panel" id="panel-templates">
   <div class="fila-bar">
     <span id="tpl-status">Carregando...</span>
@@ -1613,7 +1685,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -1637,6 +1709,7 @@ function switchTab(name) {
       .then(carregarListas);
   }
   if (name === 'templates') carregarTemplates();
+  if (name === 'config') cfgAbrir();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
@@ -3542,12 +3615,132 @@ function aplicarPreset(btn, key) {
   toggleLimite(); marcarLoja('c');
 }
 
+/* ══════ CONFIGURAÇÕES DA OPERAÇÃO ══════ */
+// Fonte única de afiliados/rodapés no front: vem do servidor (aba Configurações).
+// Os literais abaixo são só fallback para o painel não quebrar se o GET falhar.
+var CFG_TSP = null;
 var linksMap = {
   'Amazon': 'https://amzn.to/4dFRSzy',
   'Mercado Livre': 'https://meli.la/2xystLt',
   'Shopee_sem': 'https://s.shopee.com.br/9fHPmP3QZF',
   'Shopee_com': 'https://s.shopee.com.br/30kdYeLY0W'
 };
+var RODAPE_CUPOM  = '`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+var RODAPE_OFERTA = '`Convide seus amigos para entrar aqui no grupo:  https://chat.whatsapp.com/Ia5ZTqeTJdXHG5OT9LUwz8`';
+
+function cfgAplicar(c) {
+  CFG_TSP = c;
+  var a = c.afiliados || {};
+  linksMap['Amazon']        = a.amazon || '';
+  linksMap['Mercado Livre'] = a.mercadolivre || '';
+  linksMap['Shopee_sem']    = a.shopee_sem || '';
+  linksMap['Shopee_com']    = a.shopee_com || '';
+  var r = c.rodapes || {};
+  RODAPE_CUPOM  = (r.cupom  || '').trim();
+  RODAPE_OFERTA = (r.oferta || '').trim();
+  var nome = c.branding && c.branding.nome;
+  if (nome) {
+    document.title = 'Gestão TSP — ' + nome;
+    var sub = document.querySelector('.brand-sub');
+    if (sub) sub.textContent = nome;
+  }
+}
+
+function cfgCarregarServidor() {
+  return fetch(SERVER + '/config-tsp?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok && d.config) cfgAplicar(d.config); })
+    .catch(function(){ /* mantém os fallbacks */ });
+}
+cfgCarregarServidor();
+
+// Anexa um rodapé (se houver) sem deixar espaço sobrando quando estiver vazio.
+function anexarRodape(msg, rodape) {
+  msg = msg.replace(/\s+$/, '');
+  rodape = (rodape || '').trim();
+  return rodape ? msg + '\n\n' + rodape : msg;
+}
+
+function cfgAbrir() {
+  var pronto = GRUPOS_CACHE.length ? Promise.resolve() : carregarGrupos();
+  Promise.resolve(pronto).then(function(){
+    cfgCarregarServidor().then(cfgPreencher);
+  });
+}
+
+function cfgPreencher() {
+  var c = CFG_TSP || {};
+  var a = c.afiliados || {}, r = c.rodapes || {}, g = c.grupos || {}, t = c.telegram || {};
+  document.getElementById('cfg-nome').value          = (c.branding && c.branding.nome) || '';
+  document.getElementById('cfg-af-amazon').value     = a.amazon || '';
+  document.getElementById('cfg-af-ml').value         = a.mercadolivre || '';
+  document.getElementById('cfg-af-shopee-sem').value = a.shopee_sem || '';
+  document.getElementById('cfg-af-shopee-com').value = a.shopee_com || '';
+  document.getElementById('cfg-af-magalu').value     = a.magalu || '';
+  document.getElementById('cfg-af-ze').value         = a.zedelivery || '';
+  document.getElementById('cfg-rod-cupom').value     = r.cupom || '';
+  document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
+  document.getElementById('cfg-rod-cruzado').value   = r.grupoCupons || '';
+  document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
+  ['padrao','cupons','operador'].forEach(function(k){
+    var sel = document.getElementById('cfg-gr-' + k);
+    var atual = g[k] || '';
+    var html = '';
+    var achou = false;
+    GRUPOS_CACHE.forEach(function(gr){
+      if (gr.id === atual) achou = true;
+      html += '<option value="' + gr.id + '"' + (gr.id === atual ? ' selected' : '') + '>'
+            + (gr.nome || gr.id.split('@')[0]) + '</option>';
+    });
+    // Grupo configurado que a sessão atual não enxerga (ex.: WhatsApp desconectado):
+    // mantém o valor em vez de trocar silenciosamente para o primeiro da lista.
+    if (atual && !achou) html = '<option value="' + atual + '" selected>' + atual.split('@')[0] + ' (fora da sessão)</option>' + html;
+    sel.innerHTML = html || '<option value="">(conecte o WhatsApp para listar)</option>';
+  });
+}
+
+function cfgSalvar() {
+  var st = document.getElementById('cfg-status');
+  var btn = document.getElementById('cfg-btn');
+  var corpo = {
+    branding: { nome: document.getElementById('cfg-nome').value.trim() },
+    afiliados: {
+      amazon:       document.getElementById('cfg-af-amazon').value.trim(),
+      mercadolivre: document.getElementById('cfg-af-ml').value.trim(),
+      shopee_sem:   document.getElementById('cfg-af-shopee-sem').value.trim(),
+      shopee_com:   document.getElementById('cfg-af-shopee-com').value.trim(),
+      magalu:       document.getElementById('cfg-af-magalu').value.trim(),
+      zedelivery:   document.getElementById('cfg-af-ze').value.trim()
+    },
+    rodapes: {
+      cupom:       document.getElementById('cfg-rod-cupom').value,
+      oferta:      document.getElementById('cfg-rod-oferta').value,
+      grupoCupons: document.getElementById('cfg-rod-cruzado').value
+    },
+    grupos: {
+      padrao:   document.getElementById('cfg-gr-padrao').value,
+      cupons:   document.getElementById('cfg-gr-cupons').value,
+      operador: document.getElementById('cfg-gr-operador').value
+    },
+    telegram: {
+      canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
+        .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
+    }
+  };
+  btn.disabled = true; st.style.color = ''; st.textContent = 'Salvando…';
+  fetch(SERVER + '/config-tsp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false;
+    if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
+    cfgAplicar(d.config);
+    st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
+  }).catch(function(e){
+    btn.disabled = false;
+    st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message;
+  });
+}
 
 function toggleLojaCustom(pid) {
   var sel = document.getElementById(pid+'-loja');
@@ -3578,7 +3771,7 @@ function gerarCupom() {
     msgC += 'Acesse o link abaixo para resgatar os cupons disponíveis.\n\n';
     if (cImportante) msgC += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
     msgC += '🔗 *RESGATE O CUPOM AQUI* '+linksMap['Shopee_sem'];
-    msgC += '\n\n`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+    msgC = anexarRodape(msgC, RODAPE_CUPOM);
     mostrar('c-msg','c-result','c-ok', msgC);
     return;
   }
@@ -3617,7 +3810,7 @@ function gerarCupom() {
   if (cImportante) msg += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
   if (url) msg += '🔗 *RESGATE O CUPOM AQUI* '+url;
   else msg = msg.replace(/\s+$/,'');
-  msg += '\n\n`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+  msg = anexarRodape(msg, RODAPE_CUPOM);
   mostrar('c-msg','c-result','c-ok', msg);
 }
 
@@ -3682,7 +3875,7 @@ async function montarCombo(loja) {
   msg += '\n\n🛒 *LOJA* ' + loja.toUpperCase() + '\n\n';
   if (cImportante) msg += '⚠️ *IMPORTANTE* ' + cImportante + '\n\n';
   if (url) msg += '🔗 *RESGATE OS CUPONS AQUI* ' + url + '\n\n';
-  msg += '`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+  msg = anexarRodape(msg, RODAPE_CUPOM);
 
   mostrar('c-msg','c-result','c-ok', msg);
 }
@@ -3825,7 +4018,7 @@ function gerarOferta() {
   var oImportante = document.getElementById('o-importante').value.trim();
   if (oImportante) msg += '⚠️ *IMPORTANTE* '+oImportante+'\n\n';
   msg += '🛒 *LOJA* '+loja.toUpperCase()+'\n\n🔗 *LINK* '+link+'\n\n';
-  msg += '`Convide seus amigos para entrar aqui no grupo:  https://chat.whatsapp.com/Ia5ZTqeTJdXHG5OT9LUwz8`';
+  msg = anexarRodape(msg, RODAPE_OFERTA);
   mostrar('o-msg','o-result','o-ok', msg);
 }
 
@@ -3845,7 +4038,7 @@ function gerarLivre() {
   var lImportante = document.getElementById('l-importante').value.trim();
   if (lImportante) msg += '⚠️ *IMPORTANTE* '+lImportante+'\n\n';
   if (link) msg += '🔗 *LINK* '+link+'\n\n';
-  msg += '`Convide seus amigos para entrar aqui no grupo:  https://chat.whatsapp.com/Ia5ZTqeTJdXHG5OT9LUwz8`';
+  msg = anexarRodape(msg, RODAPE_OFERTA);
   mostrar('l-msg','l-result','l-ok', msg);
 }
 
