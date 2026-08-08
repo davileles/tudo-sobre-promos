@@ -957,6 +957,15 @@
     <p class="send-ok" id="dist-ok"></p>
   </div>
 
+  <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>👥 Tamanho dos grupos de destino</span>
+    <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="censoAtualizar()">🔄 Medir agora</button>
+  </div>
+  <div class="card">
+    <div id="censo-total" style="font-size:13px;color:var(--muted);margin-bottom:10px">Carregando…</div>
+    <div id="censo-lista"></div>
+  </div>
+
   <div class="sec-label">Links cadastrados</div>
   <div id="dist-lista"></div>
 </div>
@@ -1503,7 +1512,7 @@ function switchTab(name) {
   if (name === 'fila') carregarFila();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
-  if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); }
+  if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
@@ -1662,6 +1671,63 @@ function editarDist(slug){
   window.scrollTo({ top: 0, behavior:'smooth' });
 }
 
+// O distribuidor so pode mandar gente para grupo marcado como DESTINO na aba
+// Grupos. Sem esse filtro a busca varria os ~400 grupos da conta e era facil
+// cadastrar um link apontando para um grupo que nao e do TSP.
+function gruposDestino(){
+  return GRUPOS_CACHE.filter(function(g){ return PAPEIS[g.id] === 'destino'; });
+}
+
+/* ══════ CENSO DE MEMBROS ══════ */
+// Contagem por grupo medida pelo servidor as 06:00 (SP) e guardada la. Aqui e
+// so leitura — "Medir agora" forca uma nova passada no WhatsApp.
+async function carregarCenso(forcar){
+  var tot = document.getElementById('censo-total');
+  var el  = document.getElementById('censo-lista');
+  if (!tot || !el) return;
+  tot.textContent = forcar ? 'Medindo os grupos…' : 'Carregando…';
+  if (forcar) el.innerHTML = '<div class="fila-loading"><div class="spinner"></div></div>';
+  try {
+    var qs = forcar ? '?refresh=1' : '?t=' + Date.now();
+    var r = await fetch(SERVER + '/grupos/censo' + qs, { cache:'no-cache' });
+    var d = await r.json();
+    if (!d.ok && !d.grupos) throw new Error(d.erro || 'falha');
+    var grupos = (d.grupos || []).slice().sort(function(a,b){ return (b.membros||0) - (a.membros||0); });
+    var medidos = grupos.filter(function(g){ return typeof g.membros === 'number'; });
+    var quando = d.atualizadoEm
+      ? new Date(d.atualizadoEm).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+      : 'nunca medido';
+    tot.innerHTML = '<b style="color:var(--text);font-size:17px">' + (d.total || 0).toLocaleString('pt-BR') + '</b> membros'
+      + ' em <b>' + grupos.length + '</b> grupo(s) de destino'
+      + '<br><span style="font-size:11px;color:var(--muted2)">Última medição: ' + esc(quando)
+      + ' · atualiza sozinho todo dia às 06:00</span>';
+    if (!grupos.length){
+      el.innerHTML = '<div style="font-size:12px;color:var(--muted2)">Nenhum grupo marcado como destino na aba 👥 Grupos.</div>';
+      return;
+    }
+    el.innerHTML = grupos.map(function(g){
+      var n = typeof g.membros === 'number' ? g.membros.toLocaleString('pt-BR') : '—';
+      var v = (typeof g.variacao === 'number' && g.variacao !== 0)
+        ? '<span style="font-size:11px;color:' + (g.variacao > 0 ? 'var(--green)' : 'var(--red)') + '">'
+          + (g.variacao > 0 ? '+' : '') + g.variacao + '</span>' : '';
+      var err = g.erro ? '<div style="color:var(--red);font-size:10.5px;margin-top:3px">⚠️ ' + esc(g.erro) + '</div>' : '';
+      return '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:7px 0;border-bottom:1px dashed var(--border)">'
+        + '<span style="font-size:12.5px;flex:1;min-width:140px">' + esc(g.nome || g.jid) + '</span>'
+        + v
+        + '<span style="font-size:12.5px;font-weight:700">' + n + '</span>'
+        + err + '</div>';
+    }).join('');
+    if (medidos.length < grupos.length)
+      el.innerHTML += '<div style="font-size:11px;color:var(--muted2);padding-top:8px">'
+        + (grupos.length - medidos.length) + ' grupo(s) ainda sem medição — use “Medir agora”.</div>';
+  } catch(e){
+    tot.textContent = 'Não foi possível carregar a contagem.';
+    el.innerHTML = '<div style="font-size:12px;color:var(--red)">' + esc(e.message) + '</div>';
+  }
+}
+
+function censoAtualizar(){ carregarCenso(true); }
+
 function distSugerir(){
   var termo = document.getElementById('dist-add').value.trim().toLowerCase();
   var box = document.getElementById('dist-sug');
@@ -1669,8 +1735,13 @@ function distSugerir(){
     box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Carregando grupos do WhatsApp…</div>';
     box.style.display = 'block'; return;
   }
+  var destinos = gruposDestino();
+  if (!destinos.length){
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Nenhum grupo marcado como <b>destino</b>. Marque na aba 👥 Grupos.</div>';
+    box.style.display = 'block'; return;
+  }
   var jaTem = {}; DIST_SEL.forEach(function(g){ jaTem[g.jid] = true; });
-  var lista = GRUPOS_CACHE.filter(function(g){
+  var lista = destinos.filter(function(g){
     return !jaTem[g.id] && (!termo || (g.nome||'').toLowerCase().indexOf(termo) >= 0);
   }).slice(0, 12);
   if (!lista.length){ box.style.display = 'none'; return; }
