@@ -547,8 +547,7 @@
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
   <div class="side-group">Cadastros</div>
-  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine</button>
-  <button class="main-tab" id="tab-listas" onclick="switchTab('listas')">🔁 Listas de reenvio</button>
+  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine e disparos</button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
@@ -1319,81 +1318,15 @@
 </div>
 
 <!-- ════════ VITRINE ════════ -->
-<div class="panel" id="panel-listas">
-  <div class="aviso">
-    Conjuntos de produtos que já venderam bem e você quer <b>reenviar de tempos em tempos</b>.
-    O disparo sai <b>um produto por vez</b>, respeitando o intervalo definido — nunca em rajada.
-    Preço, link de afiliado e cupom são resolvidos <b>no instante de cada envio</b>.
-  </div>
-
-  <div class="fila-bar">
-    <span id="lst-status">Carregando…</span>
-    <div class="fila-acoes">
-      <button class="btn btn-copy btn-sm" onclick="novaLista()">+ Nova lista</button>
-      <button class="btn btn-copy btn-sm" onclick="carregarListas()">↻ Atualizar</button>
-    </div>
-  </div>
-
-  <div class="card" id="lst-form" style="display:none">
-    <div class="card-title" id="lst-form-titulo" style="margin-bottom:12px">Nova lista</div>
-
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Nome da lista</label>
-        <input type="text" id="lst-nome" placeholder="Ex: Campeões de venda — cozinha"/></div>
-      <div class="field"><label>Intervalo entre postagens <span class="tag">minutos</span></label>
-        <input type="number" id="lst-intervalo" value="20" min="1" max="720"/></div>
-    </div>
-
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Cupom</label>
-        <select id="lst-cupom-modo" onchange="lstToggleCupom()">
-          <option value="auto">Automático — melhor cupom que servir em cada produto</option>
-          <option value="fixo">Sempre este cupom</option>
-          <option value="nenhum">Sem cupom</option>
-        </select></div>
-      <div class="field" id="lst-cupom-fixo-wrap" style="display:none">
-        <label>Qual cupom</label><select id="lst-cupom-codigo"></select></div>
-    </div>
-
-    <div class="sec-label" style="margin-top:4px">Agendamento <span class="tag">opcional</span></div>
-    <div class="mon-linha" style="margin-bottom:12px">
-      <div class="mon-campo"><label>Ligado</label>
-        <button class="sw" id="lst-ag-ativo" onclick="this.classList.toggle('on')"></button></div>
-      <div class="mon-campo"><label>Hora</label>
-        <input type="time" id="lst-ag-hora" value="09:00"/></div>
-      <div class="mon-campo" style="flex:1;min-width:230px"><label>Dias da semana</label>
-        <div class="mon-lojas" id="lst-ag-dias"></div></div>
-    </div>
-
-    <div class="sec-label">Produtos da lista</div>
-    <div class="field sel-box" style="position:relative;margin-bottom:10px">
-      <label>Adicionar da vitrine</label>
-      <input type="text" id="lst-add" autocomplete="off" placeholder="Digite parte do nome do produto…"
-             oninput="lstSugerir()" onfocus="lstSugerir()"/>
-      <div class="sug" id="lst-sug"></div>
-    </div>
-    <p style="font-size:10.5px;color:var(--muted2);margin:-4px 0 10px;line-height:1.5">
-      Só aparecem produtos já cadastrados na <b>Vitrine</b>. Cole os links sem sua tag de afiliado lá —
-      a conversão para o seu link acontece a cada envio.
-    </p>
-    <div id="lst-sel"></div>
-
-    <div class="btn-row" style="margin-top:14px">
-      <button class="btn" style="flex:1;margin-top:0" onclick="salvarLista()">💾 Salvar lista</button>
-      <button class="btn btn-copy btn-sm" onclick="cancelarFormLista()">Cancelar</button>
-    </div>
-    <p class="send-ok" id="lst-ok"></p>
-  </div>
-
-  <div id="lst-lista"></div>
-</div>
-
 <div class="panel" id="panel-vitrine">
   <div class="aviso">
-    Produtos que você quer manter à mão. Preço e estoque são consultados <b>no momento do disparo</b> —
-    o que fica salvo é só o link. Ao disparar, as ofertas vão <b>direto para os grupos destino</b>.
+    Um lugar só: aqui você cadastra os produtos, monta o disparo e acompanha o envio.
+    Preço, link de afiliado e cupom são resolvidos <b>no instante de cada envio</b> —
+    o que fica salvo é apenas o link. Todo disparo sai <b>um produto por vez</b>,
+    respeitando o intervalo definido; nunca em rajada.
   </div>
 
+  <!-- ─── 1. Cadastro de produtos ─── -->
   <div class="card">
     <div class="card-title" style="margin-bottom:10px">Cadastrar produtos</div>
     <div class="field">
@@ -1402,24 +1335,104 @@
     </div>
     <div class="g2" style="margin-top:10px">
       <div class="field">
-        <label>Vincular cupom <span class="tag">opcional</span></label>
+        <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
         <select id="vit-cupom-novo"></select>
       </div>
       <div class="field" style="justify-content:flex-end">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(false)">➕ Cadastrar na vitrine</button>
-          <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(true)">🚀 Cadastrar e disparar</button>
+          <button class="btn" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(false)">➕ Cadastrar</button>
+          <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(true)">🚀 Cadastrar e montar disparo</button>
         </div>
       </div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       Aceita <code>link</code> ou <code>Nome que eu quero | link</code>. Sem nome, ele é lido do próprio endereço.
-      <b>Cadastrar</b> guarda para disparar depois; <b>Cadastrar e disparar</b> manda estes produtos agora,
-      com o cupom selecionado. Nos dois casos eles ficam salvos na vitrine.
+      Cole os links <b>sem a sua tag de afiliado</b> — a conversão acontece a cada envio.
+      O cupom vinculado aqui é o padrão do produto; cada disparo pode substituí-lo.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
   </div>
 
+  <!-- ─── 2. Disparos ─── -->
+  <div class="sec-label" style="margin-top:22px">Disparos</div>
+  <div class="fila-bar">
+    <span id="lst-status">Carregando…</span>
+    <div class="fila-acoes">
+      <button class="btn btn-copy btn-sm" onclick="novaLista()">+ Novo disparo</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarListas()">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="card" id="lst-form" style="display:none">
+    <div class="card-title" id="lst-form-titulo" style="margin-bottom:12px">Novo disparo</div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Tipo</label>
+      <select id="lst-tipo" onchange="lstToggleTipo()">
+        <option value="unico">Envio único — dispara agora e some da lista ao terminar</option>
+        <option value="salva">Lista salva — fica guardada para reenviar quando eu quiser</option>
+      </select>
+    </div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field" id="lst-nome-wrap"><label>Nome da lista</label>
+        <input type="text" id="lst-nome" placeholder="Ex: Campeões de venda — cozinha"/></div>
+      <div class="field"><label>Intervalo entre postagens <span class="tag">minutos</span></label>
+        <input type="number" id="lst-intervalo" value="20" min="1" max="720" oninput="renderLstSel()"/></div>
+    </div>
+
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Cupom</label>
+        <select id="lst-cupom-modo" onchange="lstToggleCupom()">
+          <option value="auto">Automático — melhor cupom da base que sirva em cada produto</option>
+          <option value="fixo">Sempre este cupom</option>
+          <option value="nenhum">Sem cupom</option>
+        </select></div>
+      <div class="field" id="lst-cupom-fixo-wrap" style="display:none">
+        <label>Qual cupom</label><select id="lst-cupom-codigo"></select></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-6px 0 12px;line-height:1.5">
+      No modo automático, cada produto recebe o cupom vigente daquela loja que der o
+      <b>maior desconto em reais</b> e que realmente atenda o preço do item no momento do envio —
+      cupom com mínimo de R$ 40 entra num produto de R$ 50 e é ignorado num de R$ 30.
+    </p>
+
+    <div id="lst-agenda-wrap" style="display:none">
+      <div class="sec-label" style="margin-top:4px">Agendamento <span class="tag">opcional</span></div>
+      <div class="mon-linha" style="margin-bottom:12px">
+        <div class="mon-campo"><label>Ligado</label>
+          <button class="sw" id="lst-ag-ativo" onclick="this.classList.toggle('on')"></button></div>
+        <div class="mon-campo"><label>Hora</label>
+          <input type="time" id="lst-ag-hora" value="09:00"/></div>
+        <div class="mon-campo" style="flex:1;min-width:230px"><label>Dias da semana</label>
+          <div class="mon-lojas" id="lst-ag-dias"></div></div>
+      </div>
+    </div>
+
+    <div class="sec-label">Produtos deste disparo</div>
+    <div class="field sel-box" style="position:relative;margin-bottom:10px">
+      <label>Adicionar produto</label>
+      <input type="text" id="lst-add" autocomplete="off" placeholder="Digite parte do nome do produto…"
+             oninput="lstSugerir()" onfocus="lstSugerir()"/>
+      <div class="sug" id="lst-sug"></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-4px 0 10px;line-height:1.5">
+      Só aparecem produtos já cadastrados na base abaixo. Dá para trocar a ordem, tirar um item
+      e colocar outro no lugar a qualquer momento — inclusive editando uma lista já salva.
+    </p>
+    <div id="lst-sel"></div>
+
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" id="lst-btn-salvar" style="flex:1;margin-top:0" onclick="salvarLista()">🚀 Disparar agora</button>
+      <button class="btn btn-copy btn-sm" onclick="cancelarFormLista()">Cancelar</button>
+    </div>
+    <p class="send-ok" id="lst-ok"></p>
+  </div>
+
+  <div id="lst-lista"></div>
+
+  <!-- ─── 3. Base de produtos ─── -->
+  <div class="sec-label" style="margin-top:26px">Base de produtos</div>
   <div class="fila-bar">
     <span id="vit-status">Carregando...</span>
     <div class="fila-acoes">
@@ -1432,15 +1445,9 @@
   <div id="vit-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 
   <div class="card vit-barra" id="vit-barra" style="display:none">
-    <div class="field" style="flex:1;min-width:180px">
-      <label>Cupom para este disparo <span class="tag">substitui o vinculado</span></label>
-      <select id="vit-cupom-disparo"></select>
-    </div>
-    <button class="btn" id="vit-btn-disparar" style="margin-top:0" onclick="dispararVitrine()">🚀 Disparar selecionados</button>
+    <div style="flex:1;min-width:180px;font-size:12px;color:var(--muted)" id="vit-sel-txt"></div>
+    <button class="btn" id="vit-btn-disparar" style="margin-top:0" onclick="novoDisparoComSelecionados()">🚀 Montar disparo</button>
   </div>
-  <p class="send-ok" id="vit-ok"></p>
-  <div id="vit-resultado"></div>
-
 </div>
 
 <!-- ════════ TEMPLATES ════════ -->
@@ -1595,7 +1602,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','cupom','oferta','livre','vitrine','listas','cupons','templates','grupos','dist','conexao','comissao','trafego'];
+var TABS = ['fila','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -1611,15 +1618,12 @@ function switchTab(name) {
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
-  if (name === 'listas') {
-    // Precisa da vitrine (nomes dos produtos) e dos cupons (select do modo fixo).
-    (VIT_CACHE.length ? Promise.resolve() : carregarVitrine())
-      .then(function(){ return CUPONS_CACHE.length ? null : carregarCupons(); })
-      .then(carregarListas);
-  }
   if (name === 'vitrine') {
-    // Cupons primeiro: o select da Vitrine depende deles.
-    (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(carregarVitrine);
+    // Cupons primeiro (alimentam os selects), depois a base de produtos (da os
+    // nomes dos itens de cada disparo) e por fim os disparos.
+    (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons())
+      .then(carregarVitrine)
+      .then(carregarListas);
   }
   if (name === 'templates') carregarTemplates();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
@@ -2401,8 +2405,9 @@ function carregarListas(){
       if (!d.ok) throw new Error(d.erro || 'falha');
       LST_CACHE = d.listas || [];
       var rodando = LST_CACHE.filter(function(l){ return l.execucao; }).length;
+      var salvas = LST_CACHE.filter(function(l){ return !l.efemera; }).length;
       document.getElementById('lst-status').textContent =
-        LST_CACHE.length + ' lista(s)' + (rodando ? ' · ' + rodando + ' em disparo' : '');
+        salvas + ' lista(s) salva(s)' + (rodando ? ' · ' + rodando + ' em disparo' : '');
       renderListas();
       // Enquanto houver disparo em andamento, o painel se atualiza sozinho.
       if (LST_TIMER) clearTimeout(LST_TIMER);
@@ -2417,16 +2422,17 @@ function carregarListas(){
 function renderListas(){
   var el = document.getElementById('lst-lista');
   if (!LST_CACHE.length){
-    el.innerHTML = '<div class="cup-vazio">Nenhuma lista ainda. Crie a primeira em “+ Nova lista”.</div>';
+    el.innerHTML = '<div class="cup-vazio">Nenhum disparo ativo. Comece em “+ Novo disparo”, ou selecione produtos na base abaixo.</div>';
     return;
   }
   el.innerHTML = LST_CACHE.map(function(l){
     var ex = l.execucao;
     var cupom = l.cupomModo === 'auto' ? 'cupom automático'
               : l.cupomModo === 'fixo' ? 'cupom ' + esc(l.cupomCodigo || '?') : 'sem cupom';
-    var agenda = (l.agenda && l.agenda.ativo && l.agenda.diasSemana.length)
-      ? l.agenda.diasSemana.slice().sort().map(function(d){ return DIAS_SEM[d]; }).join(', ') + ' às ' + esc(l.agenda.hora)
-      : 'sem agendamento';
+    var agenda = l.efemera ? 'não fica salvo'
+      : (l.agenda && l.agenda.ativo && l.agenda.diasSemana.length)
+        ? l.agenda.diasSemana.slice().sort().map(function(d){ return DIAS_SEM[d]; }).join(', ') + ' às ' + esc(l.agenda.hora)
+        : 'sem agendamento';
     var sumiram = l.itens.filter(function(i){ return i.sumiu; }).length;
 
     var progresso = '';
@@ -2446,6 +2452,8 @@ function renderListas(){
         + '</div>';
     }
 
+    // Envio unico so aceita acompanhar e cancelar: editar ou reagendar algo que
+    // vai deixar de existir daqui a pouco nao faz sentido.
     var acoes = ex
       ? (ex.pausada
           ? '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'retomar\')">▶ Retomar</button>'
@@ -2457,12 +2465,13 @@ function renderListas(){
 
     var duracao = l.produtos.length > 1
       ? Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10 + 'h de duração'
-      : 'envio único';
+      : 'produto único';
 
     return '<div class="card">'
       + '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px">'
       +   '<span class="card-title" style="flex:1">' + esc(l.nome)
       +     (l.ativo ? '' : ' <span style="color:var(--muted2);font-weight:500">(desativada)</span>') + '</span>'
+      +   (l.efemera ? '<span class="tag">envio único</span>' : '')
       +   (ex ? '<span class="mon-estado on">em disparo</span>' : '')
       + '</div>'
       + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">'
@@ -2495,18 +2504,44 @@ function lstToggleCupom(){
   }
 }
 
+// Envio unico e lista salva usam o MESMO formulario e a mesma maquina de envio.
+// A unica diferenca e o destino: um vira registro descartavel que some quando a
+// fila acaba, o outro fica guardado com nome e agendamento.
+function lstToggleTipo(){
+  var salva = document.getElementById('lst-tipo').value === 'salva';
+  document.getElementById('lst-nome-wrap').style.display   = salva ? 'flex' : 'none';
+  document.getElementById('lst-agenda-wrap').style.display = salva ? 'block' : 'none';
+  document.getElementById('lst-btn-salvar').textContent    = salva ? '💾 Salvar lista' : '🚀 Disparar agora';
+}
+
+function abrirFormLista(){
+  document.getElementById('lst-form').style.display = 'block';
+  lstToggleTipo(); lstToggleCupom(); renderLstSel(); lstMsg('');
+  document.getElementById('lst-form').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
 function novaLista(){
   LST_EDIT = null; LST_SEL = [];
-  document.getElementById('lst-form-titulo').textContent = 'Nova lista';
+  document.getElementById('lst-form-titulo').textContent = 'Novo disparo';
+  document.getElementById('lst-tipo').value = 'unico';
+  document.getElementById('lst-tipo').disabled = false;
   document.getElementById('lst-nome').value = '';
   document.getElementById('lst-intervalo').value = 20;
   document.getElementById('lst-cupom-modo').value = 'auto';
   document.getElementById('lst-ag-ativo').classList.remove('on');
   document.getElementById('lst-ag-hora').value = '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml([]);
-  document.getElementById('lst-form').style.display = 'block';
-  lstToggleCupom(); renderLstSel(); lstMsg('');
-  window.scrollTo({ top: 0, behavior:'smooth' });
+  abrirFormLista();
+}
+
+// Atalho da base de produtos: o que esta marcado ja entra no formulario, na
+// ordem em que aparece na base.
+function novoDisparoComSelecionados(){
+  var marcados = VIT_CACHE.filter(function(p){ return VIT_SEL[p.asin]; });
+  if (!marcados.length) return;
+  novaLista();
+  LST_SEL = marcados.map(function(p){ return { asin:p.asin, nome:p.nome }; });
+  renderLstSel();
 }
 
 function editarLista(id){
@@ -2515,26 +2550,30 @@ function editarLista(id){
   LST_EDIT = id;
   LST_SEL = l.itens.map(function(i){ return { asin:i.asin, nome:i.nome }; });
   document.getElementById('lst-form-titulo').textContent = 'Editando: ' + l.nome;
+  // Lista ja salva nao vira envio unico no meio do caminho: o registro existe.
+  document.getElementById('lst-tipo').value = 'salva';
+  document.getElementById('lst-tipo').disabled = true;
   document.getElementById('lst-nome').value = l.nome;
   document.getElementById('lst-intervalo').value = l.intervaloMin;
   document.getElementById('lst-cupom-modo').value = l.cupomModo;
   document.getElementById('lst-ag-ativo').classList.toggle('on', !!(l.agenda && l.agenda.ativo));
   document.getElementById('lst-ag-hora').value = (l.agenda && l.agenda.hora) || '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml((l.agenda && l.agenda.diasSemana) || []);
-  document.getElementById('lst-form').style.display = 'block';
-  lstToggleCupom();
+  abrirFormLista();
   if (l.cupomModo === 'fixo') document.getElementById('lst-cupom-codigo').value = l.cupomCodigo || '';
-  renderLstSel(); lstMsg('');
-  window.scrollTo({ top: 0, behavior:'smooth' });
 }
 
-function cancelarFormLista(){ document.getElementById('lst-form').style.display = 'none'; LST_EDIT = null; }
+function cancelarFormLista(){
+  document.getElementById('lst-form').style.display = 'none';
+  document.getElementById('lst-tipo').disabled = false;
+  LST_EDIT = null;
+}
 
 function lstSugerir(){
   var termo = document.getElementById('lst-add').value.trim().toLowerCase();
   var box = document.getElementById('lst-sug');
   if (!VIT_CACHE.length){
-    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Vitrine vazia — cadastre os produtos na aba 🏬 Vitrine.</div>';
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Base vazia — cadastre os produtos no campo de links, no topo desta aba.</div>';
     box.style.display = 'block'; return;
   }
   var jaTem = {}; LST_SEL.forEach(function(p){ jaTem[p.asin] = true; });
@@ -2593,32 +2632,64 @@ function renderLstSel(){
 }
 
 function salvarLista(){
-  var nome = document.getElementById('lst-nome').value.trim();
-  if (!nome) return lstMsg('Dê um nome para a lista.', true);
+  var unico = document.getElementById('lst-tipo').value === 'unico';
+  var nome  = document.getElementById('lst-nome').value.trim();
+  if (!unico && !nome) return lstMsg('Dê um nome para a lista.', true);
   if (!LST_SEL.length) return lstMsg('Adicione ao menos um produto.', true);
 
+  var modo = document.getElementById('lst-cupom-modo').value;
+  var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
+  var produtos = LST_SEL.map(function(p){ return p.asin; });
+  var cupomCodigo = modo === 'fixo' ? document.getElementById('lst-cupom-codigo').value : null;
+  if (modo === 'fixo' && !cupomCodigo) return lstMsg('Escolha o cupom fixo ou mude o modo do cupom.', true);
+
+  // ── Envio único: nada é guardado. Confirma porque sai direto para os grupos.
+  if (unico) {
+    var horas = Math.round((produtos.length - 1) * intervalo / 60 * 10) / 10;
+    if (!confirm('Disparar ' + produtos.length + ' produto(s) agora, um a cada ' + intervalo
+      + ' min — cerca de ' + horas + 'h até o último?\n\nEste envio não fica salvo.')) return;
+    lstMsg('Abrindo a fila…');
+    fetch(SERVER + '/listas/disparo-unico', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ produtos: produtos, intervaloMin: intervalo,
+                             cupomModo: modo, cupomCodigo: cupomCodigo })
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok) throw new Error(d.erro || 'falhou');
+        lstMsg('✓ Disparo iniciado — acompanhe o andamento abaixo.');
+        VIT_SEL = {}; cancelarFormLista();
+        renderVitrine(); carregarListas();
+      })
+      .catch(function(e){ lstMsg('Não foi possível disparar: ' + e.message, true); });
+    return;
+  }
+
+  // ── Lista salva: fica guardada, com agendamento opcional.
   var dias = [].slice.call(document.querySelectorAll('#lst-ag-dias input[data-dia]'))
     .filter(function(i){ return i.checked; }).map(function(i){ return Number(i.dataset.dia); });
   var agAtivo = document.getElementById('lst-ag-ativo').classList.contains('on');
   if (agAtivo && !dias.length) return lstMsg('Escolha ao menos um dia da semana para o agendamento.', true);
 
-  var modo = document.getElementById('lst-cupom-modo').value;
-  var corpo = {
-    id: LST_EDIT || undefined,
-    nome: nome,
-    produtos: LST_SEL.map(function(p){ return p.asin; }),
-    intervaloMin: Number(document.getElementById('lst-intervalo').value) || 20,
-    cupomModo: modo,
-    cupomCodigo: modo === 'fixo' ? document.getElementById('lst-cupom-codigo').value : null,
-    agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
-  };
-
-  fetch(SERVER + '/listas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) })
+  fetch(SERVER + '/listas', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id: LST_EDIT || undefined,
+      nome: nome,
+      produtos: produtos,
+      intervaloMin: intervalo,
+      cupomModo: modo,
+      cupomCodigo: cupomCodigo,
+      efemera: false,
+      agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
+    })
+  })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) throw new Error(d.erro || 'falhou');
       lstMsg('✓ Lista salva.');
-      cancelarFormLista(); carregarListas();
+      VIT_SEL = {}; cancelarFormLista();
+      renderVitrine(); carregarListas();
     })
     .catch(function(e){ lstMsg('Não foi possível salvar: ' + e.message, true); });
 }
@@ -2648,7 +2719,7 @@ function acaoLista(id, acao){
 
 function excluirLista(id){
   var l = LST_CACHE.find(function(x){ return x.id === id; });
-  if (!confirm('Excluir a lista "' + (l ? l.nome : id) + '"? Os produtos continuam na vitrine.')) return;
+  if (!confirm('Excluir a lista "' + (l ? l.nome : id) + '"? Os produtos continuam na base.')) return;
   fetch(SERVER + '/listas/' + encodeURIComponent(id), { method:'DELETE' })
     .then(function(r){ return r.json(); })
     .then(function(){ carregarListas(); })
@@ -2696,15 +2767,15 @@ function opcoesCupom(){
 }
 
 function renderVitrine(){
-  ['vit-cupom-novo','vit-cupom-disparo'].forEach(function(id){
+  ['vit-cupom-novo'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
     var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
   });
 
   var el = document.getElementById('vit-lista');
-  document.getElementById('vit-status').textContent = VIT_CACHE.length + ' produto(s) na vitrine';
+  document.getElementById('vit-status').textContent = VIT_CACHE.length + ' produto(s) na base';
   if (!VIT_CACHE.length) {
-    el.innerHTML = '<div class="cup-vazio">Vitrine vazia. Cole os links acima para começar.</div>';
+    el.innerHTML = '<div class="cup-vazio">Base vazia. Cole os links acima para começar.</div>';
     atualizarBarraVitrine(); return;
   }
 
@@ -2742,7 +2813,10 @@ function marcarTodosVitrine(v){
 function atualizarBarraVitrine(){
   var n = Object.keys(VIT_SEL).length;
   document.getElementById('vit-barra').style.display = n ? 'flex' : 'none';
-  document.getElementById('vit-btn-disparar').textContent = '🚀 Disparar ' + n + ' oferta' + (n === 1 ? '' : 's');
+  document.getElementById('vit-sel-txt').textContent =
+    n + ' produto' + (n === 1 ? '' : 's') + ' selecionado' + (n === 1 ? '' : 's')
+    + ' — no próximo passo você escolhe se é envio único ou lista salva.';
+  document.getElementById('vit-btn-disparar').textContent = '🚀 Montar disparo com ' + n;
 }
 
 function cadastrarVitrine(dispararDepois){
@@ -2767,15 +2841,17 @@ function cadastrarVitrine(dispararDepois){
 
     return carregarVitrine().then(function(){
       if (!dispararDepois || !salvos.length) return;
-      // Seleciona exatamente o que acabou de entrar e reusa o fluxo de disparo,
-      // para os dois caminhos passarem pela mesma confirmacao e pelo mesmo
-      // relatorio de enviados/descartados.
+      // Seleciona exatamente o que acabou de entrar e cai no mesmo formulario de
+      // disparo do resto da aba — um caminho so para revisar cupom e intervalo.
       VIT_SEL = {};
       salvos.forEach(function(s){ VIT_SEL[s.asin] = true; });
-      var sel = document.getElementById('vit-cupom-disparo');
-      if (cupom) sel.value = cupom;
       renderVitrine();
-      dispararVitrine();
+      novoDisparoComSelecionados();
+      if (cupom) {
+        document.getElementById('lst-cupom-modo').value = 'fixo';
+        lstToggleCupom();
+        document.getElementById('lst-cupom-codigo').value = cupom;
+      }
     });
   })
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
@@ -2809,47 +2885,6 @@ function removerVitrine(btn){
   if (!confirm('Remover "' + i.nome + '" da vitrine?')) return;
   fetch(SERVER + '/vitrine/' + encodeURIComponent(i.asin), { method:'DELETE' })
     .then(function(){ delete VIT_SEL[i.asin]; carregarVitrine(); });
-}
-
-function dispararVitrine(){
-  var asins = Object.keys(VIT_SEL);
-  if (!asins.length) return;
-  var cupom = document.getElementById('vit-cupom-disparo').value || null;
-  if (!confirm('Disparar ' + asins.length + ' oferta(s) direto para os grupos destino'
-      + (cupom ? ' com o cupom ' + cupom : '') + '?\n\nOs preços serão consultados agora.')) return;
-
-  var btn = document.getElementById('vit-btn-disparar');
-  var ok  = document.getElementById('vit-ok');
-  btn.disabled = true; btn.textContent = 'Consultando preços e enviando...';
-  ok.className = 'send-ok'; ok.textContent = '';
-  document.getElementById('vit-resultado').innerHTML = '';
-
-  fetch(SERVER + '/vitrine/disparar', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ asins: asins, cupom: cupom })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    if (!d.ok) throw new Error(d.erro || 'falhou');
-    var h = '';
-    if (d.enviados.length) {
-      h += '<div class="vit-res ok"><b>' + d.enviados.length + ' oferta(s) enviada(s)</b><br>'
-         + d.enviados.map(function(e){
-             return '· ' + esc(e.nome) + (e.cupom ? ' — cupom ' + esc(e.cupom) : '')
-                  + (e.aviso ? ' <span style="color:var(--muted)">(' + esc(e.aviso) + ')</span>' : '');
-           }).join('<br>') + '</div>';
-    }
-    var problemas = (d.descartados || []).concat(d.falhas || []);
-    if (problemas.length) {
-      h += '<div class="vit-res warn"><b>' + problemas.length + ' não enviada(s)</b><br>'
-         + problemas.map(function(p){ return '· ' + esc(p.nome || p.asin) + ' — ' + esc(p.motivo || p.erro); }).join('<br>') + '</div>';
-    }
-    document.getElementById('vit-resultado').innerHTML = h;
-    VIT_SEL = {};
-    carregarVitrine();
-  })
-  .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; })
-  .finally(function(){ btn.disabled = false; atualizarBarraVitrine(); });
 }
 
 /* ══════ TEMPLATES ══════ */
@@ -4021,7 +4056,7 @@ async function carregarFila() {
       var org = o.grupoOrigem || o.origem || '';
       var orgNome = o.grupoOrigemNome || NOMES_GRUPOS_CACHE[org] || '';
       var origemSelo = '';
-      if (org === 'vitrine') origemSelo = '<span class="fila-origem">🏬 Vitrine</span>';
+      if (org === 'vitrine' || org === 'lista') origemSelo = '<span class="fila-origem">🏬 Vitrine</span>';
       else if (String(org).indexOf('telegram:') === 0) origemSelo = '<span class="fila-origem">✈️ ' + esc(org.replace('telegram:','')) + '</span>';
       else if (org) origemSelo = '<span class="fila-origem" title="' + esc(org) + '">👥 ' + esc(orgNome || org.split('@')[0]) + '</span>';
 
