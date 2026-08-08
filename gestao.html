@@ -730,6 +730,43 @@
     dentro do mesmo dia. <b>Grupo fonte sem cadastro não captura nada.</b>
   </div>
   <div id="mon-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="sec-label" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>📱 Números de envio</span>
+    <span style="font-weight:600;text-transform:none;letter-spacing:0" id="contas-agora"></span>
+  </div>
+  <div class="aviso">
+    Quem <b>lê</b> os grupos é sempre o número principal. Os números extras <b>só disparam</b>, em turnos fixos.
+    Fora de qualquer turno — ou se o número da vez estiver fora do ar — o envio cai no principal.
+    A escala vale só para os disparos do <b>TSP</b> (cupons e ofertas de marketplace).
+  </div>
+  <div id="contas-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Adicionar número <span class="tag">apelido: letras, números, - e _</span></label>
+        <input type="text" id="conta-novo-id" placeholder="Ex: secundaria"/>
+      </div>
+      <div class="field" style="justify-content:flex-end">
+        <button class="btn" style="margin-top:0" onclick="conectarContaNova()">Gerar QR</button>
+      </div>
+    </div>
+    <p class="send-ok" id="contas-status"></p>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Escala de turnos</div>
+    <label class="mon-loja" style="display:inline-flex;margin-bottom:12px" id="turnos-ativo-wrap">
+      <input type="checkbox" id="turnos-ativo"/> Rodízio ligado
+    </label>
+    <div id="turnos-lista"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="addTurno()">+ Turno</button>
+      <button class="btn btn-sm" style="margin-top:0" id="turnos-btn" onclick="salvarTurnos()">Salvar escala</button>
+    </div>
+    <p class="send-ok" id="turnos-status"></p>
+  </div>
 </div>
 
 <!-- ════════ VITRINE ════════ -->
@@ -943,7 +980,7 @@ function switchTab(name) {
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'fila') carregarFila();
-  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
+  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); carregarContas(); }
   if (name === 'cupons') { carregarCupons(); carregarJanelaCupom(); }
   if (name === 'vitrine') {
     // Cupons primeiro: o select da Vitrine depende deles.
@@ -1066,6 +1103,159 @@ function salvarMonitor(btn){
   })
   .catch(function(e){ alert('Não foi possível salvar: ' + e.message); })
   .finally(function(){ btn.disabled = false; btn.textContent = '💾 Salvar'; });
+}
+
+/* ══════ NUMEROS DE ENVIO E ESCALA DE TURNOS ══════ */
+var CONTAS_CACHE = { principal:{}, extras:[] };
+var TURNOS_CACHE = { ativo:false, turnos:[] };
+
+function carregarContas() {
+  return fetch(SERVER + '/contas?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      CONTAS_CACHE = d;
+      TURNOS_CACHE = d.turnosTsp || { ativo:false, turnos:[] };
+      document.getElementById('contas-agora').textContent = 'disparando agora: ' + (d.contaAgora || 'principal');
+      renderContas();
+      renderTurnos();
+    })
+    .catch(function(e){
+      document.getElementById('contas-lista').innerHTML =
+        '<div class="cup-vazio">Não foi possível ler as contas.<br>' + esc(e.message) + '</div>';
+    });
+}
+
+function renderContas() {
+  var linhas = [CONTAS_CACHE.principal || { id:'principal' }].concat(CONTAS_CACHE.extras || []);
+  document.getElementById('contas-lista').innerHTML = linhas.map(function(c){
+    var ehPrinc = c.id === 'principal';
+    var est = c.conectado ? { txt:'conectado', cls:'ok' }
+            : c.conectando ? { txt:'conectando...', cls:'perto' }
+            : { txt:'desconectado', cls:'morto' };
+    return '<div class="mon' + (c.conectado ? '' : ' off') + '">'
+      + '<div class="mon-top">'
+        + '<span class="mon-nome">' + esc(c.id) + (ehPrinc ? ' <span class="tag">lê e envia</span>' : ' <span class="tag">só envia</span>') + '</span>'
+        + '<span class="mon-estado ' + est.cls + '">' + est.txt + '</span>'
+      + '</div>'
+      + '<div class="mon-linha">'
+        + (c.ultimoEnvio ? '<div class="mon-campo"><label>Último envio</label><span style="font-size:12px">' + esc(new Date(c.ultimoEnvio).toLocaleString('pt-BR')) + '</span></div>' : '')
+        + (c.ultimoErro ? '<div class="mon-campo"><label>Último erro</label><span style="font-size:12px;color:#f87171">' + esc(c.ultimoErro) + '</span></div>' : '')
+        + '<div class="mon-campo" style="justify-content:flex-end"><div style="display:flex;gap:8px;flex-wrap:wrap">'
+          + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
+            + SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr') + '">QR</a>'
+          + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
+        + '</div></div>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+function conectarContaNova() {
+  var id = document.getElementById('conta-novo-id').value.trim();
+  var s  = document.getElementById('contas-status');
+  if (!id) { s.className='send-ok send-err'; s.textContent='Dê um apelido ao número.'; return; }
+  s.className='send-ok'; s.textContent='Preparando...';
+  fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/conectar', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      window.open(SERVER + '/contas/' + encodeURIComponent(id) + '/qr', '_blank');
+      s.textContent = '✓ Escaneie o QR na aba que abriu. Depois use Atualizar.';
+      setTimeout(carregarContas, 8000);
+    })
+    .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
+}
+
+// Um número fora de um grupo de destino só falha na hora do turno dele — e aí a
+// mensagem cai no principal sem ninguém perceber. Melhor conferir antes.
+function conferirGruposConta(id) {
+  var s = document.getElementById('contas-status');
+  s.className='send-ok'; s.textContent='Conferindo grupos de ' + id + '...';
+  fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/grupos?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      if (!d.faltando.length) {
+        s.textContent = '✓ ' + id + ' está em todos os ' + d.conferidos + ' grupos de destino.';
+      } else {
+        s.className='send-ok send-err';
+        s.textContent = '⚠️ ' + id + ' não está em ' + d.faltando.length + ' grupo(s): '
+          + d.faltando.map(function(g){ return g.nome || g.jid.split('@')[0]; }).join(', ');
+      }
+    })
+    .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
+}
+
+function contasDisponiveis() {
+  return ['principal'].concat((CONTAS_CACHE.extras || []).map(function(c){ return c.id; }));
+}
+
+function renderTurnos() {
+  document.getElementById('turnos-ativo').checked = !!TURNOS_CACHE.ativo;
+  var opts = contasDisponiveis();
+  var el = document.getElementById('turnos-lista');
+  if (!TURNOS_CACHE.turnos.length) {
+    el.innerHTML = '<div class="cup-vazio">Nenhum turno: tudo sai pelo número principal.</div>';
+    return;
+  }
+  el.innerHTML = TURNOS_CACHE.turnos.map(function(t, i){
+    return '<div class="mon" data-turno="' + i + '"><div class="mon-linha">'
+      + '<div class="mon-campo"><label>Das</label><input type="time" data-campo="inicio" value="' + esc(t.inicio) + '"/></div>'
+      + '<div class="mon-campo"><label>Até</label><input type="time" data-campo="fim" value="' + esc(t.fim) + '"/></div>'
+      + '<div class="mon-campo"><label>Número</label><select data-campo="conta">'
+        + opts.map(function(o){ return '<option value="' + esc(o) + '"' + (o === t.conta ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('')
+      + '</select></div>'
+      + '<div class="mon-campo" style="justify-content:flex-end"><button class="btn btn-copy btn-sm" style="margin-top:0" onclick="removerTurno(' + i + ')">Remover</button></div>'
+    + '</div></div>';
+  }).join('');
+}
+
+function lerTurnosDaTela() {
+  return [].slice.call(document.querySelectorAll('#turnos-lista [data-turno]')).map(function(raiz){
+    return {
+      inicio: raiz.querySelector('[data-campo="inicio"]').value,
+      fim:    raiz.querySelector('[data-campo="fim"]').value,
+      conta:  raiz.querySelector('[data-campo="conta"]').value
+    };
+  });
+}
+
+function addTurno() {
+  TURNOS_CACHE.turnos = lerTurnosDaTela();
+  TURNOS_CACHE.turnos.push({ inicio:'08:00', fim:'14:00', conta:'principal' });
+  renderTurnos();
+}
+
+function removerTurno(i) {
+  TURNOS_CACHE.turnos = lerTurnosDaTela();
+  TURNOS_CACHE.turnos.splice(i, 1);
+  renderTurnos();
+}
+
+function salvarTurnos() {
+  var btn = document.getElementById('turnos-btn');
+  var s   = document.getElementById('turnos-status');
+  var payload = { turnosTsp: {
+    ativo: document.getElementById('turnos-ativo').checked,
+    turnos: lerTurnosDaTela()
+  }};
+  btn.disabled = true; s.className='send-ok'; s.textContent='Salvando...';
+  fetch(SERVER + '/mkt/config', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    TURNOS_CACHE = d.turnosTsp || payload.turnosTsp;
+    document.getElementById('contas-agora').textContent = 'disparando agora: ' + (d.contaAgora || 'principal');
+    renderTurnos();
+    s.textContent = TURNOS_CACHE.ativo
+      ? '✓ Escala ativa — disparando agora por ' + (d.contaAgora || 'principal') + '.'
+      : '✓ Escala desligada: tudo sai pelo principal.';
+  })
+  .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não salvou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
 }
 
 /* ══════ VITRINE ══════ */
