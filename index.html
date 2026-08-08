@@ -1337,22 +1337,23 @@
       <label>Links <span class="tag">um por linha</span></label>
       <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;https://link.amazon/xxxx" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
     </div>
-    <div class="g2" style="margin-top:10px">
-      <div class="field">
-        <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
-        <select id="vit-cupom-novo"></select>
-      </div>
-      <div class="field" style="justify-content:flex-end">
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(false)">➕ Cadastrar</button>
-          <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine(true)">🚀 Cadastrar e montar disparo</button>
-        </div>
-      </div>
+    <div class="field" style="margin-top:10px">
+      <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
+      <select id="vit-cupom-novo"></select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine('so')">➕ Só cadastrar na base</button>
+      <button class="btn" style="margin-top:0;flex:1;min-width:170px" onclick="cadastrarVitrine('unico')">🚀 Cadastrar e disparar agora</button>
+      <button class="btn" style="margin-top:0;flex:1;min-width:170px" onclick="cadastrarVitrine('salva')">💾 Cadastrar como lista salva</button>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       Aceita <code>link</code> ou <code>Nome que eu quero | link</code>. Sem nome, ele é lido do próprio endereço.
       Cole os links <b>sem a sua tag de afiliado</b> — a conversão acontece a cada envio.
       O cupom vinculado aqui é o padrão do produto; cada disparo pode substituí-lo.
+      <br><b>Só cadastrar</b> guarda os produtos e para por aí. <b>Disparar agora</b> abre o
+      formulário de envio único já com eles marcados — sai na hora e não fica salvo.
+      <b>Lista salva</b> abre o mesmo formulário no modo guardado, com nome e agendamento,
+      para reenviar quando quiser.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
   </div>
@@ -1442,6 +1443,7 @@
     <div class="fila-acoes">
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
+      <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
       <button class="btn btn-copy btn-sm" onclick="carregarVitrine()">↻ Atualizar</button>
     </div>
   </div>
@@ -2822,13 +2824,21 @@ function marcarTodosVitrine(v){
 function atualizarBarraVitrine(){
   var n = Object.keys(VIT_SEL).length;
   document.getElementById('vit-barra').style.display = n ? 'flex' : 'none';
+  var bx = document.getElementById('vit-btn-excluir');
+  if (bx) {
+    bx.disabled = !n;
+    bx.textContent = n ? '🗑 Excluir selecionados (' + n + ')' : '🗑 Excluir selecionados';
+  }
   document.getElementById('vit-sel-txt').textContent =
     n + ' produto' + (n === 1 ? '' : 's') + ' selecionado' + (n === 1 ? '' : 's')
     + ' — no próximo passo você escolhe se é envio único ou lista salva.';
   document.getElementById('vit-btn-disparar').textContent = '🚀 Montar disparo com ' + n;
 }
 
-function cadastrarVitrine(dispararDepois){
+// destino: 'so' = fica so na base | 'unico' = abre o form em envio unico |
+// 'salva' = abre o mesmo form no modo lista salva. A decisao e tomada aqui em
+// cima, junto com os links, e nao depois de ja ter cadastrado.
+function cadastrarVitrine(destino){
   var texto = document.getElementById('vit-links').value.trim();
   var cupom = document.getElementById('vit-cupom-novo').value || null;
   var ok = document.getElementById('vit-cad-ok');
@@ -2849,13 +2859,16 @@ function cadastrarVitrine(dispararDepois){
     if (salvos.length) document.getElementById('vit-links').value = '';
 
     return carregarVitrine().then(function(){
-      if (!dispararDepois || !salvos.length) return;
+      if (destino === 'so' || !salvos.length) return;
       // Seleciona exatamente o que acabou de entrar e cai no mesmo formulario de
       // disparo do resto da aba — um caminho so para revisar cupom e intervalo.
       VIT_SEL = {};
       salvos.forEach(function(s){ VIT_SEL[s.asin] = true; });
       renderVitrine();
       novoDisparoComSelecionados();
+      // O tipo ja vem decidido do botao; novaLista() deixa 'unico' como padrao.
+      document.getElementById('lst-tipo').value = (destino === 'salva') ? 'salva' : 'unico';
+      lstToggleTipo();
       if (cupom) {
         document.getElementById('lst-cupom-modo').value = 'fixo';
         lstToggleCupom();
@@ -2894,6 +2907,46 @@ function removerVitrine(btn){
   if (!confirm('Remover "' + i.nome + '" da vitrine?')) return;
   fetch(SERVER + '/vitrine/' + encodeURIComponent(i.asin), { method:'DELETE' })
     .then(function(){ delete VIT_SEL[i.asin]; carregarVitrine(); });
+}
+
+// Exclusao em lote. Os DELETE saem em SERIE de proposito: o proxy grava todos no
+// mesmo vitrine.json e requisicoes paralelas colidem por SHA no commit.
+function excluirSelecionadosVitrine(){
+  var asins = Object.keys(VIT_SEL);
+  if (!asins.length) return;
+  var nomes = VIT_CACHE.filter(function(p){ return VIT_SEL[p.asin]; })
+                       .map(function(p){ return p.nome; });
+  var amostra = nomes.slice(0, 6).map(function(n){ return '• ' + n; }).join('\n');
+  if (nomes.length > 6) amostra += '\n• …e mais ' + (nomes.length - 6);
+  if (!confirm('Excluir ' + asins.length + ' produto(s) da base?\n\n' + amostra
+    + '\n\nListas salvas que usem esses produtos ficam sem eles. Não dá para desfazer.')) return;
+
+  var st = document.getElementById('vit-status');
+  var bx = document.getElementById('vit-btn-excluir');
+  if (bx) bx.disabled = true;
+  var falhas = 0, feitos = 0;
+
+  asins.reduce(function(p, asin){
+    return p.then(function(){
+      st.textContent = 'Excluindo ' + (feitos + 1) + ' de ' + asins.length + '…';
+      return fetch(SERVER + '/vitrine/' + encodeURIComponent(asin), { method:'DELETE' })
+        .then(function(r){ return r.json().catch(function(){ return { ok: r.ok }; }); })
+        .then(function(d){
+          if (d && d.ok === false) { falhas++; }
+          else { delete VIT_SEL[asin]; feitos++; }
+        })
+        .catch(function(){ falhas++; });
+    });
+  }, Promise.resolve()).then(function(){
+    // O que sumiu da base nao pode continuar num disparo em edicao.
+    if (typeof LST_SEL !== 'undefined' && LST_SEL.length) {
+      LST_SEL = LST_SEL.filter(function(p){ return asins.indexOf(p.asin) === -1; });
+      if (typeof renderLstSel === 'function') renderLstSel();
+    }
+    return carregarVitrine();
+  }).then(function(){
+    if (falhas) alert(falhas + ' produto(s) não puderam ser excluídos. Atualize e tente de novo.');
+  });
 }
 
 /* ══════ TEMPLATES ══════ */
