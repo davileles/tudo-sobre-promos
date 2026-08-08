@@ -584,6 +584,12 @@
         <button class="preset-btn" onclick="aplicarPreset(this,'AZ-10A')">AZ 10% (R$50)</button>
         <button class="preset-btn" onclick="aplicarPreset(this,'AZ-10B')">AZ 10% (R$100)</button>
       </div>
+      <p class="presets-label" style="margin-top:12px">Cupons ativos <span class="tag" style="text-transform:none">monta a lista com o que está vigente na base</span></p>
+      <div class="presets" id="c-presets-ativos">
+        <button class="preset-btn" onclick="montarCombo('Mercado Livre')">Ativos ML</button>
+        <button class="preset-btn" onclick="montarCombo('Amazon')">Ativos AZ</button>
+        <button class="preset-btn" onclick="montarCombo('Shopee')">Ativos SH</button>
+      </div>
     </div>
     <div class="g2" style="margin-bottom:12px">
       <div class="field">
@@ -2549,6 +2555,69 @@ function gerarCupom() {
   if (url) msg += '🔗 *RESGATE O CUPOM AQUI* '+url;
   else msg = msg.replace(/\s+$/,'');
   msg += '\n\n`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+  mostrar('c-msg','c-result','c-ok', msg);
+}
+
+/* ══════ COMBO DE CUPONS ATIVOS ══════ */
+// Uma mensagem só listando tudo que está vigente na base para uma loja. Os
+// valores saem da base — não são digitados — então a mensagem não pode divergir
+// do que o pipeline usa para calcular preço final nas ofertas.
+function ordenarCupons(a, b) {
+  // Percentual antes de valor fixo, e maior desconto primeiro: quem lê a lista
+  // quer bater o olho no melhor cupom.
+  if (a.tipo !== b.tipo) return a.tipo === 'pct' ? -1 : 1;
+  return Number(b.valor) - Number(a.valor);
+}
+
+function linhaCombo(c) {
+  var valor = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmtBRL(c.valor);
+  var regras = [];
+  if (c.minimo) regras.push('mín. R$ ' + fmtBRL(c.minimo));
+  if (c.limite != null && c.tipo === 'pct') regras.push('máx. R$ ' + fmtBRL(c.limite) + ' de desconto');
+  var linha = '🏷️ *' + String(c.codigo).toUpperCase() + '* — ' + valor;
+  if (regras.length) linha += '\n     ' + regras.join(' · ');
+  return linha;
+}
+
+async function montarCombo(loja) {
+  var status = document.getElementById('c-ok');
+  if (!CUPONS_CACHE.length) {
+    status.textContent = 'Buscando cupons...';
+    try { await carregarCupons(); } catch(e) {}
+    status.textContent = '';
+  }
+
+  var agora = Date.now();
+  var itens = CUPONS_CACHE.filter(function(c){
+    return c.ativo !== false
+      && new Date(c.validadeAte).getTime() > agora
+      && String(c.loja || '').toLowerCase() === loja.toLowerCase();
+  }).sort(ordenarCupons);
+
+  if (!itens.length) {
+    mostrar('c-msg','c-result','c-ok', '');
+    document.getElementById('c-msg').value =
+      'Nenhum cupom vigente da ' + loja + ' na base agora.\n\n'
+      + 'Cadastre em Base de Cupons › Criar cupom à mão, ou espere a próxima captura.';
+    return;
+  }
+
+  var gatilho = document.getElementById('c-gatilho').value.trim();
+  var cImportante = document.getElementById('c-importante').value.trim();
+  var url = loja === 'Amazon' ? linksMap['Amazon']
+          : loja === 'Mercado Livre' ? linksMap['Mercado Livre']
+          : loja === 'Shopee' ? linksMap['Shopee_com'] : '';
+
+  var msg = '';
+  if (gatilho) msg += '`🚨 ' + gatilho + '`\n\n';
+  msg += '*🚨 Cupons ativos - ' + loja + '*\n\n';
+  msg += (itens.length === 1 ? 'Cupom disponível agora:' : itens.length + ' cupons disponíveis agora:') + '\n\n';
+  msg += itens.map(linhaCombo).join('\n\n');
+  msg += '\n\n🛒 *LOJA* ' + loja.toUpperCase() + '\n\n';
+  if (cImportante) msg += '⚠️ *IMPORTANTE* ' + cImportante + '\n\n';
+  if (url) msg += '🔗 *RESGATE OS CUPONS AQUI* ' + url + '\n\n';
+  msg += '`Convide seus amigos para entrar aqui no grupo: https://chat.whatsapp.com/HK7NL13BdPXKJPAGtvTKKg`';
+
   mostrar('c-msg','c-result','c-ok', msg);
 }
 
