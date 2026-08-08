@@ -1381,7 +1381,7 @@
     <span id="cupons-status">Carregando...</span>
     <div class="fila-acoes">
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
-        <input type="checkbox" id="cupons-so-vigentes" onchange="renderCupons()" style="width:auto;accent-color:var(--accent)"/> só vigentes
+        <input type="checkbox" id="cupons-so-vigentes" onchange="salvarFiltroVigentes()" style="width:auto;accent-color:var(--accent)"/> só vigentes
       </label>
       <button class="btn btn-copy btn-sm" onclick="carregarCupons()">↻ Atualizar</button>
     </div>
@@ -2211,7 +2211,28 @@ function criarCupomManual() {
   .finally(function(){ btn.disabled = false; });
 }
 
+// O filtro "só vigentes" fica marcado entre visitas. Mesmo lugar onde o tema já
+// é guardado; se o navegador bloquear o storage, o filtro só volta ao padrão —
+// nada quebra.
+var FILTRO_VIGENTES_KEY = 'tsp-cupons-so-vigentes';
+
+function salvarFiltroVigentes() {
+  try { localStorage.setItem(FILTRO_VIGENTES_KEY,
+        document.getElementById('cupons-so-vigentes').checked ? '1' : '0'); } catch(e) {}
+  renderCupons();
+}
+
+// Restaura ANTES de qualquer render: aplicar depois faria a lista aparecer
+// completa e piscar para a versão filtrada.
+function restaurarFiltroVigentes() {
+  try {
+    var v = localStorage.getItem(FILTRO_VIGENTES_KEY);
+    if (v !== null) document.getElementById('cupons-so-vigentes').checked = v === '1';
+  } catch(e) {}
+}
+
 function carregarCupons() {
+  restaurarFiltroVigentes();
   var st = document.getElementById('cupons-status');
   st.textContent = 'Carregando...';
   // Devolve a promise: a Vitrine monta o select de cupons a partir de
