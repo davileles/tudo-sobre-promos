@@ -293,6 +293,14 @@
   .mon-loja input{width:15px;height:15px;accent-color:var(--accent);margin:0;cursor:pointer}
   .mon-loja.on{color:var(--text);border-color:var(--accent)}
   .mon-aviso{font-size:11px;color:#e5534b;margin-top:9px;font-weight:600}
+  .mon-jan{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+  .mon-jan span{font-size:11px;color:var(--muted2);font-weight:700}
+  .mon-jan input[type=time]{padding:7px 9px;font-size:12.5px;width:auto;min-width:105px}
+  .mon-jan-x{background:none;border:1px solid var(--border);color:#e5534b;border-radius:6px;
+             padding:5px 9px;font-size:12px;cursor:pointer;line-height:1}
+  .mon-jan-add{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:6px;
+               padding:6px 11px;font-size:11.5px;font-weight:700;cursor:pointer}
+  .mon-jan-add:hover{border-color:var(--accent);color:var(--accent)}
 
   .sel-grupos{align-items:start}
   .sel-box{position:relative}
@@ -1996,6 +2004,38 @@ function estadoMonitor(c){
   return { cls:'on', txt:'capturando ' + c.lojas.join(' + ') };
 }
 
+// Cadastro antigo so tem inicio/fim: le como janela unica, sem exigir migracao.
+function janelasDe(c){
+  if (c && c.janelas && c.janelas.length) return c.janelas;
+  return [{ inicio: (c && c.inicio) || '00:00', fim: (c && c.fim) || '23:59' }];
+}
+
+function linhaJanela(j){
+  return '<div class="mon-jan" data-janela="1">'
+    + '<span>das</span><input type="time" value="' + esc(j.inicio) + '" data-jan="inicio"/>'
+    + '<span>às</span><input type="time" value="' + esc(j.fim) + '" data-jan="fim"/>'
+    + '<button type="button" class="mon-jan-x" onclick="monRemoverJanela(this)" title="Remover janela">✕</button>'
+    + '</div>';
+}
+
+function janelasHtml(c){ return janelasDe(c).map(linhaJanela).join(''); }
+
+function monAddJanela(btn){
+  var wrap = btn.parentNode.querySelector('.mon-janelas');
+  wrap.insertAdjacentHTML('beforeend', linhaJanela({ inicio:'12:00', fim:'13:00' }));
+}
+
+// Sem nenhuma janela o grupo capturaria 24h por padrao no servidor — o que nao e
+// o que quem apagou a ultima linha esperava. Entao a ultima nao sai.
+function monRemoverJanela(btn){
+  var wrap = btn.closest('.mon-janelas');
+  if (wrap.querySelectorAll('[data-janela]').length <= 1){
+    alert('Deixe ao menos uma janela. Para parar de capturar, desligue o botão Ativo.');
+    return;
+  }
+  btn.closest('[data-janela]').remove();
+}
+
 function renderMonitor(){
   var fontes = Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === 'fonte'; });
   var el = document.getElementById('mon-lista');
@@ -2024,10 +2064,10 @@ function renderMonitor(){
                 + esc(l) + '</label>';
             }).join('')
         + '</div></div>'
-        + '<div class="mon-campo"><label>Das</label>'
-          + '<input type="time" value="' + esc((c && c.inicio) || '00:00') + '" data-jid="' + esc(jid) + '" data-campo="inicio"/></div>'
-        + '<div class="mon-campo"><label>Até</label>'
-          + '<input type="time" value="' + esc((c && c.fim) || '23:59') + '" data-jid="' + esc(jid) + '" data-campo="fim"/></div>'
+        + '<div class="mon-campo" style="flex:1;min-width:250px"><label>Janelas de captura</label>'
+          + '<div class="mon-janelas">' + janelasHtml(c) + '</div>'
+          + '<button type="button" class="mon-jan-add" onclick="monAddJanela(this)">+ Adicionar janela</button>'
+        + '</div>'
         + '<div class="mon-campo"><label>Dias</label>'
           + '<select data-jid="' + esc(jid) + '" data-campo="dias">'
             + '<option value="todos"' + (!c || c.dias !== 'uteis' ? ' selected' : '') + '>Todos os dias</option>'
@@ -2055,11 +2095,18 @@ function salvarMonitor(btn){
     .filter(function(i){ return i.checked; }).map(function(i){ return i.dataset.loja; });
   var val = function(campo){ var el = raiz.querySelector('[data-campo="' + campo + '"]'); return el ? el.value : null; };
 
+  var janelas = [].slice.call(raiz.querySelectorAll('[data-janela]')).map(function(l){
+    return { inicio: l.querySelector('[data-jan="inicio"]').value,
+             fim:    l.querySelector('[data-jan="fim"]').value };
+  }).filter(function(j){ return j.inicio && j.fim && j.inicio !== j.fim; });
+
+  if (!janelas.length){ alert('Preencha ao menos uma janela válida (início diferente do fim).'); return; }
+
   btn.disabled = true; btn.textContent = '...';
   fetch(SERVER + '/monitor/' + encodeURIComponent(jid), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
-      lojas: lojas, inicio: val('inicio'), fim: val('fim'), dias: val('dias'),
+      lojas: lojas, janelas: janelas, dias: val('dias'),
       ativo: raiz.querySelector('[data-campo="ativo"]').classList.contains('on')
     })
   })
