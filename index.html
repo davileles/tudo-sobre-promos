@@ -969,8 +969,9 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       var payload = { mensagem: texto, grupo: 'tsp' };
       if (agendarEm) payload.agendarEm = agendarEm;
       // Oferta montada pela busca por link sai com card de preview, igual as do
-      // radar. So no envio imediato: agendamento guarda apenas o texto.
-      if (!agendarEm && msgId === 'o-msg' && _produtoBuscado
+      // radar. Vale tambem no agendamento: o servidor guarda os dados do card e
+      // baixa a thumbnail so na hora do disparo.
+      if (msgId === 'o-msg' && _produtoBuscado
           && _produtoBuscado.produto.link === document.getElementById('o-link').value.trim()) {
         payload.preview = {
           link: _produtoBuscado.produto.link,
