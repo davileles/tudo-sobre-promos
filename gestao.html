@@ -631,13 +631,17 @@
     </div>
     <div class="g2">
       <div class="field" id="c-limiteField">
-        <label>Limite desconto (R$) <span class="tag">só para %</span></label>
+        <label>Limite do desconto (R$) <span class="tag">quanto economiza, no máximo</span></label>
         <input type="number" id="c-limite" placeholder="Ex: 50" min="0"/>
       </div>
       <div class="field">
-        <label>Código do cupom <span class="tag">opcional</span></label>
-        <input type="text" id="c-cupom" placeholder="Ex: PROMO10"/>
+        <label>Produto até (R$) <span class="tag">preço máximo elegível</span></label>
+        <input type="number" id="c-maximo" placeholder="Ex: 700" min="0"/>
       </div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>Código do cupom <span class="tag">opcional</span></label>
+      <input type="text" id="c-cupom" placeholder="Ex: PROMO10"/>
     </div>
     <div class="field" style="margin-top:12px">
       <label>Importante <span class="tag">opcional</span></label>
@@ -1547,8 +1551,12 @@
     <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Compra mínima (R$) <span class="tag">0 = sem mínimo</span></label>
         <input type="number" id="nc-minimo" min="0" step="0.01" placeholder="Ex: 79"/></div>
-      <div class="field" id="nc-limiteField"><label>Teto de desconto (R$) <span class="tag">opcional</span></label>
+      <div class="field" id="nc-limiteField"><label>Teto do desconto (R$) <span class="tag">quanto economiza, no máximo</span></label>
         <input type="number" id="nc-limite" min="0" step="0.01" placeholder="Ex: 60"/></div>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Produto até (R$) <span class="tag">preço máximo elegível — não é teto de desconto</span></label>
+      <input type="number" id="nc-maximo" min="0" step="0.01" placeholder="Ex: 700"/>
     </div>
     <div class="field" style="margin-bottom:12px">
       <label>Vence em <span class="tag">vazio = 24h a partir de agora</span></label>
@@ -2757,7 +2765,8 @@ function opcoesCupom(){
   return '<option value="">— sem cupom —</option>' + vig.map(function(c){
     var v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
     var extra = [];
-    if (c.limite != null) extra.push('teto R$ ' + c.limite);
+    if (c.limite != null) extra.push('teto desc. R$ ' + c.limite);
+    if (c.maximo != null) extra.push('produto até R$ ' + c.maximo);
     if (c.minimo)         extra.push('mín R$ ' + c.minimo);
     return '<option value="' + esc(c.codigo) + '">'
       + esc(c.loja || 'Outros') + ' · ' + esc(c.codigo) + ' · ' + v
@@ -3088,6 +3097,7 @@ function aplicarPresetCupom(btn, key) {
   document.getElementById('nc-valor').value  = p.valor;
   document.getElementById('nc-minimo').value = p.minimo || '';
   document.getElementById('nc-limite').value = p.limite || '';
+  document.getElementById('nc-maximo').value = p.maximo || '';
   toggleLimiteNovoCupom();
   document.getElementById('nc-codigo').focus();
 }
@@ -3123,12 +3133,19 @@ function criarCupomManual() {
 
   var minimoRaw = document.getElementById('nc-minimo').value;
   var limiteRaw = document.getElementById('nc-limite').value;
+  var maximoRaw = document.getElementById('nc-maximo').value;
+  if (minimoRaw !== '' && maximoRaw !== '' && Number(maximoRaw) < Number(minimoRaw)) {
+    s.className='send-ok send-err';
+    s.textContent='O teto do produto não pode ser menor que a compra mínima.';
+    return;
+  }
   var corpo = {
     loja: loja,
     codigo: codigo.toUpperCase(),
     tipo: document.getElementById('nc-tipo').value,
     valor: valor,
     minimo: minimoRaw === '' ? null : Number(minimoRaw),
+    maximo: maximoRaw === '' ? null : Number(maximoRaw),
     limite: limiteRaw === '' ? null : Number(limiteRaw),
     observacao: document.getElementById('nc-obs').value.trim() || null
   };
@@ -3153,6 +3170,7 @@ function criarCupomManual() {
     document.getElementById('nc-valor').value = '';
     document.getElementById('nc-minimo').value = '';
     document.getElementById('nc-limite').value = '';
+    document.getElementById('nc-maximo').value = '';
     document.getElementById('nc-validade').value = '';
     document.getElementById('nc-obs').value = '';
     document.querySelectorAll('#nc-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -3221,7 +3239,8 @@ function regraCupom(c) {
   var partes = [];
   if (c.minimo === 0)              partes.push('sem minimo');
   else if (c.minimo != null)       partes.push('min R$ ' + fmtBRL(c.minimo));
-  if (c.limite != null)            partes.push('teto R$ ' + fmtBRL(c.limite));
+  if (c.maximo != null)            partes.push('produto ate R$ ' + fmtBRL(c.maximo));
+  if (c.limite != null)            partes.push('teto desc. R$ ' + fmtBRL(c.limite));
   return partes.join(' · ') || 'sem restricao informada';
 }
 
@@ -3408,6 +3427,7 @@ function aplicarPreset(btn, key) {
     document.getElementById('c-valor').value = '';
     document.getElementById('c-minimo').value = '';
     document.getElementById('c-limite').value = '';
+    document.getElementById('c-maximo').value = '';
     document.getElementById('c-cupom').value = '';
     toggleLimite(); marcarLoja('c'); return;
   }
@@ -3421,6 +3441,7 @@ function aplicarPreset(btn, key) {
     document.getElementById('c-valor').value = '';
     document.getElementById('c-minimo').value = '';
     document.getElementById('c-limite').value = '';
+    document.getElementById('c-maximo').value = '';
     document.getElementById('c-cupom').value = '';
     toggleLimite(); marcarLoja('c'); return;
   }
@@ -3431,6 +3452,7 @@ function aplicarPreset(btn, key) {
   document.getElementById('c-valor').value = p.valor;
   document.getElementById('c-minimo').value = p.minimo;
   document.getElementById('c-limite').value = p.limite;
+  document.getElementById('c-maximo').value = p.maximo || '';
   toggleLimite(); marcarLoja('c');
 }
 
@@ -3480,11 +3502,17 @@ function gerarCupom() {
   var valor = document.getElementById('c-valor').value.trim() || '0';
   var minimo = document.getElementById('c-minimo').value.trim() || '0';
   var limite = document.getElementById('c-limite').value.trim();
+  // "Produto até R$ X" é o teto do PRODUTO elegível, não do desconto. São
+  // regras diferentes e trocar uma pela outra anuncia o cupom para uma faixa
+  // de preço em que ele não vale.
+  var maximo = document.getElementById('c-maximo').value.trim();
   var cupom = document.getElementById('c-cupom').value.trim();
   var tipo = isPct ? '%' : ' reais';
-  var validade = (isPct && limite)
-    ? 'Válido em compras acima de R$ '+minimo+' com limite de R$ '+limite+' de desconto.'
-    : 'Válido em compras acima de R$ '+minimo+'.';
+  var partesVal = [];
+  partesVal.push(Number(minimo) > 0 ? 'em compras acima de R$ '+minimo : 'sem valor mínimo de compra');
+  if (maximo) partesVal.push('em produtos de até R$ '+maximo);
+  if (isPct && limite) partesVal.push('com limite de R$ '+limite+' de desconto');
+  var validade = 'Válido ' + partesVal.join(', ') + '.';
   var msg = '';
   if (gatilho) msg += '`🚨 '+gatilho+'`\n\n';
   msg += '*🚨 Cupom de '+valor+tipo+' - '+loja+'*\n\n';
@@ -3493,7 +3521,11 @@ function gerarCupom() {
   if (cupom) msg += '\n\n🏷️ *CUPOM* '+cupom.toUpperCase();
   if (isPct && limite) {
     var ideal = Math.ceil(100 * Number(limite) / Number(valor));
+    if (maximo) ideal = Math.min(ideal, Number(maximo));
     msg += '\n\n⚠️ *IMPORTANTE* Ideal para compras de até R$ '+ideal+'.\n\n';
+  } else if (isPct && maximo) {
+    var econ = Math.floor(Number(maximo) * Number(valor) / 100);
+    msg += '\n\n⚠️ *IMPORTANTE* Só vale para produtos de até R$ '+maximo+' — economia máxima de R$ '+econ+'.\n\n';
   } else { msg += '\n\n'; }
   var url = loja==='Amazon' ? linksMap['Amazon'] : loja==='Mercado Livre' ? linksMap['Mercado Livre'] : loja==='Shopee' ? (cupom ? linksMap['Shopee_com'] : linksMap['Shopee_sem']) : '';
   if (cImportante) msg += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
@@ -3520,6 +3552,7 @@ function linhaCombo(c) {
   var valor = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmtBRL(c.valor);
   var regras = [];
   if (c.minimo) regras.push('mín. R$ ' + fmtBRL(c.minimo));
+  if (c.maximo != null) regras.push('em produtos até R$ ' + fmtBRL(c.maximo));
   if (c.limite != null && c.tipo === 'pct') regras.push('máx. R$ ' + fmtBRL(c.limite) + ' de desconto');
   var linha = '🏷️ *' + String(c.codigo).toUpperCase() + '* — ' + valor;
   if (regras.length) linha += '\n     ' + regras.join(' · ');
