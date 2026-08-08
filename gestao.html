@@ -1596,10 +1596,19 @@ function renderContas() {
   }).join('');
 }
 
+// O apelido vira nome de pasta no servidor, então acento e espaço não passam.
+// Em vez de recusar o que o operador digitou, normaliza e mostra o resultado.
+function apelidoConta(t) {
+  return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24);
+}
+
 function conectarContaNova() {
-  var id = document.getElementById('conta-novo-id').value.trim();
+  var campo = document.getElementById('conta-novo-id');
+  var id = apelidoConta(campo.value);
   var s  = document.getElementById('contas-status');
-  if (!id) { s.className='send-ok send-err'; s.textContent='Dê um apelido ao número.'; return; }
+  if (id.length < 2) { s.className='send-ok send-err'; s.textContent='Dê um apelido de pelo menos 2 letras ou números.'; return; }
+  campo.value = id;
   s.className='send-ok'; s.textContent='Preparando...';
   fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/conectar', { method:'POST' })
     .then(function(r){ return r.json(); })
