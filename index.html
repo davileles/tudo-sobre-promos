@@ -2870,7 +2870,7 @@ function renderVitrine(){
       + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
       + '<div class="vit-info">'
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
-        + '<div class="vit-meta">' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
+        + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
       + '</div>'
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
       + '<div class="vit-acoes">'
