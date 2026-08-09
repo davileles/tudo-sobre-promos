@@ -984,7 +984,6 @@
       <span class="card-title" style="flex:1">📈 Evolução de membros</span>
       <select id="censo-gr-modo" onchange="renderCensoGrafico()" style="max-width:150px">
         <option value="total">Total somado</option>
-        <option value="variacao">Variação por dia</option>
         <option value="grupos">Por grupo</option>
       </select>
       <select id="censo-gr-dias" onchange="carregarCensoHist()" style="max-width:120px">
@@ -1337,7 +1336,7 @@
     <div class="card-title" style="margin-bottom:10px">Cadastrar produtos</div>
     <div class="field">
       <label>Links <span class="tag">um por linha</span></label>
-      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;https://link.amazon/xxxx" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;https://www.mercadolivre.com.br/.../p/MLBXXXXXXXX&#10;https://shopee.com.br/product/XXXX/XXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;Nome | https://www.magazineluiza.com.br/... | 1299,00 | 1899,00" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
     </div>
     <div class="field" style="margin-top:10px">
       <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
@@ -1518,37 +1517,6 @@
   </div>
 
   <div class="card">
-    <p class="card-title" style="margin-bottom:12px">🔑 Credenciais dos programas de afiliado</p>
-    <div class="aviso" style="margin-bottom:12px">
-      IDs, segredos e cookies que fazem os links e capturas saírem na <b>sua conta</b> de afiliado.
-      Por segurança os valores salvos <b>nunca voltam para a tela</b>: campo vazio mantém o que já está salvo,
-      digitar substitui, e escrever <b>__limpar__</b> apaga (voltando a valer a variável do servidor, se existir).
-    </div>
-    <div class="sec-label">Amazon — Creators API</div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Client ID</label><input type="text" id="cred-AMZ_CLIENT_ID" autocomplete="off"/></div>
-      <div class="field"><label>Client Secret</label><input type="password" id="cred-AMZ_CLIENT_SECRET" autocomplete="new-password"/></div>
-    </div>
-    <div class="field" style="margin-bottom:16px"><label>Partner tag <span class="tag">ex.: sualoja-20</span></label>
-      <input type="text" id="cred-AMZ_PARTNER_TAG" autocomplete="off"/></div>
-    <div class="sec-label">Mercado Livre</div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Client ID <span class="tag">DevCenter</span></label><input type="text" id="cred-ML_CLIENT_ID" autocomplete="off"/></div>
-      <div class="field"><label>Client Secret</label><input type="password" id="cred-ML_CLIENT_SECRET" autocomplete="new-password"/></div>
-    </div>
-    <div class="field" style="margin-bottom:16px"><label>Cookie do painel de afiliados <span class="tag">token do linkbuilder</span></label>
-      <textarea id="cred-ML_AFF_TOKEN" rows="2" spellcheck="false" autocomplete="off"></textarea></div>
-    <div class="sec-label">Shopee — painel de afiliado</div>
-    <div class="g2" style="margin-bottom:16px">
-      <div class="field"><label>App ID</label><input type="text" id="cred-SHOPEE_APP_ID" autocomplete="off"/></div>
-      <div class="field"><label>Secret</label><input type="password" id="cred-SHOPEE_SECRET" autocomplete="new-password"/></div>
-    </div>
-    <div class="sec-label">Magazine Luiza</div>
-    <div class="field"><label>Nome da loja no Magalu <span class="tag">o "magazine…" do seu link de divulgador</span></label>
-      <input type="text" id="cred-MAGALU_LOJA" autocomplete="off"/></div>
-  </div>
-
-  <div class="card">
     <p class="card-title" style="margin-bottom:12px">📵 Telegram — canais ignorados</p>
     <div class="aviso" style="margin-bottom:12px">
       A captura aceita qualquer canal da conta conectada; esta lista é o bloqueio. Um por linha —
@@ -1556,6 +1524,77 @@
     </div>
     <div class="field"><label>Bloqueios</label>
       <textarea id="cfg-tg-ignorados" rows="3" spellcheck="false" placeholder="canalindesejado&#10;123456789"></textarea></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🔗 Awin — ofertas automáticas</p>
+    <div class="aviso" style="margin-bottom:12px">
+      A Awin é uma rede com dezenas de lojas. O sistema varre os catálogos atrás de produtos com desconto e publica
+      sozinho, dentro das cotas abaixo. <b>Fila</b> manda tudo para aprovação manual; <b>Automático</b> dispara direto.
+      Comece em Fila.
+    </div>
+
+    <div class="field" style="margin-bottom:12px"><label>Modo das ofertas</label>
+      <select id="awin-modo">
+        <option value="off">Desligado</option>
+        <option value="fila">Fila — aprovar manualmente</option>
+        <option value="on">Automático — dispara direto</option>
+      </select></div>
+
+    <div class="field" style="margin-bottom:12px"><label>Cupons da Awin <span class="tag">Offers API</span></label>
+      <select id="awin-cupons">
+        <option value="off">Desligado</option>
+        <option value="fila">Fila — aprovar manualmente</option>
+        <option value="on">Automático — segue o gate de cupons</option>
+      </select></div>
+
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="field"><label>Publicar a cada (min)</label>
+        <input type="number" id="awin-intervalo" min="5" max="1440" step="5" oninput="awinPrever()"/></div>
+      <div class="field"><label>Máximo por dia</label>
+        <input type="number" id="awin-maxdia" min="0" max="100" oninput="awinPrever()"/></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="field"><label>Início da janela</label>
+        <input type="time" id="awin-inicio" oninput="awinPrever()"/></div>
+      <div class="field"><label>Fim da janela</label>
+        <input type="time" id="awin-fim" oninput="awinPrever()"/></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="field"><label>Por rodada</label>
+        <input type="number" id="awin-maxrodada" min="0" max="20" oninput="awinPrever()"/></div>
+      <div class="field"><label>Máximo por loja/dia</label>
+        <input type="number" id="awin-maxloja" min="0" max="40"/></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="field"><label>Desconto mínimo (%)</label>
+        <input type="number" id="awin-minpct" min="1" max="99"/></div>
+      <div class="field"><label>Preço mínimo (R$)</label>
+        <input type="number" id="awin-minpreco" min="0" step="10"/></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="field"><label>Não repetir produto por (dias)</label>
+        <input type="number" id="awin-repetir" min="1" max="365"/></div>
+      <div class="field"><label>Varrer catálogos a cada (h)</label>
+        <input type="number" id="awin-varredura" min="1" max="168"/></div>
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Lojas <span class="tag">vazio = todas com catálogo</span></label>
+      <input type="text" id="awin-lojas" placeholder="17697,17806,17777"/></div>
+
+    <div class="aviso" id="awin-previsao" style="margin-bottom:12px">—</div>
+
+    <div class="btn-row">
+      <button class="btn btn-copy btn-sm" onclick="awinSimular()">👁 Ver o que sairia</button>
+      <button class="btn btn-copy btn-sm" onclick="awinVarrer()">↻ Varrer catálogos agora</button>
+    </div>
+    <div id="awin-previa" style="margin-top:12px"></div>
+    <p class="send-ok" id="awin-status"></p>
   </div>
 
   <button class="btn" id="cfg-btn" onclick="cfgSalvar()">Salvar configurações</button>
@@ -1966,9 +2005,8 @@ async function carregarCensoHist(){
     var d = await r.json();
     if (!d.ok) throw new Error(d.erro || 'falha');
     CENSO_HIST = d;
-    // Com um ponto só o gráfico ainda não desenha curva, mas o card aparece
-    // mostrando a medição do dia — o aviso explica que a série está começando.
-    card.style.display = (d.serie && d.serie.length >= 1) ? 'block' : 'none';
+    // Um único ponto não desenha evolução nenhuma: só mostra o card a partir do segundo dia.
+    card.style.display = (d.serie && d.serie.length >= 2) ? 'block' : 'none';
     if (card.style.display === 'block') renderCensoGrafico();
   } catch(e){ card.style.display = 'none'; }
 }
@@ -1981,50 +2019,34 @@ function renderCensoGrafico(){
   var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
   var grade  = escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
   var texto  = escuro ? '#9aa0aa' : '#6b7280';
-  // Serie de 1 ponto nao desenha linha: engorda o ponto para nao ficar um card vazio.
-  var raio   = serie.length < 2 ? 4 : 2;
-  var tipo   = 'line';
   var ds;
 
   if (modo === 'total'){
     ds = [{ label:'Total', data: serie.map(function(p){ return p.total; }),
             borderColor:'#ff9900', backgroundColor:'rgba(255,153,0,.14)',
-            fill:true, tension:.3, pointRadius:raio, borderWidth:2 }];
-  } else if (modo === 'variacao'){
-    // Quanto o total subiu ou caiu de um dia para o outro. O primeiro ponto da
-    // serie nao tem dia anterior para comparar, entao fica vazio.
-    tipo = 'bar';
-    var deltas = serie.map(function(p, i){ return i === 0 ? null : (p.total - serie[i-1].total); });
-    var cor = function(v, a){ return v == null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,' + a + ')' : 'rgba(244,101,74,' + a + ')'); };
-    ds = [{ label:'Variação', data: deltas,
-            backgroundColor: deltas.map(function(v){ return cor(v, '.55'); }),
-            borderColor:     deltas.map(function(v){ return cor(v, '1'); }),
-            borderWidth:1 }];
+            fill:true, tension:.3, pointRadius:2, borderWidth:2 }];
   } else {
     ds = (CENSO_HIST.grupos || []).map(function(g, i){
       return { label: g.nome || g.jid.split('@')[0],
                data: serie.map(function(p){ return p.grupos[g.jid]; }),
                borderColor: CENSO_CORES[i % CENSO_CORES.length],
                backgroundColor:'transparent', fill:false, tension:.3,
-               pointRadius:raio, borderWidth:2, spanGaps:true };
+               pointRadius:2, borderWidth:2, spanGaps:true };
     });
   }
 
   var ctx = document.getElementById('censo-chart');
   if (CENSO_CHART) CENSO_CHART.destroy();
   CENSO_CHART = new Chart(ctx, {
-    type:tipo,
+    type:'line',
     data:{ labels: labels, datasets: ds },
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
       plugins:{
-        legend:{ display: modo === 'grupos', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
+        legend:{ display: modo !== 'total', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
         tooltip:{ callbacks:{ label:function(it){
-          if (it.parsed.y == null) return it.dataset.label + ': —';
-          var v = it.parsed.y;
-          var txt = (modo === 'variacao' && v > 0 ? '+' : '') + v.toLocaleString('pt-BR');
-          return it.dataset.label + ': ' + txt;
+          return it.dataset.label + ': ' + (it.parsed.y == null ? '—' : it.parsed.y.toLocaleString('pt-BR'));
         } } }
       },
       scales:{
@@ -2037,8 +2059,6 @@ function renderCensoGrafico(){
   var av = document.getElementById('censo-gr-aviso');
   var nAgr = serie.filter(function(p){ return p.agregado; }).length;
   av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)'
-    + (serie.length < 2 ? ' · série ainda começando: a curva aparece a partir da segunda medição' : '')
-    + (modo === 'variacao' ? ' · barras = quanto o total subiu ou caiu em relação ao dia anterior' : '')
     + (nAgr ? ' · ' + nAgr + ' ponto(s) do histórico importado só têm o total somado — sem quebra por grupo' : '');
 }
 
@@ -2864,7 +2884,11 @@ function excluirLista(id){
 function carregarVitrine(){
   return fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ VIT_CACHE = d.itens || []; renderVitrine(); })
+    .then(function(d){
+      VIT_CACHE = d.itens || [];
+      if (d.ttlPrecoMagalu) VIT_TTL_MAGALU = d.ttlPrecoMagalu;
+      renderVitrine();
+    })
     .catch(function(e){
       document.getElementById('vit-status').textContent = 'Falha: ' + e.message;
       document.getElementById('vit-lista').innerHTML = '<div class="cup-vazio">Sem resposta do servidor.</div>';
@@ -2902,6 +2926,42 @@ function opcoesCupom(){
   }).join('');
 }
 
+// Horas que o preco informado a mao para a Magalu continua valendo. O servidor
+// manda o valor real no GET /vitrine; este e so o palpite ate a primeira carga.
+var VIT_TTL_MAGALU = 24;
+
+// So a Magalu nao tem consulta de preco no disparo (sem API e com 403 para IP de
+// datacenter). Entao e a unica loja em que o painel precisa mostrar o preco
+// salvo e avisar quando ele venceu.
+function precoVitrine(i){
+  if ((i.loja || '') !== 'Magazine Luiza') return '';
+  if (i.preco == null) {
+    return '<span class="vit-cupom" style="background:rgba(255,90,90,.15);color:var(--red)">sem preço</span>';
+  }
+  var txt = 'R$ ' + Number(i.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  var idadeH = i.precoEm ? (Date.now() - new Date(i.precoEm).getTime()) / 3600000 : Infinity;
+  var vencido = idadeH > VIT_TTL_MAGALU;
+  return '<span class="vit-cupom" title="' + (i.precoEm ? 'informado em ' + new Date(i.precoEm).toLocaleString('pt-BR') : 'sem data')
+    + '"' + (vencido ? ' style="background:rgba(255,90,90,.15);color:var(--red)"' : '') + '>'
+    + esc(txt) + (vencido ? ' · vencido' : '') + '</span>';
+}
+
+// Preco e "de" na mesma caixa: sao um par, e digitar em dois prompts seguidos
+// para cada produto e atrito puro.
+function editarPrecoVitrine(btn){
+  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
+  var atual = (i.preco != null ? String(i.preco).replace('.', ',') : '')
+            + (i.precoDe != null ? ' | ' + String(i.precoDe).replace('.', ',') : '');
+  var novo = prompt('Preço da Magazine Luiza (o "de" é opcional, depois da barra):\n\nEx: 1299,00 | 1899,00', atual);
+  if (novo === null) return;
+  var nums = (novo.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:[.,]\d{2})?/g) || []).map(function(v){
+    return v.indexOf(',') >= 0 ? Number(v.replace(/\./g,'').replace(',','.')) : Number(v);
+  }).filter(function(v){ return isFinite(v) && v > 0; });
+  if (!nums.length) { alert('Não consegui ler nenhum valor.'); return; }
+  var preco = Math.min.apply(null, nums), maior = Math.max.apply(null, nums);
+  salvarCampoVitrine(i.asin, { preco: preco, precoDe: maior > preco ? maior : null });
+}
+
 function renderVitrine(){
   ['vit-cupom-novo'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
@@ -2921,11 +2981,14 @@ function renderVitrine(){
       + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
       + '<div class="vit-info">'
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
-        + '<div class="vit-meta">' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
+        + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
       + '</div>'
+      + precoVitrine(i)
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
       + '<div class="vit-acoes">'
         + '<button data-asin="' + esc(i.asin) + '" onclick="editarNomeVitrine(this)" title="Renomear">✎</button>'
+        + ((i.loja || '') === 'Magazine Luiza'
+            ? '<button data-asin="' + esc(i.asin) + '" onclick="editarPrecoVitrine(this)" title="Editar preço">💲</button>' : '')
         + '<button data-asin="' + esc(i.asin) + '" onclick="vincularCupomVitrine(this)" title="Vincular cupom">🎫</button>'
         + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
       + '</div>'
@@ -2988,59 +3051,28 @@ function cadastrarVitrine(destino){
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    var brutos = d.salvos || [];
+    var salvos = d.salvos || [];
     var erros  = d.erros || [];
-
-    // A base guarda um item por asin: dois links diferentes do mesmo produto
-    // viram UM cadastro so. Contar linhas aqui dizia '28 cadastrado(s)' e a
-    // selecao logo abaixo mostrava 25 — a divergencia nao era erro, era link
-    // repetido. O numero que vale e o de produtos distintos.
-    var vistos = {}, salvos = [], repetidos = [];
-    brutos.forEach(function(s){
-      if (vistos[s.asin]) { repetidos.push(s); return; }
-      vistos[s.asin] = s;
-      salvos.push(s);
-    });
-
     ok.className = erros.length ? 'send-ok send-err' : 'send-ok';
-    ok.textContent = salvos.length + ' produto(s) cadastrado(s)'
-      + (repetidos.length ? ' · ' + repetidos.length + ' link(s) repetidos (detalhe abaixo)' : '')
+    ok.textContent = salvos.length + ' cadastrado(s)'
       + (erros.length ? ' · ' + erros.length + ' com problema (detalhe abaixo)' : '');
 
     // Motivo colado ao link que falhou. Juntar tudo num paragrafo so escondia
     // qual dos 18 links era o problema.
     var box = document.getElementById('vit-cad-erros');
-    if (!erros.length && !repetidos.length) { box.style.display = 'none'; box.innerHTML = ''; }
+    if (!erros.length) { box.style.display = 'none'; box.innerHTML = ''; }
     else {
       box.style.display = 'block';
-      var htmlBox = '';
-      if (erros.length) {
-        htmlBox += '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">'
-          + erros.length + ' link(s) não entraram na base</div>'
-          + erros.map(function(e){
-              return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
-                + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
-                + esc(e.linha || '(linha vazia)') + '</div>'
-                + '<div style="color:var(--red)">↳ ' + esc(e.erro || 'falhou') + '</div>'
-              + '</div>';
-            }).join('')
-          + '<button class="btn btn-copy btn-sm" style="margin-top:8px" onclick="reporFalhasVitrine()">↩ Devolver só estes links ao campo</button>';
-      }
-      if (repetidos.length) {
-        htmlBox += '<div style="font-size:11px;font-weight:700;color:var(--muted);margin:'
-          + (erros.length ? '12px 0 6px' : '0 0 6px') + '">'
-          + repetidos.length + ' link(s) apontavam para produto já da leva — cadastrado uma vez só</div>'
-          + repetidos.map(function(s){
-              var orig = vistos[s.asin] || {};
-              return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
-                + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
-                + esc(s.linha || s.asin) + '</div>'
-                + '<div style="color:var(--muted)">↳ mesmo produto de “'
-                + esc(orig.nome || s.nome || s.asin) + '”</div>'
-              + '</div>';
-            }).join('');
-      }
-      box.innerHTML = htmlBox;
+      box.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">'
+        + erros.length + ' link(s) não entraram na base</div>'
+        + erros.map(function(e){
+            return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
+              + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
+              + esc(e.linha || '(linha vazia)') + '</div>'
+              + '<div style="color:var(--red)">↳ ' + esc(e.erro || 'falhou') + '</div>'
+            + '</div>';
+          }).join('')
+        + '<button class="btn btn-copy btn-sm" style="margin-top:8px" onclick="reporFalhasVitrine()">↩ Devolver só estes links ao campo</button>';
       // Guarda as linhas para o botao de reenvio, sem depender do textarea.
       VIT_FALHAS = erros.map(function(e){ return e.linha; }).filter(Boolean);
     }
@@ -3485,32 +3517,19 @@ function regraCupom(c) {
   return partes.join(' · ') || 'sem restricao informada';
 }
 
-// Cupom expirado sai da tela por padrão: está morto, só polui. O link no
-// status revela quando o operador precisar (conferir data errada, excluir).
-var MOSTRAR_EXPIRADOS = false;
-function alternarExpirados() { MOSTRAR_EXPIRADOS = !MOSTRAR_EXPIRADOS; renderCupons(); }
-
 function renderCupons() {
   var soVigentes = document.getElementById('cupons-so-vigentes').checked;
   var agora = Date.now();
-  function expirado(c) { var t = new Date(c.validadeAte).getTime(); return !isNaN(t) && t <= agora; }
-
-  var nExp = CUPONS_CACHE.filter(expirado).length;
   var itens = CUPONS_CACHE.filter(function(c){
-    if (expirado(c) && !MOSTRAR_EXPIRADOS) return false;
     if (!soVigentes) return true;
-    return c.ativo !== false && !expirado(c);
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
   });
 
   var vig = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && !expirado(c);
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
   }).length;
-  var stEl = document.getElementById('cupons-status');
-  stEl.innerHTML = CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)'
-    + (nExp ? ' · <a href="#" style="color:var(--muted)" '
-            + 'onclick="alternarExpirados();return false">'
-            + (MOSTRAR_EXPIRADOS ? 'ocultar' : 'mostrar') + ' ' + nExp + ' expirado(s)</a>'
-       : '');
+  document.getElementById('cupons-status').textContent =
+    CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)';
 
   var el = document.getElementById('cupons-lista');
   if (!itens.length) {
@@ -3744,7 +3763,7 @@ function cfgAplicar(c) {
 function cfgCarregarServidor() {
   return fetch(SERVER + '/config-tsp?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if (d.ok && d.config) { cfgAplicar(d.config); CRED_ESTADO = d.credenciais || {}; } })
+    .then(function(d){ if (d.ok && d.config) cfgAplicar(d.config); })
     .catch(function(){ /* mantém os fallbacks */ });
 }
 cfgCarregarServidor();
@@ -3761,26 +3780,113 @@ function cfgAbrir() {
   Promise.resolve(pronto).then(function(){
     cfgCarregarServidor().then(cfgPreencher);
   });
+  awinCarregar();
 }
 
-var CRED_KEYS = ['AMZ_CLIENT_ID','AMZ_CLIENT_SECRET','AMZ_PARTNER_TAG',
-                 'ML_CLIENT_ID','ML_CLIENT_SECRET','ML_AFF_TOKEN',
-                 'SHOPEE_APP_ID','SHOPEE_SECRET','MAGALU_LOJA'];
-var CRED_ESTADO = {};
+// ── AWIN ─────────────────────────────────────────────────────────────────────
+function awinCarregar() {
+  fetch(SERVER + '/awin/ofertas/estado').then(function(r){ return r.json(); }).then(function(d){
+    if (!d.ok) return;
+    var c = d.config || {};
+    function set(id, v) { var e = document.getElementById(id); if (e) e.value = v; }
+    set('awin-modo', c.modo); set('awin-cupons', c.cupons);
+    set('awin-intervalo', c.intervaloMin); set('awin-maxdia', c.maxDia);
+    set('awin-inicio', c.horaInicio); set('awin-fim', c.horaFim);
+    set('awin-maxrodada', c.maxRodada); set('awin-maxloja', c.maxLojaDia);
+    set('awin-minpct', c.minPct); set('awin-minpreco', c.minPreco);
+    set('awin-repetir', c.repetirDias); set('awin-varredura', Math.round((c.varreduraMin||360)/60));
+    set('awin-lojas', (c.lojas || []).join(','));
+    awinPrever(d);
+  }).catch(function(){});
+}
 
-// Os valores nunca chegam em claro: o campo fica vazio e o placeholder conta o
-// estado (de onde veio e os últimos 4 caracteres para reconhecimento).
-function cfgPreencherCred() {
-  CRED_KEYS.forEach(function(k){
-    var el = document.getElementById('cred-' + k);
-    if (!el) return;
-    var st = CRED_ESTADO[k] || {};
-    el.value = '';
-    el.placeholder = st.definido
-      ? 'configurado' + (st.final ? ' (…' + st.final + ')' : '')
-        + (st.origem === 'ambiente' ? ' — pelo servidor' : '') + ' · digite para substituir'
-      : 'não configurado';
+// A conta de quantas ofertas cabem no dia nao e obvia: depende da janela, do
+// intervalo e das duas cotas. Mostrar o resultado evita configurar 24/dia e
+// receber 6 sem entender por que.
+function awinPrever(estado) {
+  var el = document.getElementById('awin-previsao');
+  if (!el) return;
+  function num(id, p) { var e = document.getElementById(id); var v = e ? Number(e.value) : NaN; return isFinite(v) ? v : p; }
+  function min(id, p) { var e = document.getElementById(id); var m = e && /^(\d{1,2}):(\d{2})$/.exec(e.value || ''); return m ? (+m[1])*60 + (+m[2]) : p; }
+  var intervalo = Math.max(1, num('awin-intervalo', 30));
+  var janela = Math.max(0, min('awin-fim', 1200) - min('awin-inicio', 480));
+  var rodadas = Math.floor(janela / intervalo);
+  var teto = Math.min(num('awin-maxdia', 24), rodadas * Math.max(1, num('awin-maxrodada', 1)));
+  var txt = '<b>' + teto + ' oferta(s) por dia</b> no máximo — ' + rodadas + ' publicações possíveis entre '
+    + (document.getElementById('awin-inicio').value || '08:00') + ' e '
+    + (document.getElementById('awin-fim').value || '20:00') + ', uma a cada ' + intervalo + ' min.';
+  if (estado && estado.fila) {
+    txt += ' Fila atual: ' + estado.fila.total + ' candidato(s); hoje já saíram ' + (estado.usoHoje ? estado.usoHoje.total : 0) + '.';
+  }
+  el.innerHTML = txt;
+}
+
+function awinCorpo() {
+  function n(id) { var v = Number(document.getElementById(id).value); return isFinite(v) ? v : undefined; }
+  return {
+    modo:        document.getElementById('awin-modo').value,
+    cupons:      document.getElementById('awin-cupons').value,
+    intervaloMin: n('awin-intervalo'), maxDia: n('awin-maxdia'),
+    horaInicio:  document.getElementById('awin-inicio').value,
+    horaFim:     document.getElementById('awin-fim').value,
+    maxRodada:   n('awin-maxrodada'), maxLojaDia: n('awin-maxloja'),
+    minPct:      n('awin-minpct'),    minPreco:   n('awin-minpreco'),
+    repetirDias: n('awin-repetir'),   varreduraMin: n('awin-varredura') * 60,
+    lojas:       document.getElementById('awin-lojas').value
+  };
+}
+
+function awinSalvar() {
+  return fetch(SERVER + '/awin/ofertas/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(awinCorpo())
+  }).then(function(r){ return r.json(); });
+}
+
+function awinSimular() {
+  var st = document.getElementById('awin-status');
+  var box = document.getElementById('awin-previa');
+  st.style.color = ''; st.textContent = 'Consultando…'; box.innerHTML = '';
+  // Salva antes: a simulacao tem de refletir os campos da tela, nao o que
+  // estava gravado.
+  awinSalvar().then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'config inválida');
+    return fetch(SERVER + '/awin/ofertas/varrer', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ simular: true })
+    }).then(function(r){ return r.json(); });
+  }).then(function(d){
+    if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha.'; return; }
+    var itens = d.previa || [];
+    if (!itens.length) {
+      st.style.color = 'var(--muted)';
+      st.textContent = d.motivo || 'Nenhum candidato agora — varra os catálogos primeiro.';
+      return;
+    }
+    st.style.color = 'var(--green)';
+    st.textContent = '✓ ' + itens.length + ' oferta(s) sairiam agora (nada foi enviado).';
+    box.innerHTML = itens.map(function(i){
+      return '<div class="card" style="margin:8px 0;padding:12px">'
+        + '<b>' + i.loja + '</b> · ' + i.desconto + '% off'
+        + (i.cupom ? ' · cupom ' + i.cupom : '')
+        + '<pre style="white-space:pre-wrap;font-size:11.5px;margin-top:8px">'
+        + (i.mensagem || '').replace(/[<>]/g, '') + '</pre></div>';
+    }).join('');
+  }).catch(function(e){
+    st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message;
   });
+}
+
+function awinVarrer() {
+  var st = document.getElementById('awin-status');
+  st.style.color = ''; st.textContent = 'Varrendo catálogos… pode levar um minuto.';
+  fetch(SERVER + '/awin/ofertas/varredura', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(function(r){ return r.json(); }).then(function(d){
+      if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha.'; return; }
+      st.style.color = 'var(--green)';
+      st.textContent = '✓ ' + (d.examinadas || []).length + ' loja(s) examinada(s) — fila com ' + d.naFila + ' candidato(s).';
+      awinCarregar();
+    }).catch(function(e){ st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message; });
 }
 
 function cfgPreencher() {
@@ -3797,7 +3903,6 @@ function cfgPreencher() {
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-rod-cruzado').value   = r.grupoCupons || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
-  cfgPreencherCred();
   ['padrao','cupons','operador'].forEach(function(k){
     var sel = document.getElementById('cfg-gr-' + k);
     var atual = g[k] || '';
@@ -3841,14 +3946,8 @@ function cfgSalvar() {
     telegram: {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
         .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
-    },
-    credenciais: {}
+    }
   };
-  // Só envia o que foi digitado: vazio mantém o que já está salvo no servidor.
-  CRED_KEYS.forEach(function(k){
-    var el = document.getElementById('cred-' + k);
-    if (el && el.value.trim()) corpo.credenciais[k] = el.value.trim();
-  });
   btn.disabled = true; st.style.color = ''; st.textContent = 'Salvando…';
   fetch(SERVER + '/config-tsp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3857,9 +3956,13 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
-    CRED_ESTADO = d.credenciais || {};
-    cfgPreencherCred();
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
+    // A Awin tem endpoint proprio: o botao unico salva as duas coisas para o
+    // operador nao precisar lembrar de dois lugares.
+    awinSalvar().then(function(a){
+      if (!a.ok) { st.style.color = 'var(--red)'; st.textContent = 'Config salva, mas a Awin falhou: ' + (a.erro || ''); }
+      else awinPrever();
+    }).catch(function(){});
   }).catch(function(e){
     btn.disabled = false;
     st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message;
