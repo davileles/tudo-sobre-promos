@@ -778,10 +778,14 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <div class="sep"></div>
     <p class="card-title" style="margin-bottom:12px">Cupom adicional <span class="tag" style="text-transform:none">opcional</span></p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Escolher da base <span class="tag">só os vigentes — ou digite à mão abaixo</span></label>
+      <select id="o-cupom-base" onchange="usarCupomDaBase()"><option value="">Digitar à mão</option></select>
+    </div>
     <div class="g2" style="margin-bottom:12px">
       <div class="field">
         <label>Código do cupom</label>
-        <input type="text" id="o-cupom" placeholder="Ex: EXTRA10" oninput="toggleCupomValor()"/>
+        <input type="text" id="o-cupom" placeholder="Ex: EXTRA10" oninput="soltarCupomDaBase();toggleCupomValor()"/>
       </div>
       <div class="field">
         <label>Tipo de desconto</label>
@@ -1534,24 +1538,22 @@ body.travado > *:not(#login-screen){display:none !important}
       Texto anexado ao final de cada mensagem. Use crase (<b>`texto`</b>) para o estilo monoespaçado do WhatsApp.
       Deixe vazio para não anexar nada.
     </div>
-    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">auto-envio e gerador de cupom</span></label>
+    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">semente do template de cupom e do combo de cupons</span></label>
       <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
-    <div class="field" style="margin-bottom:12px"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
+    <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
       <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
-    <div class="field"><label>Rodapé do grupo só-cupons <span class="tag">convite cruzado — substitui o rodapé de cupom na cópia enviada a esse grupo</span></label>
-      <textarea id="cfg-rod-cruzado" rows="2" spellcheck="false"></textarea></div>
   </div>
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">👥 Grupos especiais</p>
     <div class="aviso" style="margin-bottom:12px">
       Ofertas vão para os grupos marcados como <b>destino</b> na aba Grupos. <b>Só-cupons</b> recebem apenas cupons
-      (nunca oferta de produto), com o rodapé cruzado — podem ser vários. <b>Operador</b> recebe avisos internos
+      (nunca oferta de produto) — podem ser vários. <b>Operador</b> recebe avisos internos
       (falhas, resumos) — nunca use um grupo de clientes.
     </div>
     <div class="field" style="margin-bottom:12px">
-      <label>Grupos só-cupons <span class="tag">marque quantos quiser</span></label>
-      <div class="mon-lojas" id="cfg-gr-cupons-lista"></div>
+      <label>Grupos só-cupons <span class="tag">selecione um ou mais</span></label>
+      <select id="cfg-gr-cupons" multiple size="7" style="height:auto;padding:8px 10px;line-height:1.9"></select>
     </div>
     <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
   </div>
@@ -1673,6 +1675,8 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
   </div>
 
+  <div class="aviso" id="tpl-aviso" style="margin-bottom:14px">—</div>
+
   <div class="tpl-cols">
     <div class="card" style="margin-bottom:0">
       <div class="card-title" style="margin-bottom:10px">Corpo da mensagem</div>
@@ -1689,7 +1693,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="card" style="margin-bottom:0">
       <div class="card-title" style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
         <span>Prévia</span>
-        <label style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
+        <label id="tpl-com-cupom-wrap" style="display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
           <input type="checkbox" id="tpl-com-cupom" checked onchange="previewTemplate()" style="width:auto;accent-color:var(--accent)"/> com cupom
         </label>
       </div>
@@ -1835,6 +1839,11 @@ function switchTab(name) {
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
+  // O bloco "Cupom adicional" da Oferta escolhe da base: sem o cache o select
+  // abriria vazio na primeira visita da aba.
+  if (name === 'oferta') {
+    (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons()).then(preencherCupomBaseOferta);
+  }
   if (name === 'vitrine') {
     // Cupons primeiro (alimentam os selects), depois a base de produtos (da os
     // nomes dos itens de cada disparo) e por fim os disparos.
@@ -3233,15 +3242,36 @@ function excluirSelecionadosVitrine(){
 }
 
 /* ══════ TEMPLATES ══════ */
-var TPL_CACHE = {}, TPL_VARS = [], TPL_TIMER = null;
+var TPL_CACHE = {}, TPL_VARS = [], TPL_VARS_CUPOM = [], TPL_TIMER = null;
 
-// Lojas que o radar pode produzir. O select junta estas com as ja cadastradas,
-// para dar de onde partir mesmo antes de existir template proprio.
-var TPL_LOJAS = ['_padrao','Amazon','Mercado Livre','Shopee','Magazine Luiza'];
+// Lojas que o radar pode produzir, mais os tres templates que nao pertencem a
+// loja nenhuma. O select junta estes com os ja cadastrados, para dar de onde
+// partir mesmo antes de existir template proprio.
+var TPL_LOJAS = ['_padrao','_cupom','_awin','Amazon','Mercado Livre','Shopee','Magazine Luiza'];
+
+// Espelha o TPL_RESERVADOS do servidor (radar-amazon.js). Sem este mapa
+// '_padrao' vira 'padrao' no replace e o painel grava num registro que o
+// pipeline nunca le — foi exatamente o bug do template padrao.
+var TPL_RESERVADOS = { padrao:'_padrao', cupom:'_cupom', awin:'_awin' };
+
+var TPL_ROTULOS = {
+  _padrao: 'Padrão — ofertas sem template da loja',
+  _cupom:  'Cupom — auto-envio e aba Cupom',
+  _awin:   'Awin — ofertas da rede sem template da loja'
+};
+
+var TPL_NOTAS = {
+  _padrao: 'Usado em toda oferta de marketplace cuja loja não tenha template próprio.',
+  _cupom:  'Formato de TODA mensagem de cupom: o disparo automático do monitoramento e a aba Cupom do painel renderizam este mesmo corpo. O rodapé faz parte do texto — edite-o aqui.',
+  _awin:   'Usado nas ofertas vindas da rede Awin. Se a loja tiver template próprio, o dela vence; sem template de loja e sem este, cai no Padrão.'
+};
 
 function chaveLojaTpl(loja){
-  return (loja||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'') || '_padrao';
+  var k = (loja||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'') || '_padrao';
+  return TPL_RESERVADOS[k] || k;
 }
+
+function tplEhCupom(){ return document.getElementById('tpl-loja').value === '_cupom'; }
 
 function carregarTemplates(){
   document.getElementById('tpl-status').textContent = 'Carregando...';
@@ -3250,6 +3280,7 @@ function carregarTemplates(){
     .then(function(d){
       TPL_CACHE = d.templates || {};
       TPL_VARS  = d.variaveis || [];
+      TPL_VARS_CUPOM = d.variaveisCupom || [];
       montarSelectLojas();
       renderVars();
       carregarTemplateLoja();
@@ -3262,17 +3293,23 @@ function carregarTemplates(){
 function montarSelectLojas(){
   var sel = document.getElementById('tpl-loja');
   var atual = sel.value;
-  var lojas = TPL_LOJAS.slice();
+  var fixos = TPL_LOJAS.slice();
+  var extras = [];
   // Inclui templates cadastrados que nao estao na lista fixa
   Object.keys(TPL_CACHE).forEach(function(k){
-    if (k === '_padrao') return;
+    if (TPL_ROTULOS[k]) return;                      // reservados ja estao nos fixos
     var nome = TPL_CACHE[k].nome || k;
-    if (!lojas.some(function(l){ return chaveLojaTpl(l) === k; })) lojas.push(nome);
+    if (!fixos.some(function(l){ return chaveLojaTpl(l) === k; })) extras.push(nome);
   });
+  // Dropdown do CDV e sempre alfabetico — mas os tres reservados ficam no topo,
+  // porque nao sao loja e sao os mais usados.
+  extras.sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+  var lojas = fixos.slice(0,3)
+    .concat(fixos.slice(3).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }))
+    .concat(extras);
   sel.innerHTML = lojas.map(function(l){
     var k = chaveLojaTpl(l);
-    var rotulo = (l === '_padrao' ? 'Padrão (usado quando a loja não tem template)' : l)
-               + (TPL_CACHE[k] ? '' : ' — sem template');
+    var rotulo = (TPL_ROTULOS[l] || l) + (TPL_CACHE[k] ? '' : ' — sem template');
     return '<option value="' + esc(l) + '">' + esc(rotulo) + '</option>';
   }).join('');
   if (atual) sel.value = atual;
@@ -3280,14 +3317,22 @@ function montarSelectLojas(){
 
 function carregarTemplateLoja(){
   var loja = document.getElementById('tpl-loja').value;
-  var t = TPL_CACHE[chaveLojaTpl(loja)];
-  // Loja sem template proprio: parte do padrao em vez de abrir vazio.
-  document.getElementById('tpl-corpo').value = (t && t.corpo) || (TPL_CACHE._padrao && TPL_CACHE._padrao.corpo) || '';
+  var k = chaveLojaTpl(loja);
+  var t = TPL_CACHE[k];
+  // Cupom tem outro conjunto de variaveis: cair no padrao das ofertas geraria
+  // uma mensagem de cupom com {{preco}} e {{titulo}}, que nao existem ali.
+  var base = (k === '_cupom') ? '' : ((TPL_CACHE._padrao && TPL_CACHE._padrao.corpo) || '');
+  document.getElementById('tpl-corpo').value = (t && t.corpo) || base;
+  document.getElementById('tpl-aviso').textContent =
+    TPL_NOTAS[k] || 'Template exclusivo desta loja. Vale para ofertas dela; as demais seguem o Padrão.';
+  document.getElementById('tpl-com-cupom-wrap').style.display = (k === '_cupom') ? 'none' : 'flex';
+  renderVars();
   previewTemplate();
 }
 
 function renderVars(){
-  document.getElementById('tpl-vars').innerHTML = TPL_VARS.map(function(v){
+  var lista = tplEhCupom() ? TPL_VARS_CUPOM : TPL_VARS;
+  document.getElementById('tpl-vars').innerHTML = lista.map(function(v){
     return '<button class="tpl-var" title="' + esc(v.desc) + '" data-v="' + esc(v.chave) + '" onclick="inserirVar(this)">{{' + esc(v.chave) + '}}</button>';
   }).join('');
 }
@@ -3308,9 +3353,11 @@ function previewTemplate(){
   TPL_TIMER = setTimeout(function(){
     var corpo = document.getElementById('tpl-corpo').value;
     var loja  = document.getElementById('tpl-loja').value;
+    var ehCupom = loja === '_cupom';
+    var lojaExemplo = (loja === '_padrao' || loja === '_awin' || ehCupom) ? 'Amazon' : loja;
     fetch(SERVER + '/templates/preview', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ corpo: corpo, loja: loja === '_padrao' ? 'Amazon' : loja,
+      body: JSON.stringify({ corpo: corpo, tipo: ehCupom ? 'cupom' : 'oferta', loja: lojaExemplo,
                              comCupom: document.getElementById('tpl-com-cupom').checked })
     })
     .then(function(r){ return r.json(); })
@@ -3325,7 +3372,7 @@ function salvarTemplateAtual(){
   ok.className = 'send-ok'; ok.textContent = 'Salvando...';
   fetch(SERVER + '/templates/' + encodeURIComponent(loja), {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ nome: loja === '_padrao' ? 'Padrão' : loja,
+    body: JSON.stringify({ nome: TPL_NOMES[loja] || loja,
                            corpo: document.getElementById('tpl-corpo').value })
   })
   .then(function(r){ return r.json(); })
@@ -3340,10 +3387,15 @@ function salvarTemplateAtual(){
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
 }
 
+var TPL_NOMES = { _padrao:'Padrão', _cupom:'Cupom', _awin:'Awin' };
+
 function restaurarPadrao(){
-  if (!TPL_CACHE._padrao) return;
-  if (!confirm('Substituir o conteúdo do editor pelo template padrão?')) return;
-  document.getElementById('tpl-corpo').value = TPL_CACHE._padrao.corpo;
+  // No template de cupom "o padrão" e o proprio _cupom gravado — copiar o
+  // padrao das ofertas para ca so produziria variaveis que nao existem.
+  var origem = tplEhCupom() ? TPL_CACHE._cupom : TPL_CACHE._padrao;
+  if (!origem) return;
+  if (!confirm('Substituir o conteúdo do editor pelo template ' + (tplEhCupom() ? 'de cupom gravado' : 'padrão') + '?')) return;
+  document.getElementById('tpl-corpo').value = origem.corpo;
   previewTemplate();
 }
 
@@ -3600,11 +3652,12 @@ function renderCupons() {
     return;
   }
 
-  // Agrupa por loja, alfabetico, e dentro da loja o de maior desconto primeiro.
+  // Agrupa por loja. As quatro principais vem primeiro, na ordem em que a
+  // operacao dispara; o resto sai alfabetico depois delas.
   var lojas = {};
   itens.forEach(function(c){ (lojas[c.loja || 'Outros'] = lojas[c.loja || 'Outros'] || []).push(c); });
 
-  el.innerHTML = Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(loja){
+  el.innerHTML = Object.keys(lojas).sort(ordemLojaCupom).map(function(loja){
     // Mais recente primeiro: cupom novo e o que interessa na hora de disparar.
     var lista = lojas[loja].sort(function(a,b){
       return new Date(b.capturadoEm || 0) - new Date(a.capturadoEm || 0);
@@ -3617,6 +3670,24 @@ function renderCupons() {
          + '</div>'
          + '<div class="cup-grid">' + lista.map(cardCupom).join('') + '</div>';
   }).join('');
+}
+
+// Prioridade fixa das lojas principais. Sem isto a Amazon e o ML — que sao o
+// grosso do disparo — apareciam no meio da lista alfabetica.
+var ORDEM_LOJAS_CUPOM = ['amazon', 'mercadolivre', 'shopee', 'magazineluiza'];
+
+function pesoLojaCupom(loja) {
+  var k = String(loja || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  if (k === 'magalu') k = 'magazineluiza';
+  var i = ORDEM_LOJAS_CUPOM.indexOf(k);
+  return i < 0 ? ORDEM_LOJAS_CUPOM.length : i;
+}
+
+function ordemLojaCupom(a, b) {
+  var pa = pesoLojaCupom(a), pb = pesoLojaCupom(b);
+  if (pa !== pb) return pa - pb;
+  return String(a).localeCompare(String(b), 'pt-BR');
 }
 
 function cardCupom(c) {
@@ -3732,6 +3803,8 @@ function marcarLoja(pid) {
   var card = document.getElementById(mapa[pid]); if (!card) return;
   var loja = document.getElementById(pid+'-loja').value;
   card.className = 'card ' + (MK[loja] || 'mk-outra');
+  // Trocou a loja: os cupons vigentes daquela loja mudam junto.
+  if (pid === 'o' && typeof preencherCupomBaseOferta === 'function') preencherCupomBaseOferta();
 }
 
 /* ══════ PRESETS ══════ */
@@ -4065,7 +4138,6 @@ function cfgPreencher() {
   document.getElementById('cfg-af-ze').value         = a.zedelivery || '';
   document.getElementById('cfg-rod-cupom').value     = r.cupom || '';
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
-  document.getElementById('cfg-rod-cruzado').value   = r.grupoCupons || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
   // Operador continua sendo UM grupo — é o canal de avisos internos.
   var selOp = document.getElementById('cfg-gr-operador');
@@ -4081,38 +4153,31 @@ function cfgPreencher() {
   if (atualOp && !achouOp) htmlOp = '<option value="' + atualOp + '" selected>' + atualOp.split('@')[0] + ' (fora da sessão)</option>' + htmlOp;
   selOp.innerHTML = htmlOp || '<option value="">(conecte o WhatsApp para listar)</option>';
 
-  // Só-cupons virou lista: podem ser vários grupos, então caixas em vez de select.
+  // Só-cupons é lista: select de múltipla seleção, mesmo componente do resto
+  // do painel. Ordem alfabética, como todo dropdown do CDV.
   var marcados = Array.isArray(g.cupons) ? g.cupons : (g.cupons ? [g.cupons] : []);
-  var box = document.getElementById('cfg-gr-cupons-lista');
-  var linhas = GRUPOS_CACHE.map(function(gr){
-    var on = marcados.indexOf(gr.id) >= 0;
-    return '<label class="mon-loja' + (on ? ' on' : '') + '">'
-      + '<input type="checkbox" value="' + gr.id + '"' + (on ? ' checked' : '') + '/>'
-      + (gr.nome || gr.id.split('@')[0]) + '</label>';
+  var selCup = document.getElementById('cfg-gr-cupons');
+  var listaCup = GRUPOS_CACHE.map(function(gr){
+    return { id: gr.id, nome: gr.nome || gr.id.split('@')[0] };
   });
-  // Grupo marcado que a sessão não enxerga não pode sumir da tela: sumir aqui
+  // Grupo escolhido que a sessão não enxerga não pode sumir da tela: sumir aqui
   // equivale a desmarcá-lo no próximo salvamento.
   marcados.forEach(function(jid){
-    if (GRUPOS_CACHE.some(function(gr){ return gr.id === jid; })) return;
-    linhas.unshift('<label class="mon-loja on">'
-      + '<input type="checkbox" value="' + jid + '" checked/>'
-      + jid.split('@')[0] + ' (fora da sessão)</label>');
+    if (listaCup.some(function(gr){ return gr.id === jid; })) return;
+    listaCup.push({ id: jid, nome: jid.split('@')[0] + ' (fora da sessão)' });
   });
-  box.innerHTML = linhas.join('') || '<p class="mon-vazio">Conecte o WhatsApp para listar os grupos.</p>';
+  listaCup.sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt-BR'); });
+  selCup.innerHTML = listaCup.map(function(gr){
+    return '<option value="' + esc(gr.id) + '"'
+      + (marcados.indexOf(gr.id) >= 0 ? ' selected' : '') + '>' + esc(gr.nome) + '</option>';
+  }).join('') || '<option value="" disabled>Conecte o WhatsApp para listar os grupos.</option>';
 }
 
-// Chip fica destacado enquanto marcado, como na aba de monitoramento.
-document.addEventListener('change', function(ev) {
-  var alvo = ev.target;
-  if (!alvo || alvo.type !== 'checkbox') return;
-  var pai = alvo.closest ? alvo.closest('#cfg-gr-cupons-lista .mon-loja') : null;
-  if (pai) pai.classList.toggle('on', alvo.checked);
-});
-
 function cfgGruposCupons() {
-  var box = document.getElementById('cfg-gr-cupons-lista');
-  if (!box) return [];
-  return Array.prototype.slice.call(box.querySelectorAll('input:checked')).map(function(i){ return i.value; });
+  var sel = document.getElementById('cfg-gr-cupons');
+  if (!sel) return [];
+  return Array.prototype.slice.call(sel.selectedOptions)
+    .map(function(o){ return o.value; }).filter(Boolean);
 }
 
 function cfgSalvar() {
@@ -4129,9 +4194,8 @@ function cfgSalvar() {
       zedelivery:   document.getElementById('cfg-af-ze').value.trim()
     },
     rodapes: {
-      cupom:       document.getElementById('cfg-rod-cupom').value,
-      oferta:      document.getElementById('cfg-rod-oferta').value,
-      grupoCupons: document.getElementById('cfg-rod-cruzado').value
+      cupom:  document.getElementById('cfg-rod-cupom').value,
+      oferta: document.getElementById('cfg-rod-oferta').value
     },
     grupos: {
       cupons:   cfgGruposCupons(),
@@ -4199,42 +4263,37 @@ function gerarCupom() {
     return;
   }
 
-  var loja = getLoja('c');
-  var isPct = document.getElementById('c-tipo').value === 'pct';
-  var valor = document.getElementById('c-valor').value.trim() || '0';
-  var minimo = document.getElementById('c-minimo').value.trim() || '0';
-  var limite = document.getElementById('c-limite').value.trim();
-  // "Produto até R$ X" é o teto do PRODUTO elegível, não do desconto. São
-  // regras diferentes e trocar uma pela outra anuncia o cupom para uma faixa
-  // de preço em que ele não vale.
-  var maximo = document.getElementById('c-maximo').value.trim();
-  var cupom = document.getElementById('c-cupom').value.trim();
-  var tipo = isPct ? '%' : ' reais';
-  var partesVal = [];
-  partesVal.push(Number(minimo) > 0 ? 'em compras acima de R$ '+minimo : 'sem valor mínimo de compra');
-  if (maximo) partesVal.push('em produtos de até R$ '+maximo);
-  if (isPct && limite) partesVal.push('com limite de R$ '+limite+' de desconto');
-  var validade = 'Válido ' + partesVal.join(', ') + '.';
-  var msg = '';
-  if (gatilho) msg += '`🚨 '+gatilho+'`\n\n';
-  msg += '*🚨 Cupom de '+valor+tipo+' - '+loja+'*\n\n';
-  msg += validade+'\n\n';
-  msg += '🛒 *LOJA* '+loja.toUpperCase();
-  if (cupom) msg += '\n\n🏷️ *CUPOM* '+cupom.toUpperCase();
-  if (isPct && limite) {
-    var ideal = Math.ceil(100 * Number(limite) / Number(valor));
-    if (maximo) ideal = Math.min(ideal, Number(maximo));
-    msg += '\n\n⚠️ *IMPORTANTE* Ideal para compras de até R$ '+ideal+'.\n\n';
-  } else if (isPct && maximo) {
-    var econ = Math.floor(Number(maximo) * Number(valor) / 100);
-    msg += '\n\n⚠️ *IMPORTANTE* Só vale para produtos de até R$ '+maximo+' — economia máxima de R$ '+econ+'.\n\n';
-  } else { msg += '\n\n'; }
-  var url = loja==='Amazon' ? linksMap['Amazon'] : loja==='Mercado Livre' ? linksMap['Mercado Livre'] : loja==='Shopee' ? (cupom ? linksMap['Shopee_com'] : linksMap['Shopee_sem']) : '';
-  if (cImportante) msg += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
-  if (url) msg += '🔗 *RESGATE O CUPOM AQUI* '+url;
-  else msg = msg.replace(/\s+$/,'');
-  msg = anexarRodape(msg, RODAPE_CUPOM);
-  mostrar('c-msg','c-result','c-ok', msg);
+  // O formato da mensagem de cupom deixou de morar aqui: quem monta e o
+  // servidor, com o template '_cupom' da aba Templates. Era a unica forma de o
+  // cupom gerado a mao e o disparado pelo monitoramento sairem iguais — antes
+  // eram duas copias do mesmo layout, que divergiam a cada ajuste.
+  var st = document.getElementById('c-ok');
+  st.className = 'ok'; st.textContent = 'Montando...';
+  var corpo = {
+    loja:    getLoja('c'),
+    tipo:    document.getElementById('c-tipo').value === 'pct' ? 'pct' : 'reais',
+    valor:   document.getElementById('c-valor').value.trim(),
+    minimo:  document.getElementById('c-minimo').value.trim(),
+    maximo:  document.getElementById('c-maximo').value.trim(),
+    limite:  document.getElementById('c-limite').value.trim(),
+    codigo:  document.getElementById('c-cupom').value.trim(),
+    gatilho: gatilho,
+    aviso:   cImportante
+  };
+  fetch(SERVER + '/cupons/montar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(corpo)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    st.textContent = '';
+    mostrar('c-msg','c-result','c-ok', d.mensagem);
+  })
+  .catch(function(e){
+    st.className = 'ok send-err';
+    st.textContent = 'Não foi possível montar a mensagem: ' + e.message;
+  });
 }
 
 /* ══════ COMBO DE CUPONS ATIVOS ══════ */
@@ -4387,6 +4446,73 @@ function preencherCuponsVinculo(cupons) {
   });
   sel._cupons = cupons;
   wrap.style.display = 'flex';
+}
+
+// Cupom da base direto no bloco "Cupom adicional": vale tanto para o produto
+// buscado por link quanto para a oferta digitada na mao. O select lista os
+// vigentes da loja escolhida (ou todos, quando a loja nao tem nenhum), e o
+// operador pode ignorar tudo isso e digitar o codigo no campo de baixo.
+function cuponsVigentesDaLoja(loja) {
+  var agora = Date.now();
+  var vig = CUPONS_CACHE.filter(function(c){
+    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora && c.codigo;
+  });
+  var norm = function(x){ return String(x || '').toLowerCase().trim(); };
+  var daLoja = vig.filter(function(c){ return norm(c.loja) === norm(loja); });
+  return (daLoja.length ? daLoja : vig).sort(ordenarCupons);
+}
+
+function rotuloCupomBase(c) {
+  var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmtBRL(c.valor);
+  var reg = [];
+  if (c.minimo) reg.push('mín. R$ ' + fmtBRL(c.minimo));
+  if (c.limite != null && c.tipo === 'pct') reg.push('teto R$ ' + fmtBRL(c.limite));
+  return String(c.codigo).toUpperCase() + ' — ' + val
+       + (reg.length ? ' (' + reg.join(' · ') + ')' : '')
+       + ' · ' + (c.loja || 'sem loja');
+}
+
+function preencherCupomBaseOferta() {
+  var sel = document.getElementById('o-cupom-base');
+  if (!sel) return;
+  var atual = sel.value;
+  var lista = cuponsVigentesDaLoja(getLoja('o'));
+  sel.innerHTML = '<option value="">Digitar à mão</option>'
+    + lista.map(function(c){
+        return '<option value="' + esc(c.chave) + '">' + esc(rotuloCupomBase(c)) + '</option>';
+      }).join('');
+  sel._lista = lista;
+  if (atual && lista.some(function(c){ return c.chave === atual; })) sel.value = atual;
+}
+
+function usarCupomDaBase() {
+  var sel = document.getElementById('o-cupom-base');
+  var c = (sel._lista || []).filter(function(x){ return x.chave === sel.value; })[0];
+  if (!c) return;                       // "Digitar à mão": nao mexe no que ja foi digitado
+  document.getElementById('o-cupom').value = String(c.codigo).toUpperCase();
+  document.getElementById('o-tipo').value  = c.tipo === 'reais' ? 'reais' : 'pct';
+  // Percentual com teto vira valor fixo quando o teto corta antes: senao a
+  // mensagem prometeria um desconto que o cupom nao entrega.
+  var preco = Number(document.getElementById('o-final').value || 0);
+  if (c.tipo === 'pct' && c.limite != null && preco > 0
+      && (Number(c.valor) * preco / 100) > Number(c.limite)) {
+    document.getElementById('o-tipo').value = 'reais';
+    document.getElementById('o-cupomValor').value = Number(c.limite).toFixed(2);
+  } else {
+    document.getElementById('o-cupomValor').value = c.valor;
+  }
+  toggleCupomValor();
+}
+
+// Digitou por cima: o select volta para "Digitar à mão" para nao dar a
+// impressao de que o codigo ainda veio da base.
+function soltarCupomDaBase() {
+  var sel = document.getElementById('o-cupom-base');
+  var c = sel && (sel._lista || []).filter(function(x){ return x.chave === sel.value; })[0];
+  if (!c) return;
+  if (String(c.codigo).toUpperCase() !== document.getElementById('o-cupom').value.trim().toUpperCase()) {
+    sel.value = '';
+  }
 }
 
 function vincularCupom() {
