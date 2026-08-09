@@ -1336,7 +1336,7 @@
     <div class="card-title" style="margin-bottom:10px">Cadastrar produtos</div>
     <div class="field">
       <label>Links <span class="tag">um por linha</span></label>
-      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;https://www.mercadolivre.com.br/.../p/MLBXXXXXXXX&#10;https://shopee.com.br/product/XXXX/XXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;Nome | https://www.magazineluiza.com.br/... | 1299,00 | 1899,00" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+      <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;https://link.amazon/xxxx" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
     </div>
     <div class="field" style="margin-top:10px">
       <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
@@ -1514,6 +1514,37 @@
     <div class="field" style="margin-bottom:12px"><label>Grupo padrão de envio</label><select id="cfg-gr-padrao"></select></div>
     <div class="field" style="margin-bottom:12px"><label>Grupo só-cupons</label><select id="cfg-gr-cupons"></select></div>
     <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🔑 Credenciais dos programas de afiliado</p>
+    <div class="aviso" style="margin-bottom:12px">
+      IDs, segredos e cookies que fazem os links e capturas saírem na <b>sua conta</b> de afiliado.
+      Por segurança os valores salvos <b>nunca voltam para a tela</b>: campo vazio mantém o que já está salvo,
+      digitar substitui, e escrever <b>__limpar__</b> apaga (voltando a valer a variável do servidor, se existir).
+    </div>
+    <div class="sec-label">Amazon — Creators API</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Client ID</label><input type="text" id="cred-AMZ_CLIENT_ID" autocomplete="off"/></div>
+      <div class="field"><label>Client Secret</label><input type="password" id="cred-AMZ_CLIENT_SECRET" autocomplete="new-password"/></div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>Partner tag <span class="tag">ex.: sualoja-20</span></label>
+      <input type="text" id="cred-AMZ_PARTNER_TAG" autocomplete="off"/></div>
+    <div class="sec-label">Mercado Livre</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Client ID <span class="tag">DevCenter</span></label><input type="text" id="cred-ML_CLIENT_ID" autocomplete="off"/></div>
+      <div class="field"><label>Client Secret</label><input type="password" id="cred-ML_CLIENT_SECRET" autocomplete="new-password"/></div>
+    </div>
+    <div class="field" style="margin-bottom:16px"><label>Cookie do painel de afiliados <span class="tag">token do linkbuilder</span></label>
+      <textarea id="cred-ML_AFF_TOKEN" rows="2" spellcheck="false" autocomplete="off"></textarea></div>
+    <div class="sec-label">Shopee — painel de afiliado</div>
+    <div class="g2" style="margin-bottom:16px">
+      <div class="field"><label>App ID</label><input type="text" id="cred-SHOPEE_APP_ID" autocomplete="off"/></div>
+      <div class="field"><label>Secret</label><input type="password" id="cred-SHOPEE_SECRET" autocomplete="new-password"/></div>
+    </div>
+    <div class="sec-label">Magazine Luiza</div>
+    <div class="field"><label>Nome da loja no Magalu <span class="tag">o "magazine…" do seu link de divulgador</span></label>
+      <input type="text" id="cred-MAGALU_LOJA" autocomplete="off"/></div>
   </div>
 
   <div class="card">
@@ -2813,11 +2844,7 @@ function excluirLista(id){
 function carregarVitrine(){
   return fetch(SERVER + '/vitrine?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){
-      VIT_CACHE = d.itens || [];
-      if (d.ttlPrecoMagalu) VIT_TTL_MAGALU = d.ttlPrecoMagalu;
-      renderVitrine();
-    })
+    .then(function(d){ VIT_CACHE = d.itens || []; renderVitrine(); })
     .catch(function(e){
       document.getElementById('vit-status').textContent = 'Falha: ' + e.message;
       document.getElementById('vit-lista').innerHTML = '<div class="cup-vazio">Sem resposta do servidor.</div>';
@@ -2855,42 +2882,6 @@ function opcoesCupom(){
   }).join('');
 }
 
-// Horas que o preco informado a mao para a Magalu continua valendo. O servidor
-// manda o valor real no GET /vitrine; este e so o palpite ate a primeira carga.
-var VIT_TTL_MAGALU = 24;
-
-// So a Magalu nao tem consulta de preco no disparo (sem API e com 403 para IP de
-// datacenter). Entao e a unica loja em que o painel precisa mostrar o preco
-// salvo e avisar quando ele venceu.
-function precoVitrine(i){
-  if ((i.loja || '') !== 'Magazine Luiza') return '';
-  if (i.preco == null) {
-    return '<span class="vit-cupom" style="background:rgba(255,90,90,.15);color:var(--red)">sem preço</span>';
-  }
-  var txt = 'R$ ' + Number(i.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  var idadeH = i.precoEm ? (Date.now() - new Date(i.precoEm).getTime()) / 3600000 : Infinity;
-  var vencido = idadeH > VIT_TTL_MAGALU;
-  return '<span class="vit-cupom" title="' + (i.precoEm ? 'informado em ' + new Date(i.precoEm).toLocaleString('pt-BR') : 'sem data')
-    + '"' + (vencido ? ' style="background:rgba(255,90,90,.15);color:var(--red)"' : '') + '>'
-    + esc(txt) + (vencido ? ' · vencido' : '') + '</span>';
-}
-
-// Preco e "de" na mesma caixa: sao um par, e digitar em dois prompts seguidos
-// para cada produto e atrito puro.
-function editarPrecoVitrine(btn){
-  var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
-  var atual = (i.preco != null ? String(i.preco).replace('.', ',') : '')
-            + (i.precoDe != null ? ' | ' + String(i.precoDe).replace('.', ',') : '');
-  var novo = prompt('Preço da Magazine Luiza (o "de" é opcional, depois da barra):\n\nEx: 1299,00 | 1899,00', atual);
-  if (novo === null) return;
-  var nums = (novo.match(/\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:[.,]\d{2})?/g) || []).map(function(v){
-    return v.indexOf(',') >= 0 ? Number(v.replace(/\./g,'').replace(',','.')) : Number(v);
-  }).filter(function(v){ return isFinite(v) && v > 0; });
-  if (!nums.length) { alert('Não consegui ler nenhum valor.'); return; }
-  var preco = Math.min.apply(null, nums), maior = Math.max.apply(null, nums);
-  salvarCampoVitrine(i.asin, { preco: preco, precoDe: maior > preco ? maior : null });
-}
-
 function renderVitrine(){
   ['vit-cupom-novo'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
@@ -2910,14 +2901,11 @@ function renderVitrine(){
       + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
       + '<div class="vit-info">'
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
-        + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
+        + '<div class="vit-meta">' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
       + '</div>'
-      + precoVitrine(i)
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
       + '<div class="vit-acoes">'
         + '<button data-asin="' + esc(i.asin) + '" onclick="editarNomeVitrine(this)" title="Renomear">✎</button>'
-        + ((i.loja || '') === 'Magazine Luiza'
-            ? '<button data-asin="' + esc(i.asin) + '" onclick="editarPrecoVitrine(this)" title="Editar preço">💲</button>' : '')
         + '<button data-asin="' + esc(i.asin) + '" onclick="vincularCupomVitrine(this)" title="Vincular cupom">🎫</button>'
         + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
       + '</div>'
@@ -3446,19 +3434,32 @@ function regraCupom(c) {
   return partes.join(' · ') || 'sem restricao informada';
 }
 
+// Cupom expirado sai da tela por padrão: está morto, só polui. O link no
+// status revela quando o operador precisar (conferir data errada, excluir).
+var MOSTRAR_EXPIRADOS = false;
+function alternarExpirados() { MOSTRAR_EXPIRADOS = !MOSTRAR_EXPIRADOS; renderCupons(); }
+
 function renderCupons() {
   var soVigentes = document.getElementById('cupons-so-vigentes').checked;
   var agora = Date.now();
+  function expirado(c) { var t = new Date(c.validadeAte).getTime(); return !isNaN(t) && t <= agora; }
+
+  var nExp = CUPONS_CACHE.filter(expirado).length;
   var itens = CUPONS_CACHE.filter(function(c){
+    if (expirado(c) && !MOSTRAR_EXPIRADOS) return false;
     if (!soVigentes) return true;
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+    return c.ativo !== false && !expirado(c);
   });
 
   var vig = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+    return c.ativo !== false && !expirado(c);
   }).length;
-  document.getElementById('cupons-status').textContent =
-    CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)';
+  var stEl = document.getElementById('cupons-status');
+  stEl.innerHTML = CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)'
+    + (nExp ? ' · <a href="#" style="color:var(--muted)" '
+            + 'onclick="alternarExpirados();return false">'
+            + (MOSTRAR_EXPIRADOS ? 'ocultar' : 'mostrar') + ' ' + nExp + ' expirado(s)</a>'
+       : '');
 
   var el = document.getElementById('cupons-lista');
   if (!itens.length) {
@@ -3692,7 +3693,7 @@ function cfgAplicar(c) {
 function cfgCarregarServidor() {
   return fetch(SERVER + '/config-tsp?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if (d.ok && d.config) cfgAplicar(d.config); })
+    .then(function(d){ if (d.ok && d.config) { cfgAplicar(d.config); CRED_ESTADO = d.credenciais || {}; } })
     .catch(function(){ /* mantém os fallbacks */ });
 }
 cfgCarregarServidor();
@@ -3711,6 +3712,26 @@ function cfgAbrir() {
   });
 }
 
+var CRED_KEYS = ['AMZ_CLIENT_ID','AMZ_CLIENT_SECRET','AMZ_PARTNER_TAG',
+                 'ML_CLIENT_ID','ML_CLIENT_SECRET','ML_AFF_TOKEN',
+                 'SHOPEE_APP_ID','SHOPEE_SECRET','MAGALU_LOJA'];
+var CRED_ESTADO = {};
+
+// Os valores nunca chegam em claro: o campo fica vazio e o placeholder conta o
+// estado (de onde veio e os últimos 4 caracteres para reconhecimento).
+function cfgPreencherCred() {
+  CRED_KEYS.forEach(function(k){
+    var el = document.getElementById('cred-' + k);
+    if (!el) return;
+    var st = CRED_ESTADO[k] || {};
+    el.value = '';
+    el.placeholder = st.definido
+      ? 'configurado' + (st.final ? ' (…' + st.final + ')' : '')
+        + (st.origem === 'ambiente' ? ' — pelo servidor' : '') + ' · digite para substituir'
+      : 'não configurado';
+  });
+}
+
 function cfgPreencher() {
   var c = CFG_TSP || {};
   var a = c.afiliados || {}, r = c.rodapes || {}, g = c.grupos || {}, t = c.telegram || {};
@@ -3725,6 +3746,7 @@ function cfgPreencher() {
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-rod-cruzado').value   = r.grupoCupons || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
+  cfgPreencherCred();
   ['padrao','cupons','operador'].forEach(function(k){
     var sel = document.getElementById('cfg-gr-' + k);
     var atual = g[k] || '';
@@ -3768,8 +3790,14 @@ function cfgSalvar() {
     telegram: {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
         .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
-    }
+    },
+    credenciais: {}
   };
+  // Só envia o que foi digitado: vazio mantém o que já está salvo no servidor.
+  CRED_KEYS.forEach(function(k){
+    var el = document.getElementById('cred-' + k);
+    if (el && el.value.trim()) corpo.credenciais[k] = el.value.trim();
+  });
   btn.disabled = true; st.style.color = ''; st.textContent = 'Salvando…';
   fetch(SERVER + '/config-tsp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3778,6 +3806,8 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
+    CRED_ESTADO = d.credenciais || {};
+    cfgPreencherCred();
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
   }).catch(function(e){
     btn.disabled = false;
