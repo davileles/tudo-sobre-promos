@@ -174,7 +174,8 @@
   .field.disabled{opacity:.4;pointer-events:none}
   label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
   .tag{font-size:9px;font-weight:700;color:var(--muted2);background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1px 5px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
-  input[type=text],input[type=number],input[type=datetime-local],input[type=date],input[type=time],select,textarea{
+  input[type=text],input[type=number],input[type=datetime-local],input[type=date],input[type=time],
+  input[type=password],input[type=url],input[type=email],input[type=search],select,textarea{
     width:100%;background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);
     padding:10px 12px;border-radius:10px;font-size:13px;font-family:'Montserrat',sans-serif;outline:none;transition:border-color .2s}
   input:focus,select:focus,textarea:focus{border-color:var(--accent)}
@@ -293,6 +294,7 @@
   .mon-loja input{width:15px;height:15px;accent-color:var(--accent);margin:0;cursor:pointer}
   .mon-loja.on{color:var(--text);border-color:var(--accent)}
   .mon-aviso{font-size:11px;color:#e5534b;margin-top:9px;font-weight:600}
+  .mon-vazio{font-size:11.5px;color:var(--muted2);margin:2px}
   .mon-jan{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
   .mon-jan span{font-size:11px;color:var(--muted2);font-weight:700}
   .mon-jan input[type=time]{padding:7px 9px;font-size:12.5px;width:auto;min-width:105px}
@@ -1514,7 +1516,7 @@
     </div>
     <div class="field" style="margin-bottom:12px">
       <label>Grupos só-cupons <span class="tag">marque quantos quiser</span></label>
-      <div id="cfg-gr-cupons-lista" style="max-height:220px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:8px"></div>
+      <div class="mon-lojas" id="cfg-gr-cupons-lista"></div>
     </div>
     <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
   </div>
@@ -1565,35 +1567,35 @@
         <option value="on">Automático — segue o gate de cupons</option>
       </select></div>
 
-    <div class="grid-2" style="margin-bottom:12px">
+    <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Publicar a cada (min)</label>
         <input type="number" id="awin-intervalo" min="5" max="1440" step="5" oninput="awinPrever()"/></div>
       <div class="field"><label>Máximo por dia</label>
         <input type="number" id="awin-maxdia" min="0" max="100" oninput="awinPrever()"/></div>
     </div>
 
-    <div class="grid-2" style="margin-bottom:12px">
+    <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Início da janela</label>
         <input type="time" id="awin-inicio" oninput="awinPrever()"/></div>
       <div class="field"><label>Fim da janela</label>
         <input type="time" id="awin-fim" oninput="awinPrever()"/></div>
     </div>
 
-    <div class="grid-2" style="margin-bottom:12px">
+    <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Por rodada</label>
         <input type="number" id="awin-maxrodada" min="0" max="20" oninput="awinPrever()"/></div>
       <div class="field"><label>Máximo por loja/dia</label>
         <input type="number" id="awin-maxloja" min="0" max="40"/></div>
     </div>
 
-    <div class="grid-2" style="margin-bottom:12px">
+    <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Desconto mínimo (%)</label>
         <input type="number" id="awin-minpct" min="1" max="99"/></div>
       <div class="field"><label>Preço mínimo (R$)</label>
         <input type="number" id="awin-minpreco" min="0" step="10"/></div>
     </div>
 
-    <div class="grid-2" style="margin-bottom:12px">
+    <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Não repetir produto por (dias)</label>
         <input type="number" id="awin-repetir" min="1" max="365"/></div>
       <div class="field"><label>Varrer catálogos a cada (h)</label>
@@ -3905,11 +3907,10 @@ function awinSimular() {
     st.style.color = 'var(--green)';
     st.textContent = '✓ ' + itens.length + ' oferta(s) sairiam agora (nada foi enviado).';
     box.innerHTML = itens.map(function(i){
-      return '<div class="card" style="margin:8px 0;padding:12px">'
-        + '<b>' + i.loja + '</b> · ' + i.desconto + '% off'
-        + (i.cupom ? ' · cupom ' + i.cupom : '')
-        + '<pre style="white-space:pre-wrap;font-size:11.5px;margin-top:8px">'
-        + (i.mensagem || '').replace(/[<>]/g, '') + '</pre></div>';
+      return '<div class="card" style="margin:8px 0">'
+        + '<div class="card-title" style="margin-bottom:8px">' + i.loja + ' · ' + i.desconto + '% off'
+        + (i.cupom ? '<span class="tag">cupom ' + i.cupom + '</span>' : '') + '</div>'
+        + '<div class="tpl-preview">' + (i.mensagem || '').replace(/[<>]/g, '') + '</div></div>';
     }).join('');
   }).catch(function(e){
     st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message;
@@ -3965,8 +3966,7 @@ function credPreencher(estado) {
   CRED_CAMPOS.forEach(function(c) {
     if (c.g !== grupoAtual) {
       grupoAtual = c.g;
-      html += '<p style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;'
-            + 'letter-spacing:.4px;margin:14px 0 8px">' + c.g + '</p>';
+      html += '<p class="presets-label" style="margin-top:16px">' + c.g + '</p>';
     }
     var e = estado[c.k] || {};
     var marca = e.preenchida
@@ -4020,22 +4020,28 @@ function cfgPreencher() {
   var box = document.getElementById('cfg-gr-cupons-lista');
   var linhas = GRUPOS_CACHE.map(function(gr){
     var on = marcados.indexOf(gr.id) >= 0;
-    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:12.5px;'
-      + 'font-weight:500;text-transform:none;letter-spacing:0;color:var(--txt);margin:0;cursor:pointer">'
-      + '<input type="checkbox" value="' + gr.id + '"' + (on ? ' checked' : '')
-      + ' style="width:auto;accent-color:var(--accent)"/> ' + (gr.nome || gr.id.split('@')[0]) + '</label>';
+    return '<label class="mon-loja' + (on ? ' on' : '') + '">'
+      + '<input type="checkbox" value="' + gr.id + '"' + (on ? ' checked' : '') + '/>'
+      + (gr.nome || gr.id.split('@')[0]) + '</label>';
   });
   // Grupo marcado que a sessão não enxerga não pode sumir da tela: sumir aqui
   // equivale a desmarcá-lo no próximo salvamento.
   marcados.forEach(function(jid){
     if (GRUPOS_CACHE.some(function(gr){ return gr.id === jid; })) return;
-    linhas.unshift('<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:12.5px;'
-      + 'font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);margin:0;cursor:pointer">'
-      + '<input type="checkbox" value="' + jid + '" checked style="width:auto;accent-color:var(--accent)"/> '
+    linhas.unshift('<label class="mon-loja on">'
+      + '<input type="checkbox" value="' + jid + '" checked/>'
       + jid.split('@')[0] + ' (fora da sessão)</label>');
   });
-  box.innerHTML = linhas.join('') || '<p style="font-size:11.5px;color:var(--muted2);margin:4px">Conecte o WhatsApp para listar os grupos.</p>';
+  box.innerHTML = linhas.join('') || '<p class="mon-vazio">Conecte o WhatsApp para listar os grupos.</p>';
 }
+
+// Chip fica destacado enquanto marcado, como na aba de monitoramento.
+document.addEventListener('change', function(ev) {
+  var alvo = ev.target;
+  if (!alvo || alvo.type !== 'checkbox') return;
+  var pai = alvo.closest ? alvo.closest('#cfg-gr-cupons-lista .mon-loja') : null;
+  if (pai) pai.classList.toggle('on', alvo.checked);
+});
 
 function cfgGruposCupons() {
   var box = document.getElementById('cfg-gr-cupons-lista');
