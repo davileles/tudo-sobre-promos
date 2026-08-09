@@ -1587,6 +1587,7 @@
       <label>Lojas <span class="tag">vazio = todas com catálogo</span></label>
       <input type="text" id="awin-lojas" placeholder="17697,17806,17777"/></div>
 
+    <div class="aviso" id="awin-credenciais" style="margin-bottom:12px;display:none"></div>
     <div class="aviso" id="awin-previsao" style="margin-bottom:12px">—</div>
 
     <div class="btn-row">
@@ -3796,8 +3797,24 @@ function awinCarregar() {
     set('awin-minpct', c.minPct); set('awin-minpreco', c.minPreco);
     set('awin-repetir', c.repetirDias); set('awin-varredura', Math.round((c.varreduraMin||360)/60));
     set('awin-lojas', (c.lojas || []).join(','));
+    awinCredenciais(d.credenciais);
     awinPrever(d);
   }).catch(function(){});
+}
+
+// As duas credenciais da Awin sao separadas: o token da API (cupons e links) e
+// a apikey dos feeds (ofertas de catalogo). Faltando uma, a metade
+// correspondente simplesmente nao funciona — melhor dizer isso na tela do que
+// deixar o operador descobrir por um erro ao clicar.
+function awinCredenciais(cred) {
+  var el = document.getElementById('awin-credenciais');
+  if (!el || !cred) return;
+  var faltando = [];
+  if (!cred.api)  faltando.push('<b>AWIN_TOKEN</b> + <b>AWIN_PUBLISHER_ID</b> — cupons e links de afiliado');
+  if (!cred.feed) faltando.push('<b>AWIN_FEED_APIKEY</b> — ofertas de catálogo (Toolbox &gt; Create-a-Feed na Awin)');
+  if (!faltando.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = '⚠️ Falta configurar no Railway (e redeployar):<br>• ' + faltando.join('<br>• ');
 }
 
 // A conta de quantas ofertas cabem no dia nao e obvia: depende da janela, do
@@ -3880,6 +3897,12 @@ function awinSimular() {
 function awinVarrer() {
   var st = document.getElementById('awin-status');
   st.style.color = ''; st.textContent = 'Varrendo catálogos… pode levar um minuto.';
+  var cred = document.getElementById('awin-credenciais');
+  if (cred && cred.style.display !== 'none') {
+    st.style.color = 'var(--red)';
+    st.textContent = 'Falta credencial no Railway — veja o aviso acima.';
+    return;
+  }
   fetch(SERVER + '/awin/ofertas/varredura', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     .then(function(r){ return r.json(); }).then(function(d){
       if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha.'; return; }
