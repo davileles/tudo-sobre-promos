@@ -4,6 +4,20 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Gestão TSP — Tudo Sobre Promos</title>
+<style>
+/* Visão de operador: abas administrativas nunca chegam a aparecer. A classe é
+   aplicada por script inline no head, antes do primeiro paint, a partir da
+   identidade lembrada do último login neste navegador. */
+html.visao-operador #grp-resultados,
+html.visao-operador #tab-comissao,
+html.visao-operador #tab-trafego { display: none !important; }
+</style>
+<script>
+try {
+  var _v = localStorage.getItem('tsp-visao');
+  if (_v && _v !== 'tsp') document.documentElement.classList.add('visao-operador');
+} catch (e) {}
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -3816,11 +3830,12 @@ var CRED_ESTADO = {};
 var TENANT_ATUAL = null;
 function aplicarVisaoOperador(t) {
   TENANT_ATUAL = t;
-  if (!t || t.id === 'tsp') return;
-  ['grp-resultados', 'tab-comissao', 'tab-trafego'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
+  var operador = !!(t && t.id && t.id !== 'tsp');
+  // Classe no <html> + memória local: no próximo carregamento a ocultação vale
+  // antes do primeiro paint (script inline no head), sem nenhum flash.
+  document.documentElement.classList.toggle('visao-operador', operador);
+  try { localStorage.setItem('tsp-visao', operador ? t.id : 'tsp'); } catch (e) {}
+  if (!operador) return;
   ['panel-comissao', 'panel-trafego'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el && el.classList.contains('active')) switchTab('fila');
@@ -6206,7 +6221,8 @@ function abrirPainel(){
 }
 
 function sairDaConta(){
-  try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+  try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem('tsp-visao'); } catch(e) {}
+  document.documentElement.classList.remove('visao-operador');
   document.body.classList.add('travado');
   document.getElementById('etapa-codigo').style.display = 'none';
   document.getElementById('etapa-email').style.display  = 'block';
