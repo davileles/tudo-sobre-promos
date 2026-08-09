@@ -1401,6 +1401,37 @@ body.travado > *:not(#login-screen){display:none !important}
     <div id="vit-cad-erros" style="display:none;margin-top:8px;border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:10px 12px;background:rgba(248,113,113,.05)"></div>
   </div>
 
+  <!-- ─── 1b. Catalogo da Awin ─── -->
+  <div class="sec-label" style="margin-top:22px">Ofertas da Awin <span class="tag" style="text-transform:none">catálogo da rede, do maior desconto para o menor</span></div>
+  <div class="fila-bar">
+    <span id="awc-status">—</span>
+    <div class="fila-acoes">
+      <select id="awc-loja" onchange="renderAwinCand()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <button class="btn btn-copy btn-sm" onclick="awinCandVarrer()">↻ Varrer catálogos</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarAwinCand()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div class="field">
+      <label>Vincular cupom ao selecionar <span class="tag">opcional</span></label>
+      <select id="awc-cupom"></select>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
+      A lista é a fila que o robô usa para publicar sozinho. Escolher aqui manda o produto para a
+      <b>base de produtos</b> abaixo e o tira da fila automática — daí ele segue o mesmo caminho de
+      qualquer outro item: só cadastrar, disparo único ou lista salva.
+      <b>A escolha manual passa por cima das cotas</b>; o aviso em vermelho só informa o que o robô
+      não faria sozinho hoje.
+    </p>
+  </div>
+  <div id="awc-lista"></div>
+  <div class="card vit-barra" id="awc-barra" style="display:none">
+    <div style="flex:1;min-width:180px;font-size:12px;color:var(--muted)" id="awc-sel-txt"></div>
+    <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="cadastrarAwinSel('so')">➕ Só cadastrar</button>
+    <button class="btn btn-sm" style="margin-top:0" onclick="cadastrarAwinSel('unico')">🚀 Cadastrar e disparar agora</button>
+    <button class="btn btn-sm" style="margin-top:0" onclick="cadastrarAwinSel('salva')">💾 Cadastrar como lista salva</button>
+  </div>
+
   <!-- ─── 2. Disparos ─── -->
   <div class="sec-label" style="margin-top:22px">Disparos</div>
   <div class="fila-bar">
@@ -1849,7 +1880,8 @@ function switchTab(name) {
     // nomes dos itens de cada disparo) e por fim os disparos.
     (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons())
       .then(carregarVitrine)
-      .then(carregarListas);
+      .then(carregarListas)
+      .then(carregarAwinCand);
   }
   if (name === 'templates') carregarTemplates();
   if (name === 'config') cfgAbrir();
@@ -3005,8 +3037,14 @@ var VIT_TTL_MAGALU = 24;
 // So a Magalu nao tem consulta de preco no disparo (sem API e com 403 para IP de
 // datacenter). Entao e a unica loja em que o painel precisa mostrar o preco
 // salvo e avisar quando ele venceu.
+// Lojas cujo preco pode vir do cadastro: Magalu (nao ha fonte para consultar) e
+// Awin (parte das lojas bloqueia leitura vinda de datacenter).
+function usaPrecoDeCadastro(i){
+  return (i.loja || '') === 'Magazine Luiza' || String(i.asin || '').indexOf('AWIN-') === 0;
+}
+
 function precoVitrine(i){
-  if ((i.loja || '') !== 'Magazine Luiza') return '';
+  if (!usaPrecoDeCadastro(i)) return '';
   if (i.preco == null) {
     return '<span class="vit-cupom" style="background:rgba(255,90,90,.15);color:var(--red)">sem preço</span>';
   }
@@ -3059,7 +3097,7 @@ function renderVitrine(){
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
       + '<div class="vit-acoes">'
         + '<button data-asin="' + esc(i.asin) + '" onclick="editarNomeVitrine(this)" title="Renomear">✎</button>'
-        + ((i.loja || '') === 'Magazine Luiza'
+        + (usaPrecoDeCadastro(i)
             ? '<button data-asin="' + esc(i.asin) + '" onclick="editarPrecoVitrine(this)" title="Editar preço">💲</button>' : '')
         + '<button data-asin="' + esc(i.asin) + '" onclick="vincularCupomVitrine(this)" title="Vincular cupom">🎫</button>'
         + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
@@ -3150,25 +3188,164 @@ function cadastrarVitrine(destino){
     }
     if (salvos.length) document.getElementById('vit-links').value = '';
 
-    return carregarVitrine().then(function(){
-      if (destino === 'so' || !salvos.length) return;
-      // Seleciona exatamente o que acabou de entrar e cai no mesmo formulario de
-      // disparo do resto da aba — um caminho so para revisar cupom e intervalo.
-      VIT_SEL = {};
-      salvos.forEach(function(s){ VIT_SEL[s.asin] = true; });
-      renderVitrine();
-      novoDisparoComSelecionados();
-      // O tipo ja vem decidido do botao; novaLista() deixa 'unico' como padrao.
-      document.getElementById('lst-tipo').value = (destino === 'salva') ? 'salva' : 'unico';
-      lstToggleTipo();
-      if (cupom) {
-        document.getElementById('lst-cupom-modo').value = 'fixo';
-        lstToggleCupom();
-        document.getElementById('lst-cupom-codigo').value = cupom;
-      }
-    });
+    return aposCadastroVitrine(salvos, destino, cupom);
   })
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
+}
+
+// Caminho comum depois de cadastrar: recarrega a base, marca exatamente o que
+// entrou e cai no mesmo formulario de disparo do resto da aba. Vale para o
+// link colado e para o produto vindo do catalogo da Awin — um caminho so para
+// revisar cupom e intervalo.
+function aposCadastroVitrine(salvos, destino, cupom){
+  return carregarVitrine().then(function(){
+    if (destino === 'so' || !salvos.length) return;
+    VIT_SEL = {};
+    salvos.forEach(function(s){ VIT_SEL[s.asin] = true; });
+    renderVitrine();
+    novoDisparoComSelecionados();
+    // O tipo ja vem decidido do botao; novaLista() deixa 'unico' como padrao.
+    document.getElementById('lst-tipo').value = (destino === 'salva') ? 'salva' : 'unico';
+    lstToggleTipo();
+    if (cupom) {
+      document.getElementById('lst-cupom-modo').value = 'fixo';
+      lstToggleCupom();
+      document.getElementById('lst-cupom-codigo').value = cupom;
+    }
+  });
+}
+
+/* ══════ CATALOGO DA AWIN DENTRO DA VITRINE ══════ */
+// A fila de candidatos da Awin (o que o robo publicaria sozinho) exposta como
+// lista escolhivel. O ranking vem pronto do servidor: maior desconto primeiro,
+// desempate por preco.
+var AWC_CACHE = [], AWC_SEL = {};
+
+function carregarAwinCand(){
+  var st = document.getElementById('awc-status');
+  st.textContent = 'Carregando…';
+  return fetch(SERVER + '/awin/ofertas/candidatos?limite=150&t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      AWC_CACHE = d.itens || [];
+      AWC_SEL = {};
+      montarFiltroLojaAwin();
+      renderAwinCand(d);
+    })
+    .catch(function(e){
+      AWC_CACHE = [];
+      st.textContent = 'Falha ao carregar: ' + e.message;
+      document.getElementById('awc-lista').innerHTML = '';
+    });
+}
+
+function montarFiltroLojaAwin(){
+  var sel = document.getElementById('awc-loja');
+  var atual = sel.value;
+  var lojas = {};
+  AWC_CACHE.forEach(function(c){ lojas[c.loja] = (lojas[c.loja] || 0) + 1; });
+  sel.innerHTML = '<option value="">Todas as lojas (' + AWC_CACHE.length + ')</option>'
+    + Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(l){
+        return '<option value="' + esc(l) + '">' + esc(l) + ' (' + lojas[l] + ')</option>';
+      }).join('');
+  if (atual) sel.value = atual;
+}
+
+function renderAwinCand(estado){
+  ['awc-cupom'].forEach(function(id){
+    var s = document.getElementById(id); if (!s) return;
+    var a = s.value; s.innerHTML = opcoesCupom(); if (a) s.value = a;
+  });
+
+  var st = document.getElementById('awc-status');
+  var el = document.getElementById('awc-lista');
+  var loja = document.getElementById('awc-loja').value;
+  var itens = loja ? AWC_CACHE.filter(function(c){ return c.loja === loja; }) : AWC_CACHE;
+
+  if (estado) {
+    var idade = estado.idadeHoras;
+    st.textContent = AWC_CACHE.length + ' candidato(s) na fila'
+      + (idade != null ? ' · varrido há ' + idade + 'h (vence em ' + estado.validadeHoras + 'h)' : '')
+      + (estado.uso ? ' · hoje saíram ' + estado.uso.total : '');
+  }
+  if (!AWC_CACHE.length) {
+    st.textContent = 'Fila vazia — clique em "Varrer catálogos".';
+    el.innerHTML = '<div class="cup-vazio">Nenhum candidato agora.<br>A varredura roda sozinha de tempos em tempos; use o botão acima para adiantar.</div>';
+    atualizarBarraAwin(); return;
+  }
+
+  el.innerHTML = itens.map(function(c){
+    var sel = !!AWC_SEL[c.chaveHistorico];
+    var preco = 'R$ ' + fmtBRL(c.preco);
+    var de = c.precoDe ? ' <span style="text-decoration:line-through;opacity:.55">R$ ' + fmtBRL(c.precoDe) + '</span>' : '';
+    return '<div class="vit' + (sel ? ' sel' : '') + '">'
+      + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-k="' + esc(c.chaveHistorico) + '" onchange="selAwinCand(this)"/>'
+      + '<div class="vit-info">'
+        + '<div class="vit-nome" title="' + esc(c.titulo) + '">' + esc(c.titulo || '(sem título)') + '</div>'
+        + '<div class="vit-meta">' + esc(c.loja) + ' · ' + c.desconto + '% off'
+          + (c.cupom ? ' · cupom ' + esc(c.cupom.codigo) + ' (−R$ ' + fmtBRL(c.cupom.desconto) + ')' : '')
+          + (c.bloqueio ? ' · <span style="color:var(--red)">' + esc(c.bloqueio) + '</span>' : '')
+        + '</div>'
+      + '</div>'
+      + '<div class="vit-preco" style="text-align:right;white-space:nowrap">' + preco + de + '</div>'
+    + '</div>';
+  }).join('');
+  atualizarBarraAwin();
+}
+
+function selAwinCand(cb){
+  if (cb.checked) AWC_SEL[cb.dataset.k] = true; else delete AWC_SEL[cb.dataset.k];
+  cb.closest('.vit').classList.toggle('sel', cb.checked);
+  atualizarBarraAwin();
+}
+
+function atualizarBarraAwin(){
+  var n = Object.keys(AWC_SEL).length;
+  document.getElementById('awc-barra').style.display = n ? 'flex' : 'none';
+  // Escolha manual passa por cima das cotas, mas o operador precisa saber o que
+  // esta furando — dizer isso aqui e mais util do que barrar.
+  var travados = AWC_CACHE.filter(function(c){ return AWC_SEL[c.chaveHistorico] && c.bloqueio; }).length;
+  document.getElementById('awc-sel-txt').innerHTML =
+    n + ' produto' + (n === 1 ? '' : 's') + ' selecionado' + (n === 1 ? '' : 's')
+    + (travados ? ' · <span style="color:var(--red)">' + travados + ' fora da cota do robô — vai mesmo assim</span>' : '');
+}
+
+function cadastrarAwinSel(destino){
+  var chaves = Object.keys(AWC_SEL);
+  if (!chaves.length) return;
+  var cupom = document.getElementById('awc-cupom').value || null;
+  var st = document.getElementById('awc-status');
+  st.textContent = 'Cadastrando ' + chaves.length + ' produto(s)…';
+  fetch(SERVER + '/awin/ofertas/cadastrar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ chaves: chaves, cupom: cupom })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var salvos = d.salvos || [];
+    st.textContent = salvos.length + ' produto(s) na base · ' + d.naFila + ' ainda na fila da Awin';
+    AWC_SEL = {};
+    // Recarrega a fila: os escolhidos sairam dela do lado do servidor.
+    carregarAwinCand();
+    return aposCadastroVitrine(salvos, destino, cupom);
+  })
+  .catch(function(e){ st.textContent = 'Erro: ' + e.message; });
+}
+
+function awinCandVarrer(){
+  var st = document.getElementById('awc-status');
+  st.textContent = 'Varrendo catálogos… pode levar um minuto.';
+  fetch(SERVER + '/awin/ofertas/varredura', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) { st.textContent = d.erro || 'Falha na varredura.'; return; }
+    carregarAwinCand();
+  })
+  .catch(function(e){ st.textContent = 'Erro: ' + e.message; });
 }
 
 function salvarCampoVitrine(asin, campos){
