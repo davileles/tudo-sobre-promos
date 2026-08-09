@@ -483,6 +483,25 @@
 }
 /* ── LOGIN ── */
 .res-scope #login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
+/* Gate de acesso: cobre a pagina inteira antes de qualquer aba abrir. Fora do
+   .res-scope porque agora protege o painel todo, nao so a aba de resultados. */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:none;align-items:center;justify-content:center;padding:24px}
+body.travado #login-screen{display:flex}
+body.travado > *:not(#login-screen){display:none !important}
+#login-screen .login-box{background:var(--surface,var(--card));border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;display:flex;flex-direction:column}
+#login-screen .login-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+#login-screen .login-title span{color:var(--accent)}
+#login-screen .login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:26px}
+#login-screen .login-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+#login-screen .login-input{width:100%;background:var(--card);border:1px solid var(--border-ctrl,var(--border));color:var(--text);padding:11px 14px;border-radius:10px;font-size:14px;font-family:'Montserrat',sans-serif;outline:none;margin-bottom:14px}
+#login-screen .login-input:focus{border-color:var(--accent)}
+#login-screen .login-input.codigo{text-align:center;letter-spacing:10px;font-size:20px;font-weight:800}
+#login-screen .login-btn{width:100%;background:var(--accent);border:none;color:#111;padding:12px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:'Montserrat',sans-serif;margin-bottom:10px}
+#login-screen .login-btn:disabled{opacity:.5;cursor:not-allowed}
+#login-screen .login-link{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;font-family:'Montserrat',sans-serif;text-decoration:underline}
+#login-screen .login-msg{font-size:12px;font-weight:700;text-align:center;min-height:18px;margin-bottom:6px}
+#login-screen .login-msg.err{color:var(--red)}
+#login-screen .login-msg.ok{color:var(--green)}
 .res-scope .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;display:flex;flex-direction:column}
 .res-scope .login-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
 .res-scope .login-title span{color:var(--orange)}
@@ -517,7 +536,31 @@
 
 </style>
 </head>
-<body>
+<body class="travado">
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title"><span>Tudo Sobre Promos</span></div>
+    <div class="login-sub">Acesso ao painel</div>
+
+    <div id="etapa-email">
+      <div class="login-label">E-mail</div>
+      <input class="login-input" id="login-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+      <div class="login-msg" id="login-msg"></div>
+      <button class="login-btn" id="login-btn" onclick="enviarCodigo()">Enviar código</button>
+    </div>
+
+    <div id="etapa-codigo" style="display:none">
+      <div class="login-label">Código enviado por e-mail</div>
+      <input class="login-input codigo" id="login-codigo" type="text" inputmode="numeric" maxlength="6" placeholder="000000"/>
+      <div class="login-msg" id="login-msg2"></div>
+      <button class="login-btn" id="login-btn2" onclick="validarCodigo()">Entrar</button>
+      <button class="login-link" onclick="voltarEmail()">Usar outro e-mail</button>
+    </div>
+  </div>
+</div>
+
+
+
 
 <header>
   <div class="logo-row">
@@ -1045,29 +1088,6 @@
 
 <!-- ════════ RESULTADOS: COMISSÃO ════════ -->
 <div class="panel res-scope" id="panel-comissao">
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-title"><span>Tudo Sobre Promos</span></div>
-    <div class="login-sub">Painel de Resultados &middot; acesso restrito</div>
-
-    <div id="etapa-email">
-      <div class="login-label">E-mail</div>
-      <input class="login-input" id="login-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
-      <div class="login-msg" id="login-msg"></div>
-      <button class="login-btn" id="login-btn" onclick="enviarCodigo()">Enviar código</button>
-    </div>
-
-    <div id="etapa-codigo" style="display:none">
-      <div class="login-label">Código enviado por e-mail</div>
-      <input class="login-input codigo" id="login-codigo" type="text" inputmode="numeric" maxlength="6" placeholder="000000"/>
-      <div class="login-msg" id="login-msg2"></div>
-      <button class="login-btn" id="login-btn2" onclick="validarCodigo()">Entrar</button>
-      <button class="login-link" onclick="voltarEmail()">Usar outro e-mail</button>
-    </div>
-  </div>
-</div>
-
-
 <div id="app-content" style="display:none">
   <div id="loading-overlay">
     <div class="spinner"></div>
@@ -1615,6 +1635,14 @@
     </div>
     <div id="awin-previa" style="margin-top:12px"></div>
     <p class="send-ok" id="awin-status"></p>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:8px">🔒 Sessão</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      Conectado como <b id="cfg-email-logado">—</b>. O acesso vale por 24h neste dispositivo.
+    </p>
+    <button class="btn btn-rej btn-sm" onclick="sairDaConta()">Sair da conta</button>
   </div>
 
   <button class="btn" id="cfg-btn" onclick="cfgSalvar()">Salvar configurações</button>
@@ -6077,6 +6105,8 @@ async function validarCodigo(){
     var d = await r.json();
     if(d.ok){
       localStorage.setItem(AUTH_KEY, JSON.stringify({ email: d.email, ts: Date.now() }));
+      var elEmail = document.getElementById('cfg-email-logado');
+      if (elEmail) elEmail.textContent = d.email || '';
       abrirPainel();
       return;
     }
@@ -6102,22 +6132,39 @@ document.getElementById('login-codigo').addEventListener('keydown', function(e){
 var _resCarregado = false;
 
 function resAbrir(qual) {
-  if (!lerSessao()) {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app-content').style.display  = 'none';
-    return;
-  }
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-content').style.display  = 'block';
+  // O acesso ja foi resolvido no portao; aqui so falta buscar os dados na
+  // primeira vez que a aba e aberta.
+  document.getElementById('app-content').style.display = 'block';
   if (!_resCarregado) { _resCarregado = true; loadAll(); }
   else showPage(qual);
 }
 
+// O login deixou de ser da aba de resultados e virou o portao do painel: sem
+// sessao valida nao ha aba nenhuma para abrir.
 function abrirPainel(){
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-content').style.display  = 'block';
-  if (!_resCarregado) { _resCarregado = true; loadAll(); }
+  document.body.classList.remove('travado');
+  var app = document.getElementById('app-content');
+  if (app) app.style.display = 'block';
 }
+
+function sairDaConta(){
+  try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+  document.body.classList.add('travado');
+  document.getElementById('etapa-codigo').style.display = 'none';
+  document.getElementById('etapa-email').style.display  = 'block';
+  document.getElementById('login-codigo').value = '';
+  _msg('login-msg',''); _msg('login-msg2','');
+}
+
+// Decide no carregamento: sessao valida entra direto, senao fica no portao.
+(function inicioComAuth(){
+  var s = lerSessao();
+  if (s) {
+    abrirPainel();
+    var el = document.getElementById('cfg-email-logado');
+    if (el) el.textContent = s.email || '';
+  }
+})();
 
 </script>
 </body>
