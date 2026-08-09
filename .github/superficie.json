@@ -1,0 +1,55 @@
+{
+  "limiarRemocao": 150,
+  "arquivos": {
+    "index.html": {
+      "minLinhas": 5490,
+      "obrigatorio": [
+        "async function aprovarFila(",
+        "async function atualizarBadge(",
+        "async function buscarProduto(",
+        "async function carregarCenso(",
+        "async function carregarCensoHist(",
+        "async function carregarDist(",
+        "async function carregarFila(",
+        "async function carregarGrupos(",
+        "async function carregarPapeis(",
+        "async function distRenovar(",
+        "async function distSincronizar(",
+        "async function enviarCodigo(",
+        "async function enviarWA(",
+        "async function excluirDist(",
+        "async function fetchSheet(",
+        "async function forcarReconexao(",
+        "async function limparFilaPendente(",
+        "async function loadAll(",
+        "async function montarCombo(",
+        "async function rejeitarFila(",
+        "async function removerImagem(",
+        "async function salvarDist(",
+        "async function salvarPapeis(",
+        "async function validarCodigo(",
+        "function _fetchTimeout("
+      ]
+    },
+    "painel.html": {
+      "minLinhas": 1408,
+      "obrigatorio": [
+        "async function enviarCodigo(",
+        "async function fetchSheet(",
+        "async function loadAll(",
+        "async function validarCodigo(",
+        "function _msg(",
+        "function abrirPainel(",
+        "function avgMes(",
+        "function avgMonths(",
+        "function calcCPM(",
+        "function crescimento(",
+        "function cumCliques(",
+        "function cumComis(",
+        "function dateKey(",
+        "function fillPlat(",
+        "function fmtDate("
+      ]
+    }
+  }
+}
