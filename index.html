@@ -6129,7 +6129,9 @@ async function validarCodigo(){
   try{
     var r = await fetch(AUTH_PROXY + '/admin/verificar-codigo', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email: _authEmail, codigo: codigo })
+      // app na verificação também: é aqui que a autorização de OPERADOR é
+      // checada e que o token de sessão do operador é cunhado.
+      body: JSON.stringify({ email: _authEmail, codigo: codigo, app: 'tsp' })
     });
     var d = await r.json();
     if(d.ok){
