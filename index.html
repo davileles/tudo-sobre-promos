@@ -1508,11 +1508,14 @@
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">👥 Grupos especiais</p>
     <div class="aviso" style="margin-bottom:12px">
-      <b>Padrão</b> recebe os envios quando nenhum destino está marcado. <b>Só-cupons</b> recebe cópia de todo cupom com o
-      rodapé cruzado. <b>Operador</b> recebe avisos internos (falhas, resumos) — nunca use um grupo de clientes.
+      Ofertas vão para os grupos marcados como <b>destino</b> na aba Grupos. <b>Só-cupons</b> recebem apenas cupons
+      (nunca oferta de produto), com o rodapé cruzado — podem ser vários. <b>Operador</b> recebe avisos internos
+      (falhas, resumos) — nunca use um grupo de clientes.
     </div>
-    <div class="field" style="margin-bottom:12px"><label>Grupo padrão de envio</label><select id="cfg-gr-padrao"></select></div>
-    <div class="field" style="margin-bottom:12px"><label>Grupo só-cupons</label><select id="cfg-gr-cupons"></select></div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Grupos só-cupons <span class="tag">marque quantos quiser</span></label>
+      <div id="cfg-gr-cupons-lista" style="max-height:220px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:8px"></div>
+    </div>
     <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
   </div>
 
@@ -1524,6 +1527,20 @@
     </div>
     <div class="field"><label>Bloqueios</label>
       <textarea id="cfg-tg-ignorados" rows="3" spellcheck="false" placeholder="canalindesejado&#10;123456789"></textarea></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🔑 Credenciais dos serviços</p>
+    <div class="aviso" style="margin-bottom:12px">
+      Configure aqui em vez de mexer no Railway. Campo em branco = mantém o que já está gravado; digite
+      <b>--</b> para apagar uma credencial. Por segurança o valor nunca é devolvido para a tela — só os
+      últimos 4 caracteres.
+    </div>
+    <div id="cred-campos"></div>
+    <p style="font-size:10.5px;color:var(--muted2);margin-top:4px;line-height:1.5">
+      Telegram e GitHub só passam a valer no próximo restart do servidor; os demais valem na hora.
+    </p>
+    <p class="send-ok" id="cred-status"></p>
   </div>
 
   <div class="card">
@@ -3761,10 +3778,15 @@ function cfgAplicar(c) {
   }
 }
 
+var CRED_ESTADO = {};
 function cfgCarregarServidor() {
   return fetch(SERVER + '/config-tsp?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if (d.ok && d.config) cfgAplicar(d.config); })
+    .then(function(d){
+      if (d.ok && d.config) cfgAplicar(d.config);
+      // Só o ESTADO das credenciais vem do servidor — o valor nunca volta.
+      if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
+    })
     .catch(function(){ /* mantém os fallbacks */ });
 }
 cfgCarregarServidor();
@@ -3912,6 +3934,59 @@ function awinVarrer() {
     }).catch(function(e){ st.style.color = 'var(--red)'; st.textContent = 'Erro: ' + e.message; });
 }
 
+// Cada credencial com o rotulo que o operador reconhece e onde ela e obtida.
+// Sem isso, "AMZ_CLIENT_SECRET" nao diz de qual painel da Amazon veio.
+var CRED_CAMPOS = [
+  { g: 'Awin', k: 'AWIN_TOKEN',        r: 'Token da API',        d: 'Awin > seu usuário > API credentials' },
+  { g: 'Awin', k: 'AWIN_PUBLISHER_ID', r: 'Publisher ID',        d: 'número da sua conta de publisher' },
+  { g: 'Awin', k: 'AWIN_FEED_APIKEY',  r: 'API key dos feeds',   d: 'Awin > Toolbox > Create-a-Feed' },
+  { g: 'Shopee', k: 'SHOPEE_APP_ID',   r: 'App ID',              d: 'painel de afiliado Shopee' },
+  { g: 'Shopee', k: 'SHOPEE_SECRET',   r: 'Secret',              d: 'painel de afiliado Shopee' },
+  { g: 'Mercado Livre', k: 'ML_CLIENT_ID',     r: 'Client ID',   d: 'devcenter do Mercado Livre' },
+  { g: 'Mercado Livre', k: 'ML_CLIENT_SECRET', r: 'Client Secret', d: 'devcenter do Mercado Livre' },
+  { g: 'Mercado Livre', k: 'ML_AFF_TOKEN',     r: 'Token de afiliado', d: 'usado para gerar os links' },
+  { g: 'Mercado Livre', k: 'ML_TAG',           r: 'Tag de afiliado', d: 'identificador da sua conta' },
+  { g: 'Amazon', k: 'AMZ_CLIENT_ID',     r: 'Client ID',     d: 'Amazon PA-API' },
+  { g: 'Amazon', k: 'AMZ_CLIENT_SECRET', r: 'Client Secret', d: 'Amazon PA-API' },
+  { g: 'Amazon', k: 'AMZ_PARTNER_TAG',   r: 'Partner tag',   d: 'ex.: seusite-20' },
+  { g: 'Magazine Luiza', k: 'MAGALU_LOJA', r: 'Nome da loja no Magazine Você', d: 'aparece na URL do seu link' },
+  { g: 'Outros', k: 'ANTHROPIC_API_KEY', r: 'Chave da Anthropic', d: 'leitura de cupons por IA' },
+  { g: 'Outros', k: 'TG_API_ID',   r: 'Telegram API ID',   d: 'my.telegram.org — exige restart' },
+  { g: 'Outros', k: 'TG_API_HASH', r: 'Telegram API hash', d: 'my.telegram.org — exige restart' },
+  { g: 'Outros', k: 'GITHUB_TOKEN', r: 'Token do GitHub', d: 'backup dos dados — exige restart' },
+  { g: 'Outros', k: 'GITHUB_REPO_DADOS', r: 'Repositório de dados', d: 'usuario/repo (privado!)' }
+];
+
+function credPreencher(estado) {
+  var box = document.getElementById('cred-campos');
+  if (!box) return;
+  estado = estado || {};
+  var html = '', grupoAtual = '';
+  CRED_CAMPOS.forEach(function(c) {
+    if (c.g !== grupoAtual) {
+      grupoAtual = c.g;
+      html += '<p style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;'
+            + 'letter-spacing:.4px;margin:14px 0 8px">' + c.g + '</p>';
+    }
+    var e = estado[c.k] || {};
+    var marca = e.preenchida
+      ? '<span class="tag" style="color:var(--green)">' + (e.origem === 'painel' ? 'salva' : 'Railway') + ' ' + (e.sufixo || '') + '</span>'
+      : '<span class="tag" style="color:var(--red)">não configurada</span>';
+    html += '<div class="field" style="margin-bottom:10px"><label>' + c.r + ' ' + marca + '</label>'
+         + '<input type="password" autocomplete="new-password" id="cred-' + c.k + '" placeholder="' + c.d + '"/></div>';
+  });
+  box.innerHTML = html;
+}
+
+function credCorpo() {
+  var out = {};
+  CRED_CAMPOS.forEach(function(c) {
+    var el = document.getElementById('cred-' + c.k);
+    if (el && el.value.trim()) out[c.k] = el.value.trim();
+  });
+  return out;
+}
+
 function cfgPreencher() {
   var c = CFG_TSP || {};
   var a = c.afiliados || {}, r = c.rodapes || {}, g = c.grupos || {}, t = c.telegram || {};
@@ -3926,21 +4001,46 @@ function cfgPreencher() {
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-rod-cruzado').value   = r.grupoCupons || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
-  ['padrao','cupons','operador'].forEach(function(k){
-    var sel = document.getElementById('cfg-gr-' + k);
-    var atual = g[k] || '';
-    var html = '';
-    var achou = false;
-    GRUPOS_CACHE.forEach(function(gr){
-      if (gr.id === atual) achou = true;
-      html += '<option value="' + gr.id + '"' + (gr.id === atual ? ' selected' : '') + '>'
-            + (gr.nome || gr.id.split('@')[0]) + '</option>';
-    });
-    // Grupo configurado que a sessão atual não enxerga (ex.: WhatsApp desconectado):
-    // mantém o valor em vez de trocar silenciosamente para o primeiro da lista.
-    if (atual && !achou) html = '<option value="' + atual + '" selected>' + atual.split('@')[0] + ' (fora da sessão)</option>' + html;
-    sel.innerHTML = html || '<option value="">(conecte o WhatsApp para listar)</option>';
+  // Operador continua sendo UM grupo — é o canal de avisos internos.
+  var selOp = document.getElementById('cfg-gr-operador');
+  var atualOp = g.operador || '';
+  var htmlOp = '', achouOp = false;
+  GRUPOS_CACHE.forEach(function(gr){
+    if (gr.id === atualOp) achouOp = true;
+    htmlOp += '<option value="' + gr.id + '"' + (gr.id === atualOp ? ' selected' : '') + '>'
+           + (gr.nome || gr.id.split('@')[0]) + '</option>';
   });
+  // Grupo configurado que a sessão atual não enxerga (ex.: WhatsApp desconectado):
+  // mantém o valor em vez de trocar silenciosamente para o primeiro da lista.
+  if (atualOp && !achouOp) htmlOp = '<option value="' + atualOp + '" selected>' + atualOp.split('@')[0] + ' (fora da sessão)</option>' + htmlOp;
+  selOp.innerHTML = htmlOp || '<option value="">(conecte o WhatsApp para listar)</option>';
+
+  // Só-cupons virou lista: podem ser vários grupos, então caixas em vez de select.
+  var marcados = Array.isArray(g.cupons) ? g.cupons : (g.cupons ? [g.cupons] : []);
+  var box = document.getElementById('cfg-gr-cupons-lista');
+  var linhas = GRUPOS_CACHE.map(function(gr){
+    var on = marcados.indexOf(gr.id) >= 0;
+    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:12.5px;'
+      + 'font-weight:500;text-transform:none;letter-spacing:0;color:var(--txt);margin:0;cursor:pointer">'
+      + '<input type="checkbox" value="' + gr.id + '"' + (on ? ' checked' : '')
+      + ' style="width:auto;accent-color:var(--accent)"/> ' + (gr.nome || gr.id.split('@')[0]) + '</label>';
+  });
+  // Grupo marcado que a sessão não enxerga não pode sumir da tela: sumir aqui
+  // equivale a desmarcá-lo no próximo salvamento.
+  marcados.forEach(function(jid){
+    if (GRUPOS_CACHE.some(function(gr){ return gr.id === jid; })) return;
+    linhas.unshift('<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:12.5px;'
+      + 'font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);margin:0;cursor:pointer">'
+      + '<input type="checkbox" value="' + jid + '" checked style="width:auto;accent-color:var(--accent)"/> '
+      + jid.split('@')[0] + ' (fora da sessão)</label>');
+  });
+  box.innerHTML = linhas.join('') || '<p style="font-size:11.5px;color:var(--muted2);margin:4px">Conecte o WhatsApp para listar os grupos.</p>';
+}
+
+function cfgGruposCupons() {
+  var box = document.getElementById('cfg-gr-cupons-lista');
+  if (!box) return [];
+  return Array.prototype.slice.call(box.querySelectorAll('input:checked')).map(function(i){ return i.value; });
 }
 
 function cfgSalvar() {
@@ -3962,10 +4062,10 @@ function cfgSalvar() {
       grupoCupons: document.getElementById('cfg-rod-cruzado').value
     },
     grupos: {
-      padrao:   document.getElementById('cfg-gr-padrao').value,
-      cupons:   document.getElementById('cfg-gr-cupons').value,
+      cupons:   cfgGruposCupons(),
       operador: document.getElementById('cfg-gr-operador').value
     },
+    credenciais: credCorpo(),
     telegram: {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
         .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
@@ -3979,6 +4079,7 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
+    if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
     // A Awin tem endpoint proprio: o botao unico salva as duas coisas para o
     // operador nao precisar lembrar de dois lugares.
