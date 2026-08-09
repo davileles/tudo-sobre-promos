@@ -6199,6 +6199,10 @@ function abrirPainel(){
   document.body.classList.remove('travado');
   var app = document.getElementById('app-content');
   if (app) app.style.display = 'block';
+  // Recarrega a config JA AUTENTICADO: a chamada do boot sai antes do token
+  // existir e o servidor responde como operacao padrao — e daqui que vem a
+  // identidade do operador (abas ocultas, nome, links, rodapes dele).
+  cfgCarregarServidor();
 }
 
 function sairDaConta(){
