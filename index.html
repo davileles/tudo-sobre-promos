@@ -598,9 +598,10 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
-  <div class="side-group">Resultados</div>
+  <div class="side-group" id="grp-resultados">Resultados</div>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
+  <div class="side-group">Sistema</div>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
 </div>
 
@@ -3816,7 +3817,7 @@ var TENANT_ATUAL = null;
 function aplicarVisaoOperador(t) {
   TENANT_ATUAL = t;
   if (!t || t.id === 'tsp') return;
-  ['tab-comissao', 'tab-trafego'].forEach(function (id) {
+  ['grp-resultados', 'tab-comissao', 'tab-trafego'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
