@@ -6051,6 +6051,35 @@ async function loadAll() {
 
 // ── LOGIN (OTP por e-mail via proxy CDV) ─────────────────────────────────────
 const AUTH_PROXY = 'https://cdv-proxy-production.up.railway.app';
+
+/* ── Token do operador (fase 2.5) ──
+   Toda chamada ao baileys-server leva o token da sessão: é ele que diz ao
+   servidor QUAL operador está falando. Sem token (sessão antiga/admin sem
+   segredo configurado) tudo segue como operação padrão — comportamento atual. */
+function tokenOperadorTsp() {
+  try {
+    var s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    return (s && s.token) || null;
+  } catch (e) { return null; }
+}
+(function () {
+  var _fetch = window.fetch;
+  window.fetch = function (url, opts) {
+    try {
+      if (typeof url === 'string' && url.indexOf(SERVER) === 0) {
+        var tk = tokenOperadorTsp();
+        if (tk) {
+          opts = opts || {};
+          var h = {}; var ho = opts.headers || {};
+          if (ho.forEach) { ho.forEach(function (v, k) { h[k] = v; }); } else { for (var k in ho) h[k] = ho[k]; }
+          h['X-TSP-Token'] = tk;
+          opts.headers = h;
+        }
+      }
+    } catch (e) {}
+    return _fetch.call(this, url, opts);
+  };
+})();
 const AUTH_KEY   = 'tsp_auth';
 const AUTH_TTL   = 24 * 60 * 60 * 1000; // 24h
 let _authEmail = '';
@@ -6104,7 +6133,7 @@ async function validarCodigo(){
     });
     var d = await r.json();
     if(d.ok){
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: d.email, ts: Date.now() }));
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ email: d.email, token: d.tenantToken || null, ts: Date.now() }));
       var elEmail = document.getElementById('cfg-email-logado');
       if (elEmail) elEmail.textContent = d.email || '';
       abrirPainel();
