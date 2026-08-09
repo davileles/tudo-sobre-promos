@@ -2456,7 +2456,7 @@ function renderContas() {
         + (c.ultimoErro ? '<div class="mon-campo"><label>Último erro</label><span style="font-size:12px;color:#f87171">' + esc(c.ultimoErro) + '</span></div>' : '')
         + '<div class="mon-campo" style="justify-content:flex-end"><div style="display:flex;gap:8px;flex-wrap:wrap">'
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
-            + SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr') + '">QR</a>'
+            + urlComToken(SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr')) + '">QR</a>'
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="excluirConta(\'' + esc(c.id) + '\')">Excluir</button>')
         + '</div></div>'
@@ -2483,7 +2483,7 @@ function conectarContaNova() {
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) throw new Error(d.erro || 'falhou');
-      window.open(SERVER + '/contas/' + encodeURIComponent(id) + '/qr', '_blank');
+      window.open(urlComToken(SERVER + '/contas/' + encodeURIComponent(id) + '/qr'), '_blank');
       s.textContent = '✓ Escaneie o QR na aba que abriu. Depois use Atualizar.';
       setTimeout(carregarContas, 8000);
     })
@@ -6094,6 +6094,13 @@ const AUTH_PROXY = 'https://cdv-proxy-production.up.railway.app';
    Toda chamada ao baileys-server leva o token da sessão: é ele que diz ao
    servidor QUAL operador está falando. Sem token (sessão antiga/admin sem
    segredo configurado) tudo segue como operação padrão — comportamento atual. */
+// Para páginas abertas em ABA PRÓPRIA (QR, tg-auth): header não vai, então o
+// token segue na query — o servidor aceita ?tsp_token= exatamente para isso.
+function urlComToken(url) {
+  var tk = tokenOperadorTsp();
+  if (!tk) return url;
+  return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'tsp_token=' + encodeURIComponent(tk);
+}
 function tokenOperadorTsp() {
   try {
     var s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
