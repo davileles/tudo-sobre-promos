@@ -2968,28 +2968,59 @@ function cadastrarVitrine(destino){
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    var salvos = d.salvos || [];
+    var brutos = d.salvos || [];
     var erros  = d.erros || [];
+
+    // A base guarda um item por asin: dois links diferentes do mesmo produto
+    // viram UM cadastro so. Contar linhas aqui dizia '28 cadastrado(s)' e a
+    // selecao logo abaixo mostrava 25 — a divergencia nao era erro, era link
+    // repetido. O numero que vale e o de produtos distintos.
+    var vistos = {}, salvos = [], repetidos = [];
+    brutos.forEach(function(s){
+      if (vistos[s.asin]) { repetidos.push(s); return; }
+      vistos[s.asin] = s;
+      salvos.push(s);
+    });
+
     ok.className = erros.length ? 'send-ok send-err' : 'send-ok';
-    ok.textContent = salvos.length + ' cadastrado(s)'
+    ok.textContent = salvos.length + ' produto(s) cadastrado(s)'
+      + (repetidos.length ? ' · ' + repetidos.length + ' link(s) repetidos (detalhe abaixo)' : '')
       + (erros.length ? ' · ' + erros.length + ' com problema (detalhe abaixo)' : '');
 
     // Motivo colado ao link que falhou. Juntar tudo num paragrafo so escondia
     // qual dos 18 links era o problema.
     var box = document.getElementById('vit-cad-erros');
-    if (!erros.length) { box.style.display = 'none'; box.innerHTML = ''; }
+    if (!erros.length && !repetidos.length) { box.style.display = 'none'; box.innerHTML = ''; }
     else {
       box.style.display = 'block';
-      box.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">'
-        + erros.length + ' link(s) não entraram na base</div>'
-        + erros.map(function(e){
-            return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
-              + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
-              + esc(e.linha || '(linha vazia)') + '</div>'
-              + '<div style="color:var(--red)">↳ ' + esc(e.erro || 'falhou') + '</div>'
-            + '</div>';
-          }).join('')
-        + '<button class="btn btn-copy btn-sm" style="margin-top:8px" onclick="reporFalhasVitrine()">↩ Devolver só estes links ao campo</button>';
+      var htmlBox = '';
+      if (erros.length) {
+        htmlBox += '<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">'
+          + erros.length + ' link(s) não entraram na base</div>'
+          + erros.map(function(e){
+              return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
+                + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
+                + esc(e.linha || '(linha vazia)') + '</div>'
+                + '<div style="color:var(--red)">↳ ' + esc(e.erro || 'falhou') + '</div>'
+              + '</div>';
+            }).join('')
+          + '<button class="btn btn-copy btn-sm" style="margin-top:8px" onclick="reporFalhasVitrine()">↩ Devolver só estes links ao campo</button>';
+      }
+      if (repetidos.length) {
+        htmlBox += '<div style="font-size:11px;font-weight:700;color:var(--muted);margin:'
+          + (erros.length ? '12px 0 6px' : '0 0 6px') + '">'
+          + repetidos.length + ' link(s) apontavam para produto já da leva — cadastrado uma vez só</div>'
+          + repetidos.map(function(s){
+              var orig = vistos[s.asin] || {};
+              return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
+                + '<div style="font-family:ui-monospace,Menlo,monospace;color:var(--muted);word-break:break-all">'
+                + esc(s.linha || s.asin) + '</div>'
+                + '<div style="color:var(--muted)">↳ mesmo produto de “'
+                + esc(orig.nome || s.nome || s.asin) + '”</div>'
+              + '</div>';
+            }).join('');
+      }
+      box.innerHTML = htmlBox;
       // Guarda as linhas para o botao de reenvio, sem depender do textarea.
       VIT_FALHAS = erros.map(function(e){ return e.linha; }).filter(Boolean);
     }
