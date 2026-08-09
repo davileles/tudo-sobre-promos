@@ -3816,11 +3816,11 @@ var TENANT_ATUAL = null;
 function aplicarVisaoOperador(t) {
   TENANT_ATUAL = t;
   if (!t || t.id === 'tsp') return;
-  ['tab-dist', 'tab-comissao', 'tab-trafego'].forEach(function (id) {
+  ['tab-comissao', 'tab-trafego'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  ['panel-dist', 'panel-comissao', 'panel-trafego'].forEach(function (id) {
+  ['panel-comissao', 'panel-trafego'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el && el.classList.contains('active')) switchTab('fila');
   });
@@ -6088,7 +6088,7 @@ function tokenOperadorTsp() {
   var _fetch = window.fetch;
   window.fetch = function (url, opts) {
     try {
-      if (typeof url === 'string' && url.indexOf(SERVER) === 0) {
+      if (typeof url === 'string' && (url.indexOf(SERVER) === 0 || url.indexOf(DIST_PROXY) === 0)) {
         var tk = tokenOperadorTsp();
         if (tk) {
           opts = opts || {};
