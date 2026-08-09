@@ -984,6 +984,7 @@
       <span class="card-title" style="flex:1">📈 Evolução de membros</span>
       <select id="censo-gr-modo" onchange="renderCensoGrafico()" style="max-width:150px">
         <option value="total">Total somado</option>
+        <option value="variacao">Variação por dia</option>
         <option value="grupos">Por grupo</option>
       </select>
       <select id="censo-gr-dias" onchange="carregarCensoHist()" style="max-width:120px">
@@ -1965,8 +1966,9 @@ async function carregarCensoHist(){
     var d = await r.json();
     if (!d.ok) throw new Error(d.erro || 'falha');
     CENSO_HIST = d;
-    // Um único ponto não desenha evolução nenhuma: só mostra o card a partir do segundo dia.
-    card.style.display = (d.serie && d.serie.length >= 2) ? 'block' : 'none';
+    // Com um ponto só o gráfico ainda não desenha curva, mas o card aparece
+    // mostrando a medição do dia — o aviso explica que a série está começando.
+    card.style.display = (d.serie && d.serie.length >= 1) ? 'block' : 'none';
     if (card.style.display === 'block') renderCensoGrafico();
   } catch(e){ card.style.display = 'none'; }
 }
@@ -1979,34 +1981,50 @@ function renderCensoGrafico(){
   var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
   var grade  = escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
   var texto  = escuro ? '#9aa0aa' : '#6b7280';
+  // Serie de 1 ponto nao desenha linha: engorda o ponto para nao ficar um card vazio.
+  var raio   = serie.length < 2 ? 4 : 2;
+  var tipo   = 'line';
   var ds;
 
   if (modo === 'total'){
     ds = [{ label:'Total', data: serie.map(function(p){ return p.total; }),
             borderColor:'#ff9900', backgroundColor:'rgba(255,153,0,.14)',
-            fill:true, tension:.3, pointRadius:2, borderWidth:2 }];
+            fill:true, tension:.3, pointRadius:raio, borderWidth:2 }];
+  } else if (modo === 'variacao'){
+    // Quanto o total subiu ou caiu de um dia para o outro. O primeiro ponto da
+    // serie nao tem dia anterior para comparar, entao fica vazio.
+    tipo = 'bar';
+    var deltas = serie.map(function(p, i){ return i === 0 ? null : (p.total - serie[i-1].total); });
+    var cor = function(v, a){ return v == null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,' + a + ')' : 'rgba(244,101,74,' + a + ')'); };
+    ds = [{ label:'Variação', data: deltas,
+            backgroundColor: deltas.map(function(v){ return cor(v, '.55'); }),
+            borderColor:     deltas.map(function(v){ return cor(v, '1'); }),
+            borderWidth:1 }];
   } else {
     ds = (CENSO_HIST.grupos || []).map(function(g, i){
       return { label: g.nome || g.jid.split('@')[0],
                data: serie.map(function(p){ return p.grupos[g.jid]; }),
                borderColor: CENSO_CORES[i % CENSO_CORES.length],
                backgroundColor:'transparent', fill:false, tension:.3,
-               pointRadius:2, borderWidth:2, spanGaps:true };
+               pointRadius:raio, borderWidth:2, spanGaps:true };
     });
   }
 
   var ctx = document.getElementById('censo-chart');
   if (CENSO_CHART) CENSO_CHART.destroy();
   CENSO_CHART = new Chart(ctx, {
-    type:'line',
+    type:tipo,
     data:{ labels: labels, datasets: ds },
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
       plugins:{
-        legend:{ display: modo !== 'total', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
+        legend:{ display: modo === 'grupos', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
         tooltip:{ callbacks:{ label:function(it){
-          return it.dataset.label + ': ' + (it.parsed.y == null ? '—' : it.parsed.y.toLocaleString('pt-BR'));
+          if (it.parsed.y == null) return it.dataset.label + ': —';
+          var v = it.parsed.y;
+          var txt = (modo === 'variacao' && v > 0 ? '+' : '') + v.toLocaleString('pt-BR');
+          return it.dataset.label + ': ' + txt;
         } } }
       },
       scales:{
@@ -2019,6 +2037,8 @@ function renderCensoGrafico(){
   var av = document.getElementById('censo-gr-aviso');
   var nAgr = serie.filter(function(p){ return p.agregado; }).length;
   av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)'
+    + (serie.length < 2 ? ' · série ainda começando: a curva aparece a partir da segunda medição' : '')
+    + (modo === 'variacao' ? ' · barras = quanto o total subiu ou caiu em relação ao dia anterior' : '')
     + (nAgr ? ' · ' + nAgr + ' ponto(s) do histórico importado só têm o total somado — sem quebra por grupo' : '');
 }
 
