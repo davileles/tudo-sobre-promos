@@ -3809,6 +3809,27 @@ function cfgAplicar(c) {
 }
 
 var CRED_ESTADO = {};
+/* Abas exclusivas da operação padrão: Distribuidor, Comissão e Tráfego pago
+   são infraestrutura do administrador (planilhas, contas e grupos DELE).
+   Operador não vê — e se estiver numa delas ao logar, volta para a Fila. */
+var TENANT_ATUAL = null;
+function aplicarVisaoOperador(t) {
+  TENANT_ATUAL = t;
+  if (!t || t.id === 'tsp') return;
+  ['tab-dist', 'tab-comissao', 'tab-trafego'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  ['panel-dist', 'panel-comissao', 'panel-trafego'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && el.classList.contains('active')) switchTab('fila');
+  });
+  if (t.nome) {
+    var sub = document.querySelector('.brand-sub');
+    if (sub) sub.textContent = t.nome;
+  }
+}
+
 function cfgCarregarServidor() {
   return fetch(SERVER + '/config-tsp?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
@@ -3816,6 +3837,7 @@ function cfgCarregarServidor() {
       if (d.ok && d.config) cfgAplicar(d.config);
       // Só o ESTADO das credenciais vem do servidor — o valor nunca volta.
       if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
+      if (d.tenant) aplicarVisaoOperador(d.tenant);
     })
     .catch(function(){ /* mantém os fallbacks */ });
 }
