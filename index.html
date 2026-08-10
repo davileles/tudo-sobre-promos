@@ -342,10 +342,14 @@ try {
 
   .grp-resumo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   @media(max-width:700px){ .grp-resumo{grid-template-columns:1fr} }
+  .sel-grupos-4{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:700px){ .sel-grupos-4{grid-template-columns:1fr} }
   .grp-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
   .grp-box::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
   .grp-box.fonte::before{background:var(--blue)}
   .grp-box.destino::before{background:var(--accent)}
+  .grp-box.cupons::before{background:#22c55e}
+  .grp-box.operador::before{background:var(--muted)}
   .grp-box-tit{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .grp-box-n{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:1px 8px;font-size:10px;color:var(--text)}
   .grp-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;padding:5px 0;border-bottom:1px dashed var(--border)}
@@ -952,12 +956,14 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ GRUPOS ════════ -->
 <div class="panel" id="panel-grupos">
   <div class="aviso">
-    <b>Fonte</b> é de onde as ofertas são lidas. <b>Destino</b> é para onde elas vão depois de aprovadas.
+    Cada grupo tem <b>um papel só</b>. <b>Fonte</b> é de onde as ofertas são lidas.
+    <b>Ofertas + cupons</b> recebe tudo o que é publicado. <b>Somente cupons</b> recebe cupom mas nunca
+    oferta de produto. <b>Operador</b> recebe avisos internos (falhas, resumos) — nunca use um grupo de clientes.
     Busque pelo nome nos campos abaixo — a lista vem da sessão do WhatsApp, sem precisar copiar ID de grupo.
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
   <div class="sec-label">🎯 Seleção de grupos</div>
-  <div class="g2 sel-grupos">
+  <div class="sel-grupos-4 sel-grupos">
     <div class="field sel-box">
       <label>Adicionar grupo FONTE <span class="tag">de onde as ofertas vêm</span></label>
       <input type="text" id="add-fonte" autocomplete="off" placeholder="Digite parte do nome do grupo…"
@@ -965,10 +971,22 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="sug" id="sug-fonte"></div>
     </div>
     <div class="field sel-box">
-      <label>Adicionar grupo DESTINO <span class="tag">para onde as ofertas vão</span></label>
+      <label>Adicionar grupo OFERTAS + CUPONS <span class="tag">recebe tudo</span></label>
       <input type="text" id="add-destino" autocomplete="off" placeholder="Digite parte do nome do grupo…"
              oninput="sugerirGrupos('destino')" onfocus="sugerirGrupos('destino')"/>
       <div class="sug" id="sug-destino"></div>
+    </div>
+    <div class="field sel-box">
+      <label>Adicionar grupo SOMENTE CUPONS <span class="tag">nunca recebe oferta</span></label>
+      <input type="text" id="add-cupons" autocomplete="off" placeholder="Digite parte do nome do grupo…"
+             oninput="sugerirGrupos('cupons')" onfocus="sugerirGrupos('cupons')"/>
+      <div class="sug" id="sug-cupons"></div>
+    </div>
+    <div class="field sel-box">
+      <label>Definir grupo do OPERADOR <span class="tag">avisos internos — só um</span></label>
+      <input type="text" id="add-operador" autocomplete="off" placeholder="Digite parte do nome do grupo…"
+             oninput="sugerirGrupos('operador')" onfocus="sugerirGrupos('operador')"/>
+      <div class="sug" id="sug-operador"></div>
     </div>
   </div>
 
@@ -1554,7 +1572,8 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
   <div class="aviso">
-    Identidade da <b>sua operação</b>: links de afiliado, rodapés das mensagens, grupos especiais e bloqueios do Telegram.
+    Identidade da <b>sua operação</b>: links de afiliado, rodapés das mensagens e bloqueios do Telegram.
+    Os papéis dos grupos ficam todos na aba <b>Grupos</b>.
     Tudo que você salvar aqui vale na hora para o auto-envio, a fila e os geradores — sem reiniciar nada.
   </div>
 
@@ -1593,20 +1612,6 @@ body.travado > *:not(#login-screen){display:none !important}
       <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
     <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
       <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
-  </div>
-
-  <div class="card">
-    <p class="card-title" style="margin-bottom:12px">👥 Grupos especiais</p>
-    <div class="aviso" style="margin-bottom:12px">
-      Ofertas vão para os grupos marcados como <b>destino</b> na aba Grupos. <b>Só-cupons</b> recebem apenas cupons
-      (nunca oferta de produto) — podem ser vários. <b>Operador</b> recebe avisos internos
-      (falhas, resumos) — nunca use um grupo de clientes.
-    </div>
-    <div class="field" style="margin-bottom:12px">
-      <label>Grupos só-cupons <span class="tag">selecione um ou mais</span></label>
-      <select id="cfg-gr-cupons" multiple size="7" style="height:auto;padding:8px 10px;line-height:1.9"></select>
-    </div>
-    <div class="field"><label>Grupo do operador <span class="tag">avisos internos</span></label><select id="cfg-gr-operador"></select></div>
   </div>
 
   <div class="card">
@@ -4138,10 +4143,8 @@ function anexarRodape(msg, rodape) {
 }
 
 function cfgAbrir() {
-  var pronto = GRUPOS_CACHE.length ? Promise.resolve() : carregarGrupos();
-  Promise.resolve(pronto).then(function(){
-    cfgCarregarServidor().then(cfgPreencher);
-  });
+  // Nao depende mais da lista de grupos: os papeis sairam desta aba.
+  cfgCarregarServidor().then(cfgPreencher);
   awinCarregar();
 }
 
@@ -4326,7 +4329,7 @@ function credCorpo() {
 
 function cfgPreencher() {
   var c = CFG_TSP || {};
-  var a = c.afiliados || {}, r = c.rodapes || {}, g = c.grupos || {}, t = c.telegram || {};
+  var a = c.afiliados || {}, r = c.rodapes || {}, t = c.telegram || {};
   document.getElementById('cfg-nome').value          = (c.branding && c.branding.nome) || '';
   document.getElementById('cfg-af-amazon').value     = a.amazon || '';
   document.getElementById('cfg-af-ml').value         = a.mercadolivre || '';
@@ -4337,45 +4340,6 @@ function cfgPreencher() {
   document.getElementById('cfg-rod-cupom').value     = r.cupom || '';
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
-  // Operador continua sendo UM grupo — é o canal de avisos internos.
-  var selOp = document.getElementById('cfg-gr-operador');
-  var atualOp = g.operador || '';
-  var htmlOp = '', achouOp = false;
-  GRUPOS_CACHE.forEach(function(gr){
-    if (gr.id === atualOp) achouOp = true;
-    htmlOp += '<option value="' + gr.id + '"' + (gr.id === atualOp ? ' selected' : '') + '>'
-           + (gr.nome || gr.id.split('@')[0]) + '</option>';
-  });
-  // Grupo configurado que a sessão atual não enxerga (ex.: WhatsApp desconectado):
-  // mantém o valor em vez de trocar silenciosamente para o primeiro da lista.
-  if (atualOp && !achouOp) htmlOp = '<option value="' + atualOp + '" selected>' + atualOp.split('@')[0] + ' (fora da sessão)</option>' + htmlOp;
-  selOp.innerHTML = htmlOp || '<option value="">(conecte o WhatsApp para listar)</option>';
-
-  // Só-cupons é lista: select de múltipla seleção, mesmo componente do resto
-  // do painel. Ordem alfabética, como todo dropdown do CDV.
-  var marcados = Array.isArray(g.cupons) ? g.cupons : (g.cupons ? [g.cupons] : []);
-  var selCup = document.getElementById('cfg-gr-cupons');
-  var listaCup = GRUPOS_CACHE.map(function(gr){
-    return { id: gr.id, nome: gr.nome || gr.id.split('@')[0] };
-  });
-  // Grupo escolhido que a sessão não enxerga não pode sumir da tela: sumir aqui
-  // equivale a desmarcá-lo no próximo salvamento.
-  marcados.forEach(function(jid){
-    if (listaCup.some(function(gr){ return gr.id === jid; })) return;
-    listaCup.push({ id: jid, nome: jid.split('@')[0] + ' (fora da sessão)' });
-  });
-  listaCup.sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt-BR'); });
-  selCup.innerHTML = listaCup.map(function(gr){
-    return '<option value="' + esc(gr.id) + '"'
-      + (marcados.indexOf(gr.id) >= 0 ? ' selected' : '') + '>' + esc(gr.nome) + '</option>';
-  }).join('') || '<option value="" disabled>Conecte o WhatsApp para listar os grupos.</option>';
-}
-
-function cfgGruposCupons() {
-  var sel = document.getElementById('cfg-gr-cupons');
-  if (!sel) return [];
-  return Array.prototype.slice.call(sel.selectedOptions)
-    .map(function(o){ return o.value; }).filter(Boolean);
 }
 
 function cfgSalvar() {
@@ -4395,10 +4359,9 @@ function cfgSalvar() {
       cupom:  document.getElementById('cfg-rod-cupom').value,
       oferta: document.getElementById('cfg-rod-oferta').value
     },
-    grupos: {
-      cupons:   cfgGruposCupons(),
-      operador: document.getElementById('cfg-gr-operador').value
-    },
+    // 'grupos' NAO vai aqui de proposito: os papeis sao gravados pela aba
+    // Grupos. Mandar deste formulario sobrescreveria a marcacao com o estado
+    // de uma tela que nao tem mais esses campos.
     credenciais: credCorpo(),
     telegram: {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
@@ -5344,8 +5307,36 @@ async function atualizarBadge() {
 
 /* ══════ GRUPOS ══════ */
 var GRUPOS_CACHE = [];
-var PAPEIS = {};      // jid -> 'fonte' | 'destino'
+var PAPEIS = {};      // jid -> 'fonte' | 'destino'  (vive em radar_config.json)
 var PERSIST_SERVER = false;
+
+// Os quatro papeis moram em DOIS lugares no servidor: fonte/destino em
+// radar_config.json (/mkt/config) e cupons/operador na config TSP
+// (/config-tsp). A tela unifica; a gravacao e que se divide.
+var PAPEIS_LABEL = {
+  fonte:    'fonte',
+  destino:  'ofertas + cupons',
+  cupons:   'somente cupons',
+  operador: 'operador',
+};
+
+function cfgGrupos() {
+  var g = (CFG_TSP && CFG_TSP.grupos) || {};
+  return {
+    cupons:   Array.isArray(g.cupons) ? g.cupons.slice() : (g.cupons ? [g.cupons] : []),
+    operador: g.operador || '',
+  };
+}
+
+// Papel unico e efetivo de um grupo. A ordem importa: um grupo que por engano
+// aparecesse nos dois lugares e mostrado com o papel mais restritivo, que e o
+// que o servidor de fato aplica (enviarOfertaParaDestinos pula os so-cupons).
+function papelDe(jid) {
+  var g = cfgGrupos();
+  if (jid && jid === g.operador) return 'operador';
+  if (g.cupons.indexOf(jid) >= 0) return 'cupons';
+  return PAPEIS[jid] || '';
+}
 
 async function carregarPapeis() {
   try {
@@ -5368,23 +5359,33 @@ async function carregarPapeis() {
 }
 
 async function salvarPapeis() {
-  if (!PERSIST_SERVER) { alert('Servidor indisponível — a marcação não foi salva.'); return; }
-  try {
-    var r = await fetch(SERVER+'/mkt/config', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ papeis: PAPEIS })
-    });
-    var d = await r.json();
-    if (!d.ok) throw new Error(d.erro || 'falhou');
-  } catch(e) {
-    alert('Não foi possível salvar a marcação no servidor: ' + e.message);
-    await carregarPapeis();   // volta ao estado real do servidor
-    renderGrupos();
-  }
+  if (!PERSIST_SERVER) throw new Error('servidor indisponível');
+  var r = await fetch(SERVER+'/mkt/config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ papeis: PAPEIS })
+  });
+  var d = await r.json();
+  if (!d.ok) throw new Error(d.erro || 'falhou');
+}
+
+// Grava a metade da config que vive em /config-tsp. Merge parcial no servidor:
+// mandar so 'grupos' preserva afiliados, rodapes e credenciais.
+async function salvarGruposCfg(cupons, operador) {
+  var r = await fetch(SERVER + '/config-tsp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grupos: { cupons: cupons, operador: operador } })
+  });
+  var d = await r.json();
+  if (!d.ok) throw new Error(d.erro || 'falhou');
+  if (d.config) cfgAplicar(d.config);
+  else { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
 }
 
 async function carregarGrupos(forcar) {
   await carregarPapeis();
+  // Sem a config TSP a tela nao sabe quem e so-cupons nem quem e operador, e
+  // esses grupos apareceriam como "sem papel" — convite a remarcar errado.
+  if (!CFG_TSP) { try { await cfgCarregarServidor(); } catch(e) {} }
   try {
     var r = await fetch(SERVER+'/grupos' + (forcar ? '?refresh=1' : ''), { signal: AbortSignal.timeout(30000) });
     var d = await r.json();
@@ -5406,7 +5407,10 @@ function renderResumoGrupos() {
     return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
   }
   function caixa(papel, titulo, vazio) {
-    var jids = Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === papel; });
+    var g = cfgGrupos();
+    var jids = papel === 'cupons'   ? g.cupons
+             : papel === 'operador' ? (g.operador ? [g.operador] : [])
+             : Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === papel && papelDe(j) === papel; });
     var corpo = jids.length
       ? jids.map(function(j){
           return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDe(j)) + '</span>'
@@ -5418,20 +5422,24 @@ function renderResumoGrupos() {
       + corpo + '</div>';
   }
   document.getElementById('grp-resumo').innerHTML =
-      caixa('fonte',   '📥 Fontes — de onde as ofertas vêm', 'Nenhum grupo marcado: o radar não vai capturar nada.')
-    + caixa('destino', '📤 Destinos — para onde são enviadas', 'Sem destino: as ofertas caem no grupo TSP padrão.');
+      caixa('fonte',    '📥 Fontes — de onde as ofertas vêm', 'Nenhum grupo marcado: o radar não vai capturar nada.')
+    + caixa('destino',  '📤 Ofertas + cupons — recebem tudo', 'Sem nenhum grupo aqui, o envio de oferta falha.')
+    + caixa('cupons',   '🏷️ Somente cupons — nunca recebem oferta', 'Nenhum grupo exclusivo de cupom.')
+    + caixa('operador', '🛠️ Operador — avisos internos', 'Sem grupo de operador: falhas de envio não são avisadas.');
 }
 
 // A lista completa de ~400 grupos nao e mais renderizada: era o que travava a
 // aba. A selecao passa a ser por busca, e so os grupos escolhidos aparecem.
 function renderGrupos() {
+  var g = cfgGrupos();
   var nFonte = 0, nDest = 0;
-  GRUPOS_CACHE.forEach(function(g){
-    if (PAPEIS[g.id] === 'fonte') nFonte++;
-    if (PAPEIS[g.id] === 'destino') nDest++;
+  Object.keys(PAPEIS).forEach(function(j){
+    if (papelDe(j) === 'fonte') nFonte++;
+    if (papelDe(j) === 'destino') nDest++;
   });
   var tot = document.getElementById('grupos-total');
-  if (tot) tot.textContent = nFonte + ' fonte · ' + nDest + ' destino · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
+  if (tot) tot.textContent = nFonte + ' fonte · ' + nDest + ' ofertas+cupons · '
+    + g.cupons.length + ' só-cupons · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
   renderResumoGrupos();
   renderMonitor();
 }
@@ -5450,15 +5458,16 @@ function sugerirGrupos(papel) {
   }
   var lista = GRUPOS_CACHE
     .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
-    .filter(function(g){ return PAPEIS[g.id] !== papel; })
+    .filter(function(g){ return papelDe(g.id) !== papel; })
     .slice(0, 12);
 
   if (!lista.length) {
     caixa.innerHTML = '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
   } else {
     caixa.innerHTML = lista.map(function(g){
-      var outro = PAPEIS[g.id] && PAPEIS[g.id] !== papel
-        ? '<span class="ja">hoje ' + esc(PAPEIS[g.id]) + '</span>' : '';
+      var pa = papelDe(g.id);
+      var outro = pa && pa !== papel
+        ? '<span class="ja">hoje ' + esc(PAPEIS_LABEL[pa] || pa) + '</span>' : '';
       return '<div class="sug-item" data-jid="' + esc(g.id) + '" data-papel="' + esc(papel) + '" '
         + 'onclick="escolherGrupo(this)" title="' + esc(g.nome) + '">' + esc(g.nome) + outro + '</div>';
     }).join('');
@@ -5467,17 +5476,29 @@ function sugerirGrupos(papel) {
 }
 
 function fecharSugestoes(){
-  ['fonte','destino'].forEach(function(p){
+  ['fonte','destino','cupons','operador'].forEach(function(p){
     var c = document.getElementById('sug-' + p); if (c) c.classList.remove('open');
   });
 }
 
 function escolherGrupo(el){
   var jid = el.dataset.jid, papel = el.dataset.papel;
-  var atual = PAPEIS[jid];
+  var atual = papelDe(jid);
+  var nomeDeJid = function(j){
+    var g = GRUPOS_CACHE.find(function(x){ return x.id === j; });
+    return g ? (g.nome || j) : j;
+  };
   if (atual && atual !== papel) {
-    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
-    if (!confirm('"' + (g ? g.nome : jid) + '" já é ' + atual + '. Mudar para ' + papel + '?')) return;
+    if (!confirm('"' + nomeDeJid(jid) + '" já é ' + (PAPEIS_LABEL[atual] || atual)
+      + '. Mudar para ' + (PAPEIS_LABEL[papel] || papel) + '?')) return;
+  }
+  // Operador e UM grupo só: escolher outro tira o anterior, e isso precisa
+  // ficar explícito — quem perde o papel para de receber os avisos de falha.
+  if (papel === 'operador') {
+    var antigo = cfgGrupos().operador;
+    if (antigo && antigo !== jid
+      && !confirm('O grupo de operador hoje é "' + nomeDeJid(antigo)
+        + '". Ele deixa de receber os avisos internos. Continuar?')) return;
   }
   definirPapel(jid, papel);
   document.getElementById('add-' + papel).value = '';
@@ -5489,11 +5510,36 @@ document.addEventListener('click', function(e){
   if (!e.target.closest('.sel-box')) fecharSugestoes();
 });
 
-function definirPapel(jid, papel) {
-  if (papel === 'off') delete PAPEIS[jid];
-  else PAPEIS[jid] = papel;
-  salvarPapeis();
+// Papel exclusivo: o grupo sai de onde estava antes de entrar no novo, sem
+// depender de qual dos dois arquivos guardava o papel anterior.
+async function definirPapel(jid, papel) {
+  var anterior = papelDe(jid);
+  if (anterior === papel) return;
+
+  var g = cfgGrupos();
+  var cupons   = g.cupons.filter(function(j){ return j !== jid; });
+  var operador = g.operador === jid ? '' : g.operador;
+  var mexeuCfg = (cupons.length !== g.cupons.length) || (operador !== g.operador);
+
+  delete PAPEIS[jid];
+  var mexeuPapeis = (anterior === 'fonte' || anterior === 'destino');
+
+  if (papel === 'fonte' || papel === 'destino') { PAPEIS[jid] = papel; mexeuPapeis = true; }
+  else if (papel === 'cupons')   { cupons.push(jid); mexeuCfg = true; }
+  else if (papel === 'operador') { operador = jid;   mexeuCfg = true; }
+
+  // Render otimista: a tela responde na hora e volta ao estado real do
+  // servidor se alguma das duas gravacoes falhar.
+  if (mexeuCfg) { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
   renderGrupos();
+
+  try {
+    if (mexeuPapeis) await salvarPapeis();
+    if (mexeuCfg)    await salvarGruposCfg(cupons, operador);
+  } catch(e) {
+    alert('Não foi possível salvar a marcação no servidor: ' + e.message);
+    await carregarGrupos();
+  }
 }
 
 /* ══════ INIT ══════ */
