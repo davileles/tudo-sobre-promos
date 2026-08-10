@@ -1582,6 +1582,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="fila-acoes">
       <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
       <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <button class="btn btn-copy btn-sm" onclick="resolverNomesVitrine()" title="Lê na Amazon o título dos itens que ficaram como &quot;Produto ASIN&quot;">✎ Resolver nomes</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
       <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
@@ -3216,6 +3217,28 @@ function montarFiltroLojaVitrine(){
   if (atual && nomes.indexOf(atual) >= 0) sel.value = atual;
 }
 
+// Link encurtado ou /dp/ASIN puro nao tem o nome no endereco. Quando a Creators
+// API tambem nao responde no cadastro, o item fica como "Produto B0XXXXXXXX" —
+// e isso precisa saltar aos olhos ANTES de o operador montar o disparo.
+function nomeProvisorio(nome){
+  return /^Produto [A-Z0-9]{10}$/.test(String(nome || ''));
+}
+
+function resolverNomesVitrine(){
+  var st = document.getElementById('vit-status');
+  st.textContent = 'Lendo os títulos na Amazon…';
+  fetch(SERVER + '/vitrine/nomes', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      return carregarVitrine().then(function(){
+        document.getElementById('vit-status').textContent =
+          (d.resolvidos || 0) + ' nome(s) resolvido(s)'
+          + (d.restantes ? ' · ' + d.restantes + ' sem resposta da API' : '');
+      });
+    })
+    .catch(function(e){ st.textContent = 'Erro: ' + e.message; });
+}
+
 function renderVitrine(){
   vitToggleCupomModo();
 
@@ -3246,7 +3269,8 @@ function renderVitrine(){
     return '<div class="vit' + (sel ? ' sel' : '') + '">'
       + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
       + '<div class="vit-info">'
-        + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome) + '</div>'
+        + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome)
+          + (nomeProvisorio(i.nome) ? ' <span style="color:var(--red);font-weight:700;font-size:10px">nome não lido</span>' : '') + '</div>'
         + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
       + '</div>'
       + precoVitrine(i)
