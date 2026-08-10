@@ -1420,9 +1420,19 @@ body.travado > *:not(#login-screen){display:none !important}
       <label>Links <span class="tag">um por linha</span></label>
       <textarea id="vit-links" spellcheck="false" placeholder="https://www.amazon.com.br/dp/XXXXXXXXXX&#10;https://www.mercadolivre.com.br/.../p/MLBXXXXXXXX&#10;https://shopee.com.br/product/XXXX/XXXX&#10;Nome que eu quero | https://amzn.to/xxxx&#10;Nome | https://www.magazineluiza.com.br/... | 1299,00 | 1899,00" style="min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
     </div>
-    <div class="field" style="margin-top:10px">
-      <label>Vincular cupom ao produto <span class="tag">opcional</span></label>
-      <select id="vit-cupom-novo"></select>
+    <div class="g2" style="margin-top:10px">
+      <div class="field">
+        <label>Cupom <span class="tag">vale para todos os links acima</span></label>
+        <select id="vit-cupom-modo" onchange="vitToggleCupomModo()">
+          <option value="auto">Melhor cupom &mdash; o que der maior desconto em cada produto</option>
+          <option value="fixo">Sempre este cupom &mdash; o mesmo para todos</option>
+          <option value="nenhum">Sem cupom &mdash; n&atilde;o vincula nada</option>
+        </select>
+      </div>
+      <div class="field" id="vit-cupom-fixo-wrap" style="display:none">
+        <label>Qual cupom</label>
+        <select id="vit-cupom-novo"></select>
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine('so')">➕ Só cadastrar na base</button>
@@ -1432,7 +1442,10 @@ body.travado > *:not(#login-screen){display:none !important}
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       Aceita <code>link</code> ou <code>Nome que eu quero | link</code>. Sem nome, ele é lido do próprio endereço.
       Cole os links <b>sem a sua tag de afiliado</b> — a conversão acontece a cada envio.
-      O cupom vinculado aqui é o padrão do produto; cada disparo pode substituí-lo.
+      A escolha de cupom já vai ligada para o disparo: <b>melhor cupom</b> deixa cada produto
+      receber o cupom vigente daquela loja que der o maior desconto em reais e que caiba no preço
+      dele no instante do envio; <b>sempre este cupom</b> grava o mesmo código em todos os produtos;
+      <b>sem cupom</b> não vincula nada. O formulário de disparo ainda permite trocar isso.
       <br><b>Só cadastrar</b> guarda os produtos e para por aí. <b>Disparar agora</b> abre o
       formulário de envio único já com eles marcados — sai na hora e não fica salvo.
       <b>Lista salva</b> abre o mesmo formulário no modo guardado, com nome e agendamento,
@@ -1454,9 +1467,19 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
   </div>
   <div class="card" style="padding:12px 14px;margin-bottom:10px">
-    <div class="field">
-      <label>Vincular cupom ao selecionar <span class="tag">opcional</span></label>
-      <select id="awc-cupom"></select>
+    <div class="g2">
+      <div class="field">
+        <label>Cupom <span class="tag">vale para todos os selecionados</span></label>
+        <select id="awc-cupom-modo" onchange="awcToggleCupomModo()">
+          <option value="auto">Melhor cupom &mdash; o que der maior desconto em cada produto</option>
+          <option value="fixo">Sempre este cupom &mdash; o mesmo para todos</option>
+          <option value="nenhum">Sem cupom &mdash; n&atilde;o vincula nada</option>
+        </select>
+      </div>
+      <div class="field" id="awc-cupom-fixo-wrap" style="display:none">
+        <label>Qual cupom</label>
+        <select id="awc-cupom"></select>
+      </div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       A lista é a fila que o robô usa para publicar sozinho. Escolher aqui manda o produto para a
@@ -2809,6 +2832,38 @@ function lstDiasHtml(sel){
   }).join('');
 }
 
+// Os tres modos de cupom (melhor / fixo / nenhum) valem em todo lugar onde se
+// escolhe cupom: cadastro por link, catalogo da Awin e formulario de disparo.
+// So o modo "fixo" precisa do seletor de codigo — os outros dois se resolvem
+// sozinhos no instante do envio.
+function toggleCupomModo(idModo, idWrap, idSelect){
+  var fixo = document.getElementById(idModo).value === 'fixo';
+  document.getElementById(idWrap).style.display = fixo ? 'flex' : 'none';
+  if (fixo){
+    var s = document.getElementById(idSelect);
+    var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
+  }
+}
+
+function vitToggleCupomModo(){
+  toggleCupomModo('vit-cupom-modo', 'vit-cupom-fixo-wrap', 'vit-cupom-novo');
+}
+
+function awcToggleCupomModo(){
+  toggleCupomModo('awc-cupom-modo', 'awc-cupom-fixo-wrap', 'awc-cupom');
+}
+
+// Le a escolha de cupom de um bloco de tres modos e devolve { modo, cupom } ou
+// null quando o operador pediu cupom fixo e nao escolheu nenhum — barrar aqui
+// evita cadastrar dezenas de produtos com o cupom errado (nenhum).
+function lerCupomModo(idModo, idSelect){
+  var modo = document.getElementById(idModo).value;
+  if (modo !== 'fixo') return { modo: modo, cupom: null };
+  var cod = document.getElementById(idSelect).value || '';
+  if (!cod) return null;
+  return { modo: 'fixo', cupom: cod };
+}
+
 function lstToggleCupom(){
   var fixo = document.getElementById('lst-cupom-modo').value === 'fixo';
   document.getElementById('lst-cupom-fixo-wrap').style.display = fixo ? 'flex' : 'none';
@@ -3072,7 +3127,7 @@ function opcoesCupom(){
   if (!vig.length) {
     return '<option value="">— nenhum cupom vigente (ative na aba Base de Cupons) —</option>';
   }
-  return '<option value="">— sem cupom —</option>' + vig.map(function(c){
+  return '<option value="">— escolha um cupom —</option>' + vig.map(function(c){
     var v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
     var extra = [];
     if (c.limite != null) extra.push('teto desc. R$ ' + c.limite);
@@ -3162,10 +3217,7 @@ function montarFiltroLojaVitrine(){
 }
 
 function renderVitrine(){
-  ['vit-cupom-novo'].forEach(function(id){
-    var s = document.getElementById(id); if (!s) return;
-    var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
-  });
+  vitToggleCupomModo();
 
   var el = document.getElementById('vit-lista');
   montarFiltroLojaVitrine();
@@ -3254,9 +3306,11 @@ function reporFalhasVitrine(){
 // cima, junto com os links, e nao depois de ja ter cadastrado.
 function cadastrarVitrine(destino){
   var texto = document.getElementById('vit-links').value.trim();
-  var cupom = document.getElementById('vit-cupom-novo').value || null;
   var ok = document.getElementById('vit-cad-ok');
   if (!texto) { ok.className = 'send-ok send-err'; ok.textContent = 'Cole ao menos um link.'; return; }
+  var esc0 = lerCupomModo('vit-cupom-modo', 'vit-cupom-novo');
+  if (!esc0) { ok.className = 'send-ok send-err'; ok.textContent = 'Escolha qual cupom será aplicado ou troque o modo.'; return; }
+  var modoCupom = esc0.modo, cupom = esc0.cupom;
   document.getElementById('vit-cad-erros').style.display = 'none';
   ok.className = 'send-ok';
   ok.textContent = 'Resolvendo ' + texto.split('\n').filter(function(l){ return l.trim(); }).length + ' link(s)…';
@@ -3294,7 +3348,7 @@ function cadastrarVitrine(destino){
     }
     if (salvos.length) document.getElementById('vit-links').value = '';
 
-    return aposCadastroVitrine(salvos, destino, cupom);
+    return aposCadastroVitrine(salvos, destino, cupom, modoCupom);
   })
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
 }
@@ -3303,7 +3357,7 @@ function cadastrarVitrine(destino){
 // entrou e cai no mesmo formulario de disparo do resto da aba. Vale para o
 // link colado e para o produto vindo do catalogo da Awin — um caminho so para
 // revisar cupom e intervalo.
-function aposCadastroVitrine(salvos, destino, cupom){
+function aposCadastroVitrine(salvos, destino, cupom, modoCupom){
   return carregarVitrine().then(function(){
     if (destino === 'so' || !salvos.length) return;
     VIT_SEL = {};
@@ -3313,11 +3367,13 @@ function aposCadastroVitrine(salvos, destino, cupom){
     // O tipo ja vem decidido do botao; novaLista() deixa 'unico' como padrao.
     document.getElementById('lst-tipo').value = (destino === 'salva') ? 'salva' : 'unico';
     lstToggleTipo();
-    if (cupom) {
-      document.getElementById('lst-cupom-modo').value = 'fixo';
-      lstToggleCupom();
-      document.getElementById('lst-cupom-codigo').value = cupom;
-    }
+    // A escolha feita no cadastro chega inteira no disparo: quem marcou "sem
+    // cupom" nao pode receber um cupom automatico so porque esse e o padrao do
+    // formulario.
+    var modo = modoCupom || (cupom ? 'fixo' : 'auto');
+    document.getElementById('lst-cupom-modo').value = modo;
+    lstToggleCupom();
+    if (modo === 'fixo' && cupom) document.getElementById('lst-cupom-codigo').value = cupom;
   });
 }
 
@@ -3382,10 +3438,7 @@ function awcVerMais(todos){
 var AWC_ESTADO = '';
 
 function renderAwinCand(estado){
-  ['awc-cupom'].forEach(function(id){
-    var s = document.getElementById(id); if (!s) return;
-    var a = s.value; s.innerHTML = opcoesCupom(); if (a) s.value = a;
-  });
+  awcToggleCupomModo();
 
   var st = document.getElementById('awc-status');
   var el = document.getElementById('awc-lista');
@@ -3452,8 +3505,10 @@ function atualizarBarraAwin(){
 function cadastrarAwinSel(destino){
   var chaves = Object.keys(AWC_SEL);
   if (!chaves.length) return;
-  var cupom = document.getElementById('awc-cupom').value || null;
   var st = document.getElementById('awc-status');
+  var escA = lerCupomModo('awc-cupom-modo', 'awc-cupom');
+  if (!escA) { st.textContent = 'Escolha qual cupom será aplicado ou troque o modo.'; return; }
+  var modoCupom = escA.modo, cupom = escA.cupom;
   st.textContent = 'Cadastrando ' + chaves.length + ' produto(s)…';
   fetch(SERVER + '/awin/ofertas/cadastrar', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -3467,7 +3522,7 @@ function cadastrarAwinSel(destino){
     AWC_SEL = {};
     // Recarrega a fila: os escolhidos sairam dela do lado do servidor.
     carregarAwinCand();
-    return aposCadastroVitrine(salvos, destino, cupom);
+    return aposCadastroVitrine(salvos, destino, cupom, modoCupom);
   })
   .catch(function(e){ st.textContent = 'Erro: ' + e.message; });
 }
