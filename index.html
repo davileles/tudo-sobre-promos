@@ -4959,6 +4959,10 @@ function parseDatetimeAsSP(val) {
 async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
   var el = document.getElementById(msgId);
   var texto = el.tagName==='TEXTAREA' ? el.value : el.textContent;
+  // O servidor usa isto para montar a lista de alvos: cupom sai nos grupos de
+  // destino MAIS os grupos so-cupons; oferta e mensagem livre saem so nos
+  // destinos, porque grupo so-cupons nunca recebe produto.
+  var tipoEnvio = (msgId === 'c-msg') ? 'cupom' : 'oferta';
   var s = document.getElementById(statusId);
   if (!wsConectado) { s.className='send-ok send-err'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; },4000); return; }
 
@@ -4984,6 +4988,7 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     if (file && !agendarEm) {
       var formData = new FormData();
       formData.append('imagem',file); formData.append('legenda',texto); formData.append('grupo','tsp');
+      formData.append('tipo',tipoEnvio);
       r = await fetch(SERVER+'/enviar-imagem', { method:'POST', body:formData });
     } else if (file && agendarEm) {
       // Agendado com anexo: multipart nao serve porque o arquivo precisa ficar
@@ -4995,10 +5000,10 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       }
       var b64 = await arquivoParaBase64(file);
       r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ mensagem: texto, grupo: 'tsp', agendarEm: agendarEm,
+        body: JSON.stringify({ mensagem: texto, grupo: 'tsp', tipo: tipoEnvio, agendarEm: agendarEm,
           anexo: { base64: b64, mimetype: file.type || 'image/jpeg', nomeArquivo: file.name || '' } }) });
     } else {
-      var payload = { mensagem: texto, grupo: 'tsp' };
+      var payload = { mensagem: texto, grupo: 'tsp', tipo: tipoEnvio };
       if (agendarEm) payload.agendarEm = agendarEm;
       // Oferta montada pela busca por link sai com card de preview, igual às do
       // radar — inclusive agendada: o servidor guarda os dados do card e baixa a
@@ -5016,7 +5021,10 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     }
     var d = await r.json();
     if (d.ok) {
-      s.textContent = d.agendado ? ('📅 Agendado para ' + d.horario + ' (SP)!') : '✓ Enviado no grupo!';
+      s.textContent = d.agendado
+        ? ('📅 Agendado para ' + d.horario + ' (SP)!')
+        : ('✓ Enviado em ' + (d.enviados || 1) + ' grupo(s)!'
+           + ((d.falhas && d.falhas.length) ? ' — ' + d.falhas.length + ' falha(s)' : ''));
       setTimeout(function(){ s.textContent=''; },5000);
     } else { s.className='send-ok send-err'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; },5000); }
   } catch(e) { s.className='send-ok send-err'; s.textContent='Sem resposta do servidor.'; setTimeout(function(){ s.textContent=''; },4000); }
