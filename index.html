@@ -248,7 +248,10 @@ try {
 
   /* ══ FILA ══ */
   .fila-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted);font-weight:600}
-  .fila-acoes{margin-left:auto;display:flex;gap:8px}
+  .fila-acoes{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .busca-mini{width:auto!important;min-width:180px;padding:7px 10px!important;font-size:12px!important}
+  .ver-mais{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  .ver-mais button{margin-top:0}
   .fila-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px;position:relative;transition:opacity .4s;animation:fadeUp .35s cubic-bezier(.22,.68,0,1.2) both}
   .fila-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--outra)}
   .fila-card.mk-amazon::before{background:var(--amazon)}
@@ -1444,7 +1447,8 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="awc-status">—</span>
     <div class="fila-acoes">
-      <select id="awc-loja" onchange="renderAwinCand()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <input type="text" id="awc-busca" class="busca-mini" autocomplete="off" placeholder="Buscar no catálogo…" oninput="awcFiltrar()"/>
+      <select id="awc-loja" onchange="awcFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
       <button class="btn btn-copy btn-sm" onclick="awinCandVarrer()">↻ Varrer catálogos</button>
       <button class="btn btn-copy btn-sm" onclick="carregarAwinCand()">↻ Atualizar</button>
     </div>
@@ -1553,6 +1557,8 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="vit-status">Carregando...</span>
     <div class="fila-acoes">
+      <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
+      <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
       <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
@@ -2669,6 +2675,29 @@ function salvarTurnos() {
 /* ══════ VITRINE ══════ */
 var VIT_CACHE = [], VIT_SEL = {};
 
+// A base e o catalogo da Awin passaram do tamanho em que rolar a tela ainda era
+// navegar. Em vez de cortar dados no servidor, a aba mostra um bloco por vez e
+// so estende quando o operador pede — a selecao continua sendo por item, entao
+// nada do que ja estava marcado se perde ao paginar ou filtrar.
+var VIT_PASSO = 25, VIT_VIS = VIT_PASSO;
+var AWC_PASSO = 25, AWC_VIS = AWC_PASSO;
+
+// Bloco "ver mais": um so para as duas listas, porque o problema e o mesmo.
+function blocoVerMais(mostrados, total, passo, fn){
+  if (mostrados >= total) return '';
+  var falta = total - mostrados;
+  return '<div class="ver-mais">'
+    + '<button class="btn btn-copy btn-sm" onclick="' + fn + '(false)">▾ Ver mais '
+      + Math.min(passo, falta) + ' <span style="opacity:.6">(faltam ' + falta + ')</span></button>'
+    + '<button class="btn btn-copy btn-sm" onclick="' + fn + '(true)">Mostrar todos</button>'
+    + '</div>';
+}
+
+function valorCampo(id){
+  var el = document.getElementById(id);
+  return el ? String(el.value || '') : '';
+}
+
 /* ══════ LISTAS DE REENVIO ══════ */
 var LST_CACHE = [];
 var LST_SEL   = [];      // produtos do formulario: [{asin, nome}]
@@ -3098,6 +3127,40 @@ function editarPrecoVitrine(btn){
   salvarCampoVitrine(i.asin, { preco: preco, precoDe: maior > preco ? maior : null });
 }
 
+// Busca por nome, codigo e cupom: o operador procura de todo jeito, e obrigar a
+// lembrar o ASIN exato seria pior do que rolar a lista inteira.
+function vitFiltrados(){
+  var q    = valorCampo('vit-busca').trim().toLowerCase();
+  var loja = valorCampo('vit-loja');
+  return VIT_CACHE.filter(function(i){
+    if (loja && (i.loja || 'Amazon') !== loja) return false;
+    if (!q) return true;
+    return ((i.nome || '') + ' ' + (i.asin || '') + ' ' + (i.cupom || '') + ' ' + (i.loja || ''))
+      .toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+// Trocar filtro volta ao primeiro bloco: manter 200 itens visiveis depois de
+// buscar por uma palavra seria devolver o mesmo problema.
+function vitFiltrar(){ VIT_VIS = VIT_PASSO; renderVitrine(); }
+
+function vitVerMais(todos){
+  VIT_VIS = todos ? vitFiltrados().length : VIT_VIS + VIT_PASSO;
+  renderVitrine();
+}
+
+function montarFiltroLojaVitrine(){
+  var sel = document.getElementById('vit-loja'); if (!sel) return;
+  var atual = sel.value, lojas = {};
+  VIT_CACHE.forEach(function(i){ var l = i.loja || 'Amazon'; lojas[l] = (lojas[l] || 0) + 1; });
+  var nomes = Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+  sel.innerHTML = '<option value="">Todas as lojas (' + VIT_CACHE.length + ')</option>'
+    + nomes.map(function(l){
+        return '<option value="' + esc(l) + '">' + esc(l) + ' (' + lojas[l] + ')</option>';
+      }).join('');
+  if (atual && nomes.indexOf(atual) >= 0) sel.value = atual;
+}
+
 function renderVitrine(){
   ['vit-cupom-novo'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
@@ -3105,13 +3168,28 @@ function renderVitrine(){
   });
 
   var el = document.getElementById('vit-lista');
-  document.getElementById('vit-status').textContent = VIT_CACHE.length + ' produto(s) na base';
+  montarFiltroLojaVitrine();
+
   if (!VIT_CACHE.length) {
+    document.getElementById('vit-status').textContent = '0 produto na base';
     el.innerHTML = '<div class="cup-vazio">Base vazia. Cole os links acima para começar.</div>';
     atualizarBarraVitrine(); return;
   }
 
-  el.innerHTML = VIT_CACHE.map(function(i){
+  var todos     = vitFiltrados();
+  var visiveis  = todos.slice(0, VIT_VIS);
+  var filtrando = todos.length !== VIT_CACHE.length;
+
+  document.getElementById('vit-status').textContent =
+    'mostrando ' + visiveis.length + ' de ' + todos.length
+    + (filtrando ? ' filtrado(s) · ' + VIT_CACHE.length + ' na base' : ' produto(s) na base');
+
+  if (!todos.length) {
+    el.innerHTML = '<div class="cup-vazio">Nenhum produto com esse filtro.</div>';
+    atualizarBarraVitrine(); return;
+  }
+
+  el.innerHTML = visiveis.map(function(i){
     var sel = !!VIT_SEL[i.asin];
     return '<div class="vit' + (sel ? ' sel' : '') + '">'
       + '<input type="checkbox" ' + (sel ? 'checked' : '') + ' data-asin="' + esc(i.asin) + '" onchange="selVitrine(this)"/>'
@@ -3129,7 +3207,7 @@ function renderVitrine(){
         + '<button data-asin="' + esc(i.asin) + '" onclick="removerVitrine(this)" title="Remover">🗑</button>'
       + '</div>'
     + '</div>';
-  }).join('');
+  }).join('') + blocoVerMais(visiveis.length, todos.length, VIT_PASSO, 'vitVerMais');
   atualizarBarraVitrine();
 }
 
@@ -3139,9 +3217,11 @@ function selVitrine(cb){
   atualizarBarraVitrine();
 }
 
+// Com filtro ligado, "todos" e o que esta em tela — marcar 300 itens invisiveis
+// porque o operador buscou por "fone" seria uma armadilha.
 function marcarTodosVitrine(v){
   VIT_SEL = {};
-  if (v) VIT_CACHE.forEach(function(i){ VIT_SEL[i.asin] = true; });
+  if (v) vitFiltrados().forEach(function(i){ VIT_SEL[i.asin] = true; });
   renderVitrine();
 }
 
@@ -3256,6 +3336,7 @@ function carregarAwinCand(){
       if (!d.ok) throw new Error(d.erro || 'falhou');
       AWC_CACHE = d.itens || [];
       AWC_SEL = {};
+      AWC_VIS = AWC_PASSO;
       montarFiltroLojaAwin();
       renderAwinCand(d);
     })
@@ -3278,6 +3359,28 @@ function montarFiltroLojaAwin(){
   if (atual) sel.value = atual;
 }
 
+function awcFiltrados(){
+  var q    = valorCampo('awc-busca').trim().toLowerCase();
+  var loja = valorCampo('awc-loja');
+  return AWC_CACHE.filter(function(c){
+    if (loja && c.loja !== loja) return false;
+    if (!q) return true;
+    return ((c.titulo || '') + ' ' + (c.loja || '') + ' ' + (c.cupom ? c.cupom.codigo : ''))
+      .toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function awcFiltrar(){ AWC_VIS = AWC_PASSO; renderAwinCand(); }
+
+function awcVerMais(todos){
+  AWC_VIS = todos ? awcFiltrados().length : AWC_VIS + AWC_PASSO;
+  renderAwinCand();
+}
+
+// O rodape do status guarda a idade da varredura entre renders: quem clica em
+// "ver mais" nao pode perder a informacao de quando a fila foi montada.
+var AWC_ESTADO = '';
+
 function renderAwinCand(estado){
   ['awc-cupom'].forEach(function(id){
     var s = document.getElementById(id); if (!s) return;
@@ -3286,13 +3389,10 @@ function renderAwinCand(estado){
 
   var st = document.getElementById('awc-status');
   var el = document.getElementById('awc-lista');
-  var loja = document.getElementById('awc-loja').value;
-  var itens = loja ? AWC_CACHE.filter(function(c){ return c.loja === loja; }) : AWC_CACHE;
 
   if (estado) {
     var idade = estado.idadeHoras;
-    st.textContent = AWC_CACHE.length + ' candidato(s) na fila'
-      + (idade != null ? ' · varrido há ' + idade + 'h (vence em ' + estado.validadeHoras + 'h)' : '')
+    AWC_ESTADO = (idade != null ? ' · varrido há ' + idade + 'h (vence em ' + estado.validadeHoras + 'h)' : '')
       + (estado.uso ? ' · hoje saíram ' + estado.uso.total : '');
   }
   if (!AWC_CACHE.length) {
@@ -3301,7 +3401,19 @@ function renderAwinCand(estado){
     atualizarBarraAwin(); return;
   }
 
-  el.innerHTML = itens.map(function(c){
+  var itens    = awcFiltrados();
+  var visiveis = itens.slice(0, AWC_VIS);
+
+  st.textContent = 'mostrando ' + visiveis.length + ' de ' + itens.length
+    + (itens.length !== AWC_CACHE.length ? ' filtrado(s) · ' + AWC_CACHE.length + ' na fila' : ' candidato(s) na fila')
+    + AWC_ESTADO;
+
+  if (!itens.length) {
+    el.innerHTML = '<div class="cup-vazio">Nenhum candidato com esse filtro.</div>';
+    atualizarBarraAwin(); return;
+  }
+
+  el.innerHTML = visiveis.map(function(c){
     var sel = !!AWC_SEL[c.chaveHistorico];
     var preco = 'R$ ' + fmtBRL(c.preco);
     var de = c.precoDe ? ' <span style="text-decoration:line-through;opacity:.55">R$ ' + fmtBRL(c.precoDe) + '</span>' : '';
@@ -3316,7 +3428,7 @@ function renderAwinCand(estado){
       + '</div>'
       + '<div class="vit-preco" style="text-align:right;white-space:nowrap">' + preco + de + '</div>'
     + '</div>';
-  }).join('');
+  }).join('') + blocoVerMais(visiveis.length, itens.length, AWC_PASSO, 'awcVerMais');
   atualizarBarraAwin();
 }
 
