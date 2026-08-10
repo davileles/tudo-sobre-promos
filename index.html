@@ -5070,6 +5070,9 @@ async function cancelarAgendado(id) {
 
 /* ══════ FILA ══════ */
 var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee','oferta_magalu','oferta_awin'];
+// 'on' | 'off' — lido do servidor junto com a fila. Sem isso o card nao tem
+// como dizer POR QUE a oferta esta aguardando aprovacao.
+var AUTO_OFERTA_MODO = null;
 // Nomes de grupo vêm do servidor (nunca de storage local) só para exibição.
 var NOMES_GRUPOS_CACHE = {};
 function carregarNomesGrupos(){
@@ -5082,16 +5085,26 @@ var MK_TIPO = { oferta_amazon:'mk-amazon', oferta_ml:'mk-ml', oferta_shopee:'mk-
 
 function ehTSP(o){ return TIPOS_TSP.indexOf(o.tipoConteudo) !== -1; }
 
-// Deixa explicito que o preco da mensagem ja saiu com o cupom aplicado, e sobre
-// qual valor. Sem isso o operador nao tem como conferir a conta antes de enviar.
-// Magalu nao tem API: o preco vem do texto do grupo. Sem este aviso o operador
-// aprovaria achando que o valor foi conferido, como nas outras lojas.
+// precoDeReferencia = o valor NAO foi lido do site agora. Duas origens, com
+// riscos diferentes: Magalu nao tem API e o preco vem do texto do grupo; Awin
+// entrega o preco no feed, que atrasa em relacao a loja. Nos dois casos o
+// operador precisa conferir no link — mas dizer "Magalu" numa oferta da Awin
+// (o texto antigo) fazia o aviso parecer bug e ser ignorado.
 function seloReferencia(o) {
   var d = o.dadosExtraidos || {};
   if (!d.precoDeReferencia) return '';
-  return '<div class="fila-ref">⚠️ Preço vindo do texto do grupo — a Magalu não tem API para conferir. '
-       + 'Confira no link antes de aprovar.</div>';
+  var motivo = o.tipoConteudo === 'oferta_awin'
+    ? 'veio do feed da Awin, que pode estar atrasado em relação à loja'
+    : o.tipoConteudo === 'oferta_magalu'
+      ? 'veio do texto do grupo — a Magalu não tem API para conferir'
+      : 'não foi lido da loja agora';
+  return '<div class="fila-ref">⚠️ Preço ' + motivo + '. Confira no link antes de aprovar.</div>';
 }
+
+// Oferta de produto e cupom seguem caminhos de auto-envio diferentes no
+// servidor, e so o de cupom grava autoAvaliacao. Sem esta separacao TODA oferta
+// caia no ramo "sem avaliacao" e o painel afirmava que o item era antigo.
+function ehCupom(o){ return o.tipoConteudo === 'cupom_tsp'; }
 
 function seloCupom(o) {
   var d = o.dadosExtraidos || {};
@@ -5106,6 +5119,13 @@ function seloCupom(o) {
 
 async function carregarFila() {
   if (!Object.keys(NOMES_GRUPOS_CACHE).length) await carregarNomesGrupos();
+  if (AUTO_OFERTA_MODO === null) {
+    try {
+      var rc = await fetch(SERVER+'/mkt/config?t='+Date.now(), { cache:'no-cache' });
+      var dc = await rc.json();
+      AUTO_OFERTA_MODO = dc && dc.autoEnvioOferta ? dc.autoEnvioOferta : 'off';
+    } catch(e) { AUTO_OFERTA_MODO = 'off'; }
+  }
   var lista = document.getElementById('fila-lista');
   var status = document.getElementById('fila-status');
   try {
@@ -5164,7 +5184,24 @@ async function carregarFila() {
 
       var av = o.autoAvaliacao;
       var autoSelo = '';
-      if (av) {
+      if (!ehCupom(o)) {
+        // Oferta de produto: nunca passa por avaliarAutoEnvio(). O que decide o
+        // envio direto e AUTO_ENVIO_OFERTA + preco verificado.
+        var org0 = o.grupoOrigem || o.origem || '';
+        if (org0 === 'vitrine' || org0 === 'lista') {
+          autoSelo = '<div class="fila-auto nao">✍️ <div><b>Cadastro manual</b>'
+            +'<small>Item da vitrine — auto-envio não se aplica.</small></div></div>';
+        } else if ((o.dadosExtraidos || {}).precoDeReferencia) {
+          autoSelo = '<div class="fila-auto nao">🔒 <div><b>Aprovação manual obrigatória</b>'
+            +'<small>Preço não verificado na loja — não entra em auto-envio mesmo com ele ligado.</small></div></div>';
+        } else if (AUTO_OFERTA_MODO === 'on') {
+          autoSelo = '<div class="fila-auto nao">🔒 <div><b>Não foi enviada automaticamente</b>'
+            +'<small>Auto-envio de ofertas está ligado — o envio direto falhou e o item caiu na fila.</small></div></div>';
+        } else {
+          autoSelo = '<div class="fila-auto nao">🔒 <div><b>Auto-envio de ofertas desligado</b>'
+            +'<small>Toda oferta de produto passa por aprovação manual.</small></div></div>';
+        }
+      } else if (av) {
         var motivo = (av.motivo || '').replace(/</g,'&lt;');
         if (o.autoAgendado) {
           autoSelo = '<div class="fila-auto enviado">⏳ <div><b>Aguardando auto-envio</b>'
@@ -5179,7 +5216,7 @@ async function carregarFila() {
         }
       } else {
         autoSelo = '<div class="fila-auto nao">🔒 <div><b>Sem avaliação de auto-envio</b>'
-          +'<small>Capturado antes do gate entrar no ar.</small></div></div>';
+          +'<small>Cupom capturado antes do gate entrar no ar.</small></div></div>';
       }
 
       var mk = MK_TIPO[o.tipoConteudo] || (MK[loja] || '');
