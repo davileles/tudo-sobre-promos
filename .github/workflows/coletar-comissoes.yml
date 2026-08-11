@@ -1,0 +1,38 @@
+name: Comissões de Afiliados (06h)
+
+on:
+  schedule:
+    # 09:00 UTC = 06:00 SP. A Shopee só publica o dia anterior às 17h30, e a
+    # Amazon fecha o dia à meia-noite — às 06h os três já estão prontos.
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+# Duas rodadas simultâneas gravando o mesmo JSON via API produzem lost update.
+concurrency:
+  group: coletar-comissoes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Coletar comissões do dia anterior
+        env:
+          AMAZON_COOKIE: ${{ secrets.AMAZON_COOKIE }}
+          ML_COOKIE: ${{ secrets.ML_COOKIE }}
+          SHOPEE_COOKIE: ${{ secrets.SHOPEE_COOKIE }}
+          SHOPEE_APP_ID: ${{ secrets.SHOPEE_APP_ID }}
+          SHOPEE_SECRET: ${{ secrets.SHOPEE_SECRET }}
+          GH_TOKEN_DADOS: ${{ secrets.GH_TOKEN_DADOS }}
+        run: node coletar-comissoes.js
