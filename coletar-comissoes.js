@@ -237,7 +237,12 @@ async function coletarShopee(datas) {
   const out = {};
   for (const d of datas) {
     const [cliques, vc] = await Promise.all([shopeeCliques(d), shopeeVendas(d)]);
-    out[d] = { cliques, ...vc };
+    // O relatório de cliques só consolida o dia anterior às 17h30; antes disso
+    // devolve 0. Zero com venda no mesmo dia é impossível — é dado não
+    // publicado ainda, e gravar como 0 congelaria um número errado. Vira null
+    // e a próxima rodada preenche.
+    const aindaNaoPublicado = cliques === 0 && (vc.vendas || 0) > 0;
+    out[d] = { cliques: aindaNaoPublicado ? null : cliques, ...vc };
     await new Promise((res) => setTimeout(res, 400));
   }
   return out;
@@ -270,25 +275,33 @@ async function gravarArquivo(dados, mensagem) {
   if (!r.ok) throw new Error(`gravação: status ${r.status} — ${(await r.text()).slice(0, 200)}`);
 }
 
+// Diferenças abaixo de 5 centavos são ruído de arredondamento do histórico
+// importado da planilha (a Shopee exibia "1,3mil" e virou 1300), não revisão
+// de verdade. Sem esse piso o arquivo enche de vendasRev: 517.12 contra
+// vendas: 517.1, que não informa nada.
+const PISO_REVISAO = 0.05;
+
 // Foto grava uma vez e congela; Rev acompanha as revisões da plataforma.
+// Lacuna (dia sem dado nenhum) é preenchida em qualquer ponto da janela — foi
+// o caso da Shopee em 09/08, que não existia quando o histórico foi importado.
 function aplicar(dias, plataforma, data, valores, ehFoto) {
   if (!valores) return null;
   dias[data] = dias[data] || {};
   const atual = dias[data][plataforma];
 
   if (!atual) {
-    if (!ehFoto) return null;
+    if (valores.vendas == null && valores.comissao == null) return null;
     dias[data][plataforma] = valores;
-    return 'foto';
+    return ehFoto ? 'foto' : 'lacuna';
   }
 
   let mudou = false;
   for (const [campo, chave] of [['vendas', 'vendasRev'], ['comissao', 'comissaoRev']]) {
     if (valores[campo] == null) continue;
     const ref = atual[chave] ?? atual[campo];
-    if (ref !== valores[campo]) { atual[chave] = valores[campo]; mudou = true; }
+    if (Math.abs(ref - valores[campo]) > PISO_REVISAO) { atual[chave] = valores[campo]; mudou = true; }
   }
-  // Cliques da Shopee podem chegar depois no dia D-1; completa se faltou.
+  // Cliques da Shopee só saem às 17h30; completa quando chegarem.
   if (atual.cliques == null && valores.cliques != null) { atual.cliques = valores.cliques; mudou = true; }
   return mudou ? 'revisao' : null;
 }
@@ -315,7 +328,7 @@ async function main() {
   const { dados } = await lerArquivo();
   dados.dias = dados.dias || {};
 
-  const resumo = { foto: 0, revisao: 0 };
+  const resumo = { foto: 0, lacuna: 0, revisao: 0 };
   for (const [plataforma, coletado] of Object.entries(porPlataforma)) {
     if (!coletado) continue;
     for (const [data, valores] of Object.entries(coletado)) {
@@ -327,9 +340,10 @@ async function main() {
   dados.dias = Object.fromEntries(Object.keys(dados.dias).sort().map((k) => [k, dados.dias[k]]));
   dados.atualizadoEm = new Date().toISOString();
 
-  if (resumo.foto || resumo.revisao) {
-    await gravarArquivo(dados, `chore: comissões de afiliados ${ontem} (${resumo.foto} fotos, ${resumo.revisao} revisões)`);
-    console.log(`[coleta] gravado — ${resumo.foto} fotos, ${resumo.revisao} revisões`);
+  if (resumo.foto || resumo.lacuna || resumo.revisao) {
+    const desc = `${resumo.foto} fotos, ${resumo.lacuna} lacunas, ${resumo.revisao} revisões`;
+    await gravarArquivo(dados, `chore: comissões de afiliados ${ontem} (${desc})`);
+    console.log(`[coleta] gravado — ${desc}`);
   } else {
     console.log('[coleta] nada mudou, arquivo não tocado');
   }
