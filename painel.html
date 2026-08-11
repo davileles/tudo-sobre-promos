@@ -111,6 +111,13 @@ header {
 .chart-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--orange); margin-bottom: 14px; }
 .chart-wrap { position: relative; height: 190px; }
 .grid-3 .chart-card { margin-bottom: 0; }
+/* Faixas 1fr do grid nao encolhem abaixo do min-content do filho. Um canvas do
+   Chart.js com eixo duplo tem min-content largo, entao a coluna crescia e o
+   card vazava para fora da margem direita. Only os graficos por plataforma
+   sofriam porque sao os unicos em grid-3 (coluna mais estreita) com eixo Y2. */
+.grid-2 > *, .grid-3 > *, .grid-auto > * { min-width: 0; }
+.chart-wrap { overflow: hidden; }
+.chart-wrap > canvas { max-width: 100%; display: block; }
 
 /* ── LOADING OVERLAY ── */
 #loading-overlay {
@@ -178,7 +185,7 @@ header {
 
 <div id="loading-overlay">
   <div class="spinner"></div>
-  <div class="loading-text">Carregando planilha...</div>
+  <div class="loading-text">Carregando dados...</div>
 </div>
 
 <header>
@@ -1195,8 +1202,10 @@ function renderCharts(S) {
         scales: {
           x:  { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 } }},
           y:  { position: 'left',  ticks: { callback: v => 'R$' + v.toFixed(0) }, grid: { color: '#2e2e2e' }},
-          y2: { position: 'right', ticks: { callback: v => v }, grid: { display: false },
-                title: { display: true, text: 'Cliques', color: '#60a5fa', font: { size: 9 } }},
+          // Sem title: a legenda no topo ja identifica a serie e o texto
+          // rotacionado roubava largura justamente no lado que estourava.
+          y2: { position: 'right', grid: { display: false },
+                ticks: { font: { size: 9 }, color: '#60a5fa', callback: v => v }},
         },
       },
     });
