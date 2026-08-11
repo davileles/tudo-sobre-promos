@@ -281,6 +281,13 @@ async function gravarArquivo(dados, mensagem) {
 // vendas: 517.1, que não informa nada.
 const PISO_REVISAO = 0.05;
 
+// Comissão que ainda não entrou na plataforma na hora da coleta aparece como
+// zero — acontece nas três, não só na Shopee. Congelar esse zero como foto
+// perderia o dia inteiro. Enquanto o registro estiver zerado E dentro da
+// janela, cada rodada refaz a foto do zero. Quando o número aparece, congela.
+// Se o dia foi mesmo zero, ele sai da janela zerado e fica correto.
+const zerado = (v) => !v || ((v.vendas || 0) === 0 && (v.comissao || 0) === 0);
+
 // Foto grava uma vez e congela; Rev acompanha as revisões da plataforma.
 // Lacuna (dia sem dado nenhum) é preenchida em qualquer ponto da janela — foi
 // o caso da Shopee em 09/08, que não existia quando o histórico foi importado.
@@ -290,16 +297,31 @@ function aplicar(dias, plataforma, data, valores, ehFoto) {
   const atual = dias[data][plataforma];
 
   if (!atual) {
-    if (valores.vendas == null && valores.comissao == null) return null;
+    if (valores.vendas == null && valores.comissao == null && valores.cliques == null) return null;
     dias[data][plataforma] = valores;
     return ehFoto ? 'foto' : 'lacuna';
   }
 
+  // Foto zerada ainda não é foto: reescreve até a plataforma liberar o número.
+  if (zerado(atual) && !zerado(valores)) {
+    dias[data][plataforma] = valores;
+    return 'refeita';
+  }
+  if (zerado(atual)) {
+    if (atual.cliques == null && valores.cliques != null) { atual.cliques = valores.cliques; return 'revisao'; }
+    return null;
+  }
+
   let mudou = false;
-  for (const [campo, chave] of [['vendas', 'vendasRev'], ['comissao', 'comissaoRev']]) {
-    if (valores[campo] == null) continue;
-    const ref = atual[chave] ?? atual[campo];
-    if (Math.abs(ref - valores[campo]) > PISO_REVISAO) { atual[chave] = valores[campo]; mudou = true; }
+  // Coleta zerada em cima de foto boa é falha transitória da plataforma, não
+  // revisão. Gravar vendasRev: 0 destruiria o dado. Revisão real para zero
+  // (tudo cancelado) existe, mas é rara demais para valer o risco.
+  if (!zerado(valores)) {
+    for (const [campo, chave] of [['vendas', 'vendasRev'], ['comissao', 'comissaoRev']]) {
+      if (valores[campo] == null) continue;
+      const ref = atual[chave] ?? atual[campo];
+      if (Math.abs(ref - valores[campo]) > PISO_REVISAO) { atual[chave] = valores[campo]; mudou = true; }
+    }
   }
   // Cliques da Shopee só saem às 17h30; completa quando chegarem.
   if (atual.cliques == null && valores.cliques != null) { atual.cliques = valores.cliques; mudou = true; }
@@ -328,7 +350,7 @@ async function main() {
   const { dados } = await lerArquivo();
   dados.dias = dados.dias || {};
 
-  const resumo = { foto: 0, lacuna: 0, revisao: 0 };
+  const resumo = { foto: 0, lacuna: 0, refeita: 0, revisao: 0 };
   for (const [plataforma, coletado] of Object.entries(porPlataforma)) {
     if (!coletado) continue;
     for (const [data, valores] of Object.entries(coletado)) {
@@ -340,8 +362,9 @@ async function main() {
   dados.dias = Object.fromEntries(Object.keys(dados.dias).sort().map((k) => [k, dados.dias[k]]));
   dados.atualizadoEm = new Date().toISOString();
 
-  if (resumo.foto || resumo.lacuna || resumo.revisao) {
-    const desc = `${resumo.foto} fotos, ${resumo.lacuna} lacunas, ${resumo.revisao} revisões`;
+  if (resumo.foto || resumo.lacuna || resumo.refeita || resumo.revisao) {
+    const desc = `${resumo.foto} fotos, ${resumo.lacuna} lacunas, `
+      + `${resumo.refeita} refeitas, ${resumo.revisao} revisões`;
     await gravarArquivo(dados, `chore: comissões de afiliados ${ontem} (${desc})`);
     console.log(`[coleta] gravado — ${desc}`);
   } else {
