@@ -441,6 +441,17 @@ header {
 // ─────────────────────────────────────────────────────────
 const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbz4GZg6RMDJuSQmx2naQDMDgMhVZnZ7WKilvm5HbcZ6fsv2lvZexqL4sGr7_3r92e_L/exec';
 
+// Comissão saiu da planilha: agora vem do proxy CDV, alimentado pela coleta
+// automática das três plataformas (tudo-sobre-promos/coletar-comissoes.js).
+// A aba Tráfego continua no Apps Script — não há coletor para ela.
+const COMISSOES_API = 'https://cdv-proxy-production.up.railway.app/afiliados/comissoes';
+
+// false = usa a FOTO do dia (mesmo critério dos ~5 meses de histórico da
+// planilha). true = usa o valor revisado quando existir, que é mais exato para
+// o mês corrente mas deixa a série mista: dias recentes revisados, dias antigos
+// congelados. Trocar aqui muda o painel inteiro.
+const USAR_REVISADO = false;
+
 // ─────────────────────────────────────────────────────────
 //  UTILS
 // ─────────────────────────────────────────────────────────
@@ -514,6 +525,34 @@ async function fetchSheet(sheet) {
   const text = await res.text();
   if (text.length < 10 || text.includes('not found')) throw new Error('Aba não encontrada: ' + sheet);
   return text;
+}
+
+// Devolve o mesmo formato que parseComissionamento produzia a partir do CSV
+// ({date, plat, cliques, vendas, com}), então processAll() e todos os renders
+// seguem funcionando sem alteração.
+async function fetchComissoes() {
+  const res = await fetch(COMISSOES_API);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.erro || 'resposta inválida do proxy');
+
+  const NOMES = { amazon: 'Amazon', ml: 'Mercado Livre', shopee: 'Shopee' };
+  const linhas = [];
+  for (const [dia, plataformas] of Object.entries(json.dias || {})) {
+    const [a, m, d] = dia.split('-').map(Number);
+    const date = new Date(a, m - 1, d);
+    for (const [chave, v] of Object.entries(plataformas || {})) {
+      if (!v || !NOMES[chave]) continue;
+      linhas.push({
+        date,
+        plat: NOMES[chave],
+        cliques: v.cliques || 0,
+        vendas: (USAR_REVISADO ? v.vendasRev ?? v.vendas : v.vendas) || 0,
+        com: (USAR_REVISADO ? v.comissaoRev ?? v.comissao : v.comissao) || 0,
+      });
+    }
+  }
+  return linhas;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1416,14 +1455,13 @@ function setStatus(state, msg) {
 // ─────────────────────────────────────────────────────────
 async function loadAll() {
   document.getElementById('loading-overlay').classList.remove('hidden');
-  setStatus('loading', 'Carregando planilha...');
+  setStatus('loading', 'Carregando dados...');
   try {
-    const [comisText, trafText] = await Promise.all([
-      fetchSheet('comissionamento'),
+    const [comisRaw, trafText] = await Promise.all([
+      fetchComissoes(),
       fetchSheet('trafego'),
     ]);
 
-    const comisRaw = parseComissionamento(comisText);
     const trafRows = parseTrafego(trafText);
 
     if (comisRaw.length < 3)  throw new Error('Comissão insuficiente (' + comisRaw.length + ' linhas)');
