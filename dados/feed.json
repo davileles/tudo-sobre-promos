@@ -1,7 +1,67 @@
 {
-  "atualizadoEm": "2026-08-12T12:40:02.866Z",
+  "atualizadoEm": "2026-08-12T12:57:00.143Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "ofertas": [
+    {
+      "id": "5943",
+      "loja": "Shopee",
+      "titulo": "Calça Moletom Masculina Jogger Flanelada – Algodão Peluciado Quentinha Inverno Casual",
+      "link": "https://s.shopee.com.br/qidnEbXox",
+      "imagem": null,
+      "preco": 37.9,
+      "precoDe": null,
+      "desconto": null,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:47:00.142Z"
+    },
+    {
+      "id": "5942",
+      "loja": "Amazon",
+      "titulo": "Concha y Toro Reservado Cabernet Sauvignon 750ml",
+      "link": "https://www.amazon.com.br/dp/B07XLMJHRN?tag=tdsobrepromos-20&linkCode=ogi&th=1&psc=1",
+      "imagem": "https://m.media-amazon.com/images/I/31UifMVTuyL._SL160_.jpg",
+      "preco": 21.9,
+      "precoDe": 39.9,
+      "desconto": 45,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:45:07.979Z"
+    },
+    {
+      "id": "5941",
+      "loja": "Amazon",
+      "titulo": "Achocolatado em Pó Nescau 550G",
+      "link": "https://www.amazon.com.br/dp/B095JHD5GW?tag=tdsobrepromos-20&linkCode=ogi&th=1&psc=1",
+      "imagem": "https://m.media-amazon.com/images/I/41h24TtXk-L._SL160_.jpg",
+      "preco": 10.59,
+      "precoDe": 17.29,
+      "desconto": 39,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:44:06.865Z"
+    },
+    {
+      "id": "5940",
+      "loja": "Mercado Livre",
+      "titulo": "Cafeteira britânia bcf20a 20 cafés 800ml",
+      "link": "https://meli.la/215tBhw",
+      "imagem": "https://http2.mlstatic.com/D_NQ_NP_886912-MLA91558393648_092025-O.webp",
+      "preco": 69.9,
+      "precoDe": 169.9,
+      "desconto": 59,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:43:29.454Z"
+    },
+    {
+      "id": "5877",
+      "loja": "Amazon",
+      "titulo": "NIVEA Kit Loção Hidratante Milk Pele Seca a Extrasseca 400ml (2 unidades)",
+      "link": "https://www.amazon.com.br/dp/B0DK4975DJ?tag=tdsobrepromos-20&linkCode=ogi&th=1&psc=1",
+      "imagem": "https://m.media-amazon.com/images/I/41rcELx93CL._SL160_.jpg",
+      "preco": 31.49,
+      "precoDe": 43.9,
+      "desconto": 10,
+      "cupom": "ELUX20",
+      "enviadoEm": "2026-08-12T12:40:39.261Z"
+    },
     {
       "id": "5876",
       "loja": "Amazon",
