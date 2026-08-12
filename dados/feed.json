@@ -1,0 +1,30 @@
+{
+  "atualizadoEm": "2026-08-12T12:11:39.574790Z",
+  "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
+  "ofertas": [
+    {
+      "id": "5737",
+      "loja": "Amazon",
+      "titulo": "I2GO, Carregador Portátil (Power Bank), Pocket, 5000mAh, Não Necessita Cabos, Modelo USB-C",
+      "link": "https://www.amazon.com.br/dp/B0CKK4XLTB?tag=tdsobrepromos-20&linkCode=ogi&th=1&psc=1",
+      "imagem": null,
+      "preco": 89.9,
+      "precoDe": 149.9,
+      "desconto": 40.0,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:10:40.396Z"
+    },
+    {
+      "id": "5736",
+      "loja": "Mercado Livre",
+      "titulo": "Camisa Havaiana Masculina Estampada De Folhas T.3",
+      "link": "https://meli.la/2PyLMmu",
+      "imagem": null,
+      "preco": 113.66,
+      "precoDe": null,
+      "desconto": null,
+      "cupom": "SEMPREMODA",
+      "enviadoEm": "2026-08-12T12:05:31.115Z"
+    }
+  ]
+}
