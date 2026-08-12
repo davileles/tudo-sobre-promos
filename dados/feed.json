@@ -1,7 +1,19 @@
 {
-  "atualizadoEm": "2026-08-12T12:33:59.207Z",
+  "atualizadoEm": "2026-08-12T12:40:02.866Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "ofertas": [
+    {
+      "id": "5876",
+      "loja": "Amazon",
+      "titulo": "Dolce Gusto Nescafé Café Em Cápsula Dolcegusto Alpino Tradicional 10 Unidades 178G",
+      "link": "https://www.amazon.com.br/dp/B0CJ9YJYHR?tag=tdsobrepromos-20&linkCode=ogi&th=1&psc=1",
+      "imagem": "https://m.media-amazon.com/images/I/41A-CfyR05L._SL160_.jpg",
+      "preco": 16.75,
+      "precoDe": 26.39,
+      "desconto": 37,
+      "cupom": null,
+      "enviadoEm": "2026-08-12T12:38:00.489Z"
+    },
     {
       "id": "5812",
       "loja": "Mercado Livre",
