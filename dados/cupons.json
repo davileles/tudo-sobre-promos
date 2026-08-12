@@ -1,0 +1,270 @@
+{
+  "atualizadoEm": "2026-08-12T12:11:39.574790Z",
+  "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
+  "cupons": [
+    {
+      "codigo": "COZINHAOFF",
+      "loja": "Fastshop",
+      "tipo": "pct",
+      "valor": 10,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:02:54.082Z"
+    },
+    {
+      "codigo": "15OFFGELOU",
+      "loja": "Kabum",
+      "tipo": "pct",
+      "valor": 15,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:02:49.723Z"
+    },
+    {
+      "codigo": "FAXINA15",
+      "loja": "Kabum",
+      "tipo": "pct",
+      "valor": 15,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:16:51.554Z"
+    },
+    {
+      "codigo": "LETSGO10",
+      "loja": "Kabum",
+      "tipo": "pct",
+      "valor": 10,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:17:10.761Z"
+    },
+    {
+      "codigo": "SMART10OFF",
+      "loja": "Kabum",
+      "tipo": "pct",
+      "valor": 10,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:17:12.296Z"
+    },
+    {
+      "codigo": "MEUIPHONE",
+      "loja": "Kabum",
+      "tipo": "pct",
+      "valor": 5,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T16:02:48.256Z"
+    },
+    {
+      "codigo": "DESCOTOSMELI",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "MAISCUPONS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "OFFMELI",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 19,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "COMPRINHASPRACASA",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 19,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-17T02:59:00.000Z"
+    },
+    {
+      "codigo": "MAISPORMENOS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 22,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "SUPERPROMO",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "GANHEIMAIS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 19,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "SEMPREMODA",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 19,
+      "maximo": null,
+      "limite": 60,
+      "observacao": null,
+      "validadeAte": "2026-08-17T02:59:00.000Z"
+    },
+    {
+      "codigo": "SHOWDEPROMO",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "INTERNACIONALSALE",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 18,
+      "minimo": 49,
+      "maximo": null,
+      "limite": 30,
+      "observacao": null,
+      "validadeAte": "2026-09-01T03:00:00.000Z"
+    },
+    {
+      "codigo": "HORADOCUPOM",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 18,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z"
+    },
+    {
+      "codigo": "INTERNACIONAL",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 18,
+      "minimo": 49,
+      "maximo": null,
+      "limite": 30,
+      "observacao": null,
+      "validadeAte": "2026-09-02T02:59:00.000Z"
+    },
+    {
+      "codigo": "AMOCETAPHIL",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 15,
+      "minimo": 9.9,
+      "maximo": null,
+      "limite": 100,
+      "observacao": null,
+      "validadeAte": "2026-08-31T02:59:00.000Z"
+    },
+    {
+      "codigo": "15BOMBRIL",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 15,
+      "minimo": 20,
+      "maximo": null,
+      "limite": 20,
+      "observacao": null,
+      "validadeAte": "2026-08-15T02:59:00.000Z"
+    },
+    {
+      "codigo": "Corrida15",
+      "loja": "Mizuno",
+      "tipo": "pct",
+      "valor": 15,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T15:59:38.089Z"
+    },
+    {
+      "codigo": "CALC20",
+      "loja": "Olympikus",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": null,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T15:59:36.358Z"
+    },
+    {
+      "codigo": "APR0V3IT8AF",
+      "loja": "Shopee",
+      "tipo": "reais",
+      "valor": 100,
+      "minimo": 499,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T13:09:25.668Z"
+    },
+    {
+      "codigo": "D3SC0NT0SH0",
+      "loja": "Shopee",
+      "tipo": "reais",
+      "valor": 10,
+      "minimo": 59,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T15:00:25.662Z"
+    }
+  ]
+}
