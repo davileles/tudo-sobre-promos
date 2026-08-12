@@ -1454,7 +1454,8 @@ body.travado > *:not(#login-screen){display:none !important}
       dele no instante do envio; <b>sempre este cupom</b> grava o mesmo código em todos os produtos;
       <b>sem cupom</b> não vincula nada. O formulário de disparo ainda permite trocar isso.
       <br><b>Só cadastrar</b> guarda os produtos e para por aí. <b>Disparar agora</b> abre o
-      formulário de envio único já com eles marcados — sai na hora e não fica salvo.
+      formulário de envio único já com eles marcados — não fica salvo e sai na hora, ou
+      a partir do horário que você marcar em <b>Quando começar</b> (sempre no mesmo dia).
       <b>Lista salva</b> abre o mesmo formulário no modo guardado, com nome e agendamento,
       para reenviar quando quiser.
     </p>
@@ -1548,6 +1549,21 @@ body.travado > *:not(#login-screen){display:none !important}
       cupom com mínimo de R$ 40 entra num produto de R$ 50 e é ignorado num de R$ 30.
     </p>
 
+    <div class="g2" id="lst-inicio-wrap" style="margin-bottom:12px">
+      <div class="field"><label>Quando começar</label>
+        <select id="lst-inicio-modo" onchange="lstToggleInicio()">
+          <option value="agora">Agora &mdash; o primeiro produto sai em segundos</option>
+          <option value="hora">Hoje, a partir de um horário</option>
+        </select></div>
+      <div class="field" id="lst-inicio-hora-wrap" style="display:none">
+        <label>Horário de início <span class="tag">horário de Brasília</span></label>
+        <input type="time" id="lst-inicio-hora" value="09:00"/></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-6px 0 12px;line-height:1.5;display:none" id="lst-inicio-nota">
+      O disparo é criado agora e fica <b>aguardando</b> até a hora marcada &mdash; sempre no mesmo dia.
+      Daí em diante sai um produto por vez, no intervalo acima. Dá para cancelar antes de começar.
+      Horário já passado hoje começa na hora.
+    </p>
     <div id="lst-agenda-wrap" style="display:none">
       <div class="sec-label" style="margin-top:4px">Agendamento <span class="tag">opcional</span></div>
       <div class="mon-linha" style="margin-bottom:12px">
@@ -2784,11 +2800,16 @@ function renderListas(){
     if (ex){
       var feitos = ex.indice, tot = l.produtos.length;
       var pct = tot ? Math.round(feitos / tot * 100) : 0;
+      var horaProx = new Date(ex.proximoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      // Fila criada com hora marcada: enquanto nada saiu, o card diz que esta
+      // esperando, e nao "proximo as 09:00" (que se confunde com atraso).
+      var esperando = !ex.pausada && ex.indice === 0 && ex.proximoEm > Date.now();
       var prox = ex.pausada ? 'pausada'
-        : 'próximo ' + new Date(ex.proximoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        : esperando ? 'aguardando o início, às ' + horaProx
+        : 'próximo ' + horaProx;
       progresso = '<div style="margin:10px 0">'
         + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:5px">'
-        +   '▶ ' + feitos + '/' + tot + ' · ' + ex.enviados.length + ' enviado(s)'
+        +   (esperando ? '⏳ ' : '▶ ') + feitos + '/' + tot + ' · ' + ex.enviados.length + ' enviado(s)'
         +   (ex.pulados.length ? ' · ' + ex.pulados.length + ' pulado(s)' : '')
         +   (ex.falhas.length ? ' · <span style="color:var(--red)">' + ex.falhas.length + ' falha(s)</span>' : '')
         +   ' · ' + prox + '</div>'
@@ -2817,7 +2838,9 @@ function renderListas(){
       +   '<span class="card-title" style="flex:1">' + esc(l.nome)
       +     (l.ativo ? '' : ' <span style="color:var(--muted2);font-weight:500">(desativada)</span>') + '</span>'
       +   (l.efemera ? '<span class="tag">envio único</span>' : '')
-      +   (ex ? '<span class="mon-estado on">em disparo</span>' : '')
+      +   (ex ? '<span class="mon-estado on">'
+              + (ex.indice === 0 && !ex.pausada && ex.proximoEm > Date.now() ? 'agendado' : 'em disparo')
+              + '</span>' : '')
       + '</div>'
       + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">'
       +   '<b>' + l.produtos.length + '</b> produto(s) · a cada <b>' + l.intervaloMin + ' min</b> · ' + duracao + '</div>'
@@ -2888,7 +2911,29 @@ function lstToggleTipo(){
   var salva = document.getElementById('lst-tipo').value === 'salva';
   document.getElementById('lst-nome-wrap').style.display   = salva ? 'flex' : 'none';
   document.getElementById('lst-agenda-wrap').style.display = salva ? 'block' : 'none';
-  document.getElementById('lst-btn-salvar').textContent    = salva ? '💾 Salvar lista' : '🚀 Disparar agora';
+  // Lista salva tem agenda semanal propria; envio unico ganha apenas a hora de
+  // inicio do mesmo dia — cadastrar de manha e deixar sair as 9h, por exemplo.
+  document.getElementById('lst-inicio-wrap').style.display = salva ? 'none' : 'grid';
+  if (salva) document.getElementById('lst-inicio-nota').style.display = 'none';
+  else lstToggleInicio();
+  lstBotaoDisparo();
+}
+
+// So o modo "hoje a partir de" precisa do relogio. O texto do botao acompanha,
+// para ninguem clicar em "Disparar agora" achando que sai na hora.
+function lstToggleInicio(){
+  var porHora = document.getElementById('lst-inicio-modo').value === 'hora';
+  document.getElementById('lst-inicio-hora-wrap').style.display = porHora ? 'flex' : 'none';
+  document.getElementById('lst-inicio-nota').style.display      = porHora ? 'block' : 'none';
+  lstBotaoDisparo();
+}
+
+function lstBotaoDisparo(){
+  var salva   = document.getElementById('lst-tipo').value === 'salva';
+  var porHora = document.getElementById('lst-inicio-modo').value === 'hora';
+  document.getElementById('lst-btn-salvar').textContent =
+    salva ? '💾 Salvar lista'
+          : (porHora ? '⏰ Agendar disparo de hoje' : '🚀 Disparar agora');
 }
 
 function abrirFormLista(){
@@ -2905,6 +2950,8 @@ function novaLista(){
   document.getElementById('lst-nome').value = '';
   document.getElementById('lst-intervalo').value = 20;
   document.getElementById('lst-cupom-modo').value = 'auto';
+  document.getElementById('lst-inicio-modo').value = 'agora';
+  document.getElementById('lst-inicio-hora').value = '09:00';
   document.getElementById('lst-ag-ativo').classList.remove('on');
   document.getElementById('lst-ag-hora').value = '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml([]);
@@ -3023,18 +3070,34 @@ function salvarLista(){
   // ── Envio único: nada é guardado. Confirma porque sai direto para os grupos.
   if (unico) {
     var horas = Math.round((produtos.length - 1) * intervalo / 60 * 10) / 10;
-    if (!confirm('Disparar ' + produtos.length + ' produto(s) agora, um a cada ' + intervalo
+    // Início adiado é sempre no mesmo dia: cadastro de madrugada que só deve
+    // começar a aparecer nos grupos às 9h. Hora já passada cai para "agora".
+    var inicioHora = null, jaPassou = false;
+    if (document.getElementById('lst-inicio-modo').value === 'hora') {
+      inicioHora = document.getElementById('lst-inicio-hora').value;
+      if (!/^\d{2}:\d{2}$/.test(inicioHora || '')) return lstMsg('Informe a hora de início.', true);
+      var ag = new Date(), pa = inicioHora.split(':');
+      var alvo = new Date(ag.getFullYear(), ag.getMonth(), ag.getDate(), Number(pa[0]), Number(pa[1]), 0, 0);
+      jaPassou = alvo.getTime() <= ag.getTime();
+    }
+    var quando = !inicioHora ? 'agora'
+               : jaPassou    ? 'agora (as ' + inicioHora + ' de hoje já passaram)'
+                             : 'a partir das ' + inicioHora + ' de hoje';
+    if (!confirm('Disparar ' + produtos.length + ' produto(s) ' + quando + ', um a cada ' + intervalo
       + ' min — cerca de ' + horas + 'h até o último?\n\nEste envio não fica salvo.')) return;
-    lstMsg('Abrindo a fila…');
+    lstMsg(inicioHora && !jaPassou ? 'Agendando a fila…' : 'Abrindo a fila…');
     fetch(SERVER + '/listas/disparo-unico', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ produtos: produtos, intervaloMin: intervalo,
-                             cupomModo: modo, cupomCodigo: cupomCodigo })
+                             cupomModo: modo, cupomCodigo: cupomCodigo,
+                             iniciarHora: inicioHora })
     })
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (!d.ok) throw new Error(d.erro || 'falhou');
-        lstMsg('✓ Disparo iniciado — acompanhe o andamento abaixo.');
+        lstMsg(d.aguardando
+          ? '✓ Disparo agendado para ' + (d.iniciaAs || inicioHora) + ' — fica aguardando abaixo.'
+          : '✓ Disparo iniciado — acompanhe o andamento abaixo.');
         VIT_SEL = {}; cancelarFormLista();
         renderVitrine(); carregarListas();
       })
