@@ -1,12 +1,17 @@
-name: Comissões de Afiliados (20h)
+name: Comissões de Afiliados (madrugada + 20h)
 
 on:
   schedule:
-    # 23:00 UTC = 20:00 SP. NÃO adiante para a madrugada: o relatório de
-    # cliques da Shopee só consolida o dia anterior às 17h30, e antes disso
-    # devolve 0 — rodando às 06h o campo cliques da Shopee vem sempre vazio.
-    # Amazon e ML já estão prontos desde a meia-noite; quem manda no horário
-    # é a Shopee.
+    # Duas rodadas por dia, ambas mirando o dia anterior (D-1).
+    #
+    # 04:30 UTC = 01:30 SP — Amazon e Mercado Livre já fecharam o dia à
+    # meia-noite, então o número deles entra cedo. A Shopee ainda não publicou
+    # os cliques (só saem às 17h30) e a comissão pode vir zerada; nada disso
+    # congela: cliques ausentes viram null e foto zerada é reescrita enquanto
+    # o dia estiver na janela de revisão.
+    - cron: '30 4 * * *'
+    # 23:00 UTC = 20:00 SP — rodada que fecha a Shopee (cliques + comissão).
+    # Para Amazon e ML esta rodada só revisa o que já estava gravado.
     - cron: '0 23 * * *'
   workflow_dispatch: {}
 
