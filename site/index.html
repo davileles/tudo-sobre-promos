@@ -28,7 +28,6 @@
   --accent:#ffa500;
   --accent-hover:#f09600;
   --tinta:#a85a08;
-  --ok:#137a3d;
   --alerta:#c22b2b;
   --text:#1a1a1a;
   --muted:#6b6b6b;
@@ -49,7 +48,6 @@
   --border:#282828;
   --border-forte:#3a3a3a;
   --tinta:#ffa500;
-  --ok:#22c55e;
   --alerta:#ef4444;
   --text:#f0f0f0;
   --muted:#9a9a9a;
@@ -101,7 +99,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .medidor span{font-size:9px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted-2)}
 .medidor.destaque b{color:var(--tinta)}
 .medidor.vivo b::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
-  background:var(--ok);margin-left:7px;vertical-align:middle;animation:bate 2.4s ease-in-out infinite}
+  background:var(--accent);margin-left:7px;vertical-align:middle;animation:bate 2.4s ease-in-out infinite}
 @keyframes bate{0%,100%{opacity:1}50%{opacity:.2}}
 
 /* ── Abas + busca na mesma linha ───────────────────────────────────────── */
@@ -176,12 +174,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .codigo-linha{display:flex;gap:8px;align-items:stretch}
 .codigo{flex:1;font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:1.5px;
   background:var(--surface-2);border:1px dashed var(--border-forte);border-radius:9px;
-  padding:12px 14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.copiar{background:var(--accent);color:#000;font-size:11px;font-weight:900;letter-spacing:.6px;
-  padding:0 18px;border-radius:9px;transition:background .15s;white-space:nowrap}
-.copiar:hover{background:var(--accent-hover)}
-.ticket.copiado .copiar{background:var(--ok);color:#fff}
-.ticket.copiado .codigo{border-color:var(--ok);border-style:solid;color:var(--ok)}
+  padding:12px 14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  cursor:pointer;transition:border-color .15s}
+.codigo:hover{border-color:var(--tinta)}
+.acao{display:flex;align-items:center;background:var(--accent);color:#000;font-size:11px;
+  font-weight:900;letter-spacing:.6px;padding:0 16px;border-radius:9px;
+  transition:background .15s;white-space:nowrap;text-align:center}
+.acao:hover{background:var(--accent-hover)}
+/* Confirmação sem cor nova: o botão inverte para o neutro da paleta e o código
+   fecha a borda tracejada. */
+.ticket.copiado .acao{background:var(--text);color:var(--surface)}
+.ticket.copiado .codigo{border-color:var(--tinta);border-style:solid;color:var(--tinta)}
 /* Rodapé do ticket: a validade drenando é o sinal de urgência real do cupom. */
 .validade{margin:0 -20px;padding:14px 20px 16px;border-top:1px dashed var(--border);
   display:flex;align-items:center;justify-content:space-between;gap:10px;height:56px}
@@ -518,8 +521,8 @@ function renderCupons() {
       '<p class="ticket-regra">' + esc(regraCupom(c)) + '</p>' +
       (c.observacao ? '<p class="ticket-obs">' + esc(c.observacao) + '</p>' : '') +
       '<div class="codigo-linha">' +
-        '<span class="codigo">' + esc(c.codigo) + '</span>' +
-        '<button class="copiar" data-codigo="' + esc(c.codigo) + '">COPIAR</button>' +
+        '<span class="codigo" data-codigo="' + esc(c.codigo) + '" title="Clique para copiar o código">' + esc(c.codigo) + '</span>' +
+        botaoCupom(c) +
       '</div>' +
       '<div class="validade" data-ate="' + esc(c.validadeAte) + '">' +
         '<span class="validade-txt"></span>' +
@@ -528,6 +531,17 @@ function renderCupons() {
     '</article>';
   }).join('');
   tiquetear();
+}
+
+// Com link de afiliado o botão faz as duas coisas de uma vez, que é o caminho
+// real de quem usa um cupom: copiar o código e cair na loja. É um link de
+// verdade, não um window.open depois do clipboard — assim o navegador nunca
+// trata a abertura como popup e bloqueia.
+function botaoCupom(c) {
+  var cod = esc(c.codigo);
+  if (!c.url) return '<button class="acao" data-codigo="' + cod + '">COPIAR</button>';
+  return '<a class="acao" href="' + esc(c.url) + '" target="_blank" rel="nofollow noopener sponsored" ' +
+    'data-codigo="' + cod + '">COPIAR E ABRIR</a>';
 }
 
 function blocoVazio(titulo, texto) {
@@ -563,11 +577,14 @@ setInterval(function () { if (estado.aba === 'cupons') tiquetear(); }, 30000);
 
 // ── Interações ────────────────────────────────────────────────────────────
 function copiar(texto, ticket) {
+  if (!texto || !ticket) return;
+  var btn = ticket.querySelector('.acao');
+  var rotulo = btn ? btn.textContent : '';
   var feito = function () {
     ticket.classList.add('copiado');
-    var btn = ticket.querySelector('.copiar');
-    btn.textContent = 'COPIADO';
-    setTimeout(function () { ticket.classList.remove('copiado'); btn.textContent = 'COPIAR'; }, 2000);
+    if (!btn) return;
+    btn.textContent = 'CÓDIGO COPIADO';
+    setTimeout(function () { ticket.classList.remove('copiado'); btn.textContent = rotulo; }, 2000);
   };
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(texto).then(feito, function () { copiarLegado(texto, feito); });
@@ -596,8 +613,10 @@ document.addEventListener('click', function (e) {
     return;
   }
 
-  var btn = e.target.closest('.copiar');
-  if (btn) { copiar(btn.getAttribute('data-codigo'), btn.closest('.ticket')); return; }
+  // Não usa preventDefault: quando a ação é um link, a loja abre normalmente e
+  // a cópia acontece no mesmo clique.
+  var acao = e.target.closest('.acao, .codigo');
+  if (acao) { copiar(acao.getAttribute('data-codigo'), acao.closest('.ticket')); return; }
 
   var chip = e.target.closest('.chip-loja');
   if (chip) {
