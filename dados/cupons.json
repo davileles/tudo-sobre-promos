@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-08-12T12:13:44.959Z",
+  "atualizadoEm": "2026-08-12T12:11:39.574790Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "cupons": [
     {
@@ -11,7 +11,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:02:54.082Z"
+      "validadeAte": "2026-08-12T16:02:54.082Z",
+      "url": null
     },
     {
       "codigo": "15OFFGELOU",
@@ -22,7 +23,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:02:49.723Z"
+      "validadeAte": "2026-08-12T16:02:49.723Z",
+      "url": null
     },
     {
       "codigo": "FAXINA15",
@@ -33,7 +35,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:16:51.554Z"
+      "validadeAte": "2026-08-12T16:16:51.554Z",
+      "url": null
     },
     {
       "codigo": "LETSGO10",
@@ -44,7 +47,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:17:10.761Z"
+      "validadeAte": "2026-08-12T16:17:10.761Z",
+      "url": null
     },
     {
       "codigo": "SMART10OFF",
@@ -55,7 +59,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:17:12.296Z"
+      "validadeAte": "2026-08-12T16:17:12.296Z",
+      "url": null
     },
     {
       "codigo": "MEUIPHONE",
@@ -66,18 +71,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T16:02:48.256Z"
-    },
-    {
-      "codigo": "SITETODO",
-      "loja": "Mercado Livre",
-      "tipo": "reais",
-      "valor": 40,
-      "minimo": 399,
-      "maximo": null,
-      "limite": null,
-      "observacao": null,
-      "validadeAte": "2026-08-13T12:01:57.451Z"
+      "validadeAte": "2026-08-12T16:02:48.256Z",
+      "url": null
     },
     {
       "codigo": "DESCOTOSMELI",
@@ -88,7 +83,8 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "MAISCUPONS",
@@ -99,7 +95,8 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "OFFMELI",
@@ -110,7 +107,8 @@
       "maximo": null,
       "limite": 150,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "COMPRINHASPRACASA",
@@ -121,18 +119,8 @@
       "maximo": null,
       "limite": 150,
       "observacao": null,
-      "validadeAte": "2026-08-17T02:59:00.000Z"
-    },
-    {
-      "codigo": "QUEROCUPONS",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 25,
-      "minimo": 29,
-      "maximo": null,
-      "limite": 500,
-      "observacao": null,
-      "validadeAte": "2026-08-13T12:01:55.690Z"
+      "validadeAte": "2026-08-17T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "MAISPORMENOS",
@@ -143,18 +131,8 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
-    },
-    {
-      "codigo": "ECONOMIAML",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 22,
-      "minimo": 29,
-      "maximo": null,
-      "limite": 500,
-      "observacao": null,
-      "validadeAte": "2026-08-13T12:01:55.670Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "SUPERPROMO",
@@ -165,7 +143,20 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
+      "codigo": "GANHEIMAIS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 19,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "SEMPREMODA",
@@ -176,7 +167,8 @@
       "maximo": null,
       "limite": 60,
       "observacao": null,
-      "validadeAte": "2026-08-17T02:59:00.000Z"
+      "validadeAte": "2026-08-17T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "SHOWDEPROMO",
@@ -187,7 +179,8 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "INTERNACIONALSALE",
@@ -198,7 +191,8 @@
       "maximo": null,
       "limite": 30,
       "observacao": null,
-      "validadeAte": "2026-09-01T03:00:00.000Z"
+      "validadeAte": "2026-09-01T03:00:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "HORADOCUPOM",
@@ -209,7 +203,20 @@
       "maximo": null,
       "limite": 500,
       "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
+      "codigo": "INTERNACIONAL",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 18,
+      "minimo": 49,
+      "maximo": null,
+      "limite": 30,
+      "observacao": null,
+      "validadeAte": "2026-09-02T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "AMOCETAPHIL",
@@ -220,7 +227,8 @@
       "maximo": null,
       "limite": 100,
       "observacao": null,
-      "validadeAte": "2026-08-12T18:29:11.217Z"
+      "validadeAte": "2026-08-31T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "15BOMBRIL",
@@ -231,29 +239,8 @@
       "maximo": null,
       "limite": 20,
       "observacao": null,
-      "validadeAte": "2026-08-15T02:59:00.000Z"
-    },
-    {
-      "codigo": "APROVEITAESSA",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 10,
-      "minimo": 149,
-      "maximo": null,
-      "limite": 150,
-      "observacao": null,
-      "validadeAte": "2026-08-13T12:00:41.701Z"
-    },
-    {
-      "codigo": "ALLSITECOMBATE",
-      "loja": "Mercado Livre",
-      "tipo": "reais",
-      "valor": 10,
-      "minimo": 99,
-      "maximo": null,
-      "limite": null,
-      "observacao": null,
-      "validadeAte": "2026-08-13T12:01:57.437Z"
+      "validadeAte": "2026-08-15T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "Corrida15",
@@ -264,7 +251,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T15:59:38.089Z"
+      "validadeAte": "2026-08-12T15:59:38.089Z",
+      "url": null
     },
     {
       "codigo": "CALC20",
@@ -275,7 +263,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T15:59:36.358Z"
+      "validadeAte": "2026-08-12T15:59:36.358Z",
+      "url": null
     },
     {
       "codigo": "APR0V3IT8AF",
@@ -286,7 +275,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T13:09:25.668Z"
+      "validadeAte": "2026-08-12T13:09:25.668Z",
+      "url": "https://s.shopee.com.br/30kdYeLY0W"
     },
     {
       "codigo": "D3SC0NT0SH0",
@@ -297,7 +287,8 @@
       "maximo": null,
       "limite": null,
       "observacao": null,
-      "validadeAte": "2026-08-12T15:00:25.662Z"
+      "validadeAte": "2026-08-12T15:00:25.662Z",
+      "url": "https://s.shopee.com.br/30kdYeLY0W"
     }
   ]
 }
