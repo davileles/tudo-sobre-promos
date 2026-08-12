@@ -5954,6 +5954,51 @@ async function fetchSheet(sheet) {
   throw ultimoErro || new Error('Falha ao ler ' + sheet);
 }
 
+// A aba Comissionamento da planilha foi aposentada: quem alimenta a serie agora
+// e o coletor diario (tudo-sobre-promos/coletar-comissoes.js, 20h SP), que grava
+// em cdv-tsp-dados/tsp/comissoes-afiliados.json. Lemos pelo proxy CDV.
+// Usamos a FOTO (cliques/vendas/comissao), nao os campos *Rev: e o mesmo
+// criterio dos ~5 meses importados da planilha, entao a serie segue comparavel.
+const COMISSOES_API = 'https://cdv-proxy-production.up.railway.app/afiliados/comissoes';
+const PLAT_LABEL = { amazon: 'Amazon', ml: 'Mercado Livre', shopee: 'Shopee' };
+
+async function fetchComissoesAPI() {
+  const res = await fetch(COMISSOES_API + '?t=' + Date.now(), { cache: 'no-cache' });
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' em /afiliados/comissoes');
+  const d = await res.json();
+  if (!d || !d.ok || !d.dias) throw new Error('resposta invalida de /afiliados/comissoes');
+  const out = [];
+  for (const dia of Object.keys(d.dias).sort()) {
+    const date = parseDate(dia);
+    if (!date) continue;
+    const reg = d.dias[dia] || {};
+    for (const k of Object.keys(PLAT_LABEL)) {
+      const v = reg[k];
+      if (!v) continue;
+      out.push({
+        date:    date,
+        plat:    PLAT_LABEL[k],
+        cliques: Number(v.cliques)  || 0,
+        vendas:  Number(v.vendas)   || 0,
+        com:     Number(v.comissao) || 0,
+      });
+    }
+  }
+  return out;
+}
+
+// Se o JSON estiver fora do ar, cai na planilha (congelada em 09/08/2026).
+async function carregarComissoes() {
+  try {
+    const rows = await fetchComissoesAPI();
+    if (rows.length < 3) throw new Error('JSON com apenas ' + rows.length + ' linhas');
+    return rows;
+  } catch (e) {
+    console.warn('[comissoes] JSON indisponivel, caindo na planilha —', e.message);
+    return parseComissionamento(await fetchSheet('comissionamento'));
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 //  PARSERS
 // ─────────────────────────────────────────────────────────
@@ -6895,15 +6940,14 @@ function setStatus(state, msg) {
 // ─────────────────────────────────────────────────────────
 async function loadAll() {
   document.getElementById('loading-overlay').classList.remove('hidden');
-  setStatus('loading', 'Carregando planilha...');
+  setStatus('loading', 'Carregando dados...');
   try {
-    const [comisText, trafText, censo] = await Promise.all([
-      fetchSheet('comissionamento'),
+    const [comisRaw, trafText, censo] = await Promise.all([
+      carregarComissoes(),
       fetchSheet('trafego'),
       fetchCenso(400),
     ]);
 
-    const comisRaw = parseComissionamento(comisText);
     const trafRows = parseTrafego(trafText, censo);
 
     if (comisRaw.length < 3)  throw new Error('Comissão insuficiente (' + comisRaw.length + ' linhas)');
