@@ -1,5 +1,5 @@
 {
-  "atualizadoEm": "2026-08-12T12:11:39.574790Z",
+  "atualizadoEm": "2026-08-12T12:13:44.959Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "cupons": [
     {
@@ -69,6 +69,17 @@
       "validadeAte": "2026-08-12T16:02:48.256Z"
     },
     {
+      "codigo": "SITETODO",
+      "loja": "Mercado Livre",
+      "tipo": "reais",
+      "valor": 40,
+      "minimo": 399,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:01:57.451Z"
+    },
+    {
       "codigo": "DESCOTOSMELI",
       "loja": "Mercado Livre",
       "tipo": "pct",
@@ -113,6 +124,17 @@
       "validadeAte": "2026-08-17T02:59:00.000Z"
     },
     {
+      "codigo": "QUEROCUPONS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:01:55.690Z"
+    },
+    {
       "codigo": "MAISPORMENOS",
       "loja": "Mercado Livre",
       "tipo": "pct",
@@ -124,6 +146,17 @@
       "validadeAte": "2026-08-13T02:59:00.000Z"
     },
     {
+      "codigo": "ECONOMIAML",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 22,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:01:55.670Z"
+    },
+    {
       "codigo": "SUPERPROMO",
       "loja": "Mercado Livre",
       "tipo": "pct",
@@ -131,17 +164,6 @@
       "minimo": 29,
       "maximo": null,
       "limite": 500,
-      "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z"
-    },
-    {
-      "codigo": "GANHEIMAIS",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 20,
-      "minimo": 19,
-      "maximo": null,
-      "limite": 150,
       "observacao": null,
       "validadeAte": "2026-08-13T02:59:00.000Z"
     },
@@ -190,17 +212,6 @@
       "validadeAte": "2026-08-13T02:59:00.000Z"
     },
     {
-      "codigo": "INTERNACIONAL",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 18,
-      "minimo": 49,
-      "maximo": null,
-      "limite": 30,
-      "observacao": null,
-      "validadeAte": "2026-09-02T02:59:00.000Z"
-    },
-    {
       "codigo": "AMOCETAPHIL",
       "loja": "Mercado Livre",
       "tipo": "pct",
@@ -209,7 +220,7 @@
       "maximo": null,
       "limite": 100,
       "observacao": null,
-      "validadeAte": "2026-08-31T02:59:00.000Z"
+      "validadeAte": "2026-08-12T18:29:11.217Z"
     },
     {
       "codigo": "15BOMBRIL",
@@ -221,6 +232,28 @@
       "limite": 20,
       "observacao": null,
       "validadeAte": "2026-08-15T02:59:00.000Z"
+    },
+    {
+      "codigo": "APROVEITAESSA",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 10,
+      "minimo": 149,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:00:41.701Z"
+    },
+    {
+      "codigo": "ALLSITECOMBATE",
+      "loja": "Mercado Livre",
+      "tipo": "reais",
+      "valor": 10,
+      "minimo": 99,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:01:57.437Z"
     },
     {
       "codigo": "Corrida15",
