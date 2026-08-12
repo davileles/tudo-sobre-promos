@@ -5789,6 +5789,10 @@ setInterval(function(){
 //  CONFIG
 // ─────────────────────────────────────────────────────────
 const APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycbz4GZg6RMDJuSQmx2naQDMDgMhVZnZ7WKilvm5HbcZ6fsv2lvZexqL4sGr7_3r92e_L/exec';
+// A planilha passa a ser lida pelo proxy CDV. Chamar o script.google.com direto
+// do navegador quebra com 404 quando o Chrome esta logado em mais de uma conta
+// Google (redirect para /u/N/macros/...). Pelo servidor nao ha esse redirect.
+const PLANILHA_PROXY = 'https://cdv-proxy-production.up.railway.app/tsp/planilha';
 
 // ─────────────────────────────────────────────────────────
 //  UTILS
@@ -5858,11 +5862,26 @@ function set(id, val, cls) {
 //  FETCH
 // ─────────────────────────────────────────────────────────
 async function fetchSheet(sheet) {
-  const res = await fetch(`${APPS_SCRIPT}?sheet=${sheet}`);
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const text = await res.text();
-  if (text.length < 10 || text.includes('not found')) throw new Error('Aba não encontrada: ' + sheet);
-  return text;
+  // Tenta o proxy primeiro; se ele estiver fora, cai no Apps Script direto
+  // (comportamento antigo) antes de desistir.
+  const tentativas = [
+    `${PLANILHA_PROXY}?sheet=${sheet}`,
+    `${APPS_SCRIPT}?sheet=${sheet}`
+  ];
+  let ultimoErro = null;
+  for (const url of tentativas) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' em ' + sheet);
+      const text = await res.text();
+      if (text.length < 10 || text.includes('not found')) throw new Error('Aba não encontrada: ' + sheet);
+      return text;
+    } catch (e) {
+      ultimoErro = e;
+      console.warn('[fetchSheet] falhou em', url, '—', e.message);
+    }
+  }
+  throw ultimoErro || new Error('Falha ao ler ' + sheet);
 }
 
 // ─────────────────────────────────────────────────────────
