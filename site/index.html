@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Tudo Sobre Promos — cupons e ofertas do grupo</title>
-<meta name="description" content="Os cupons e as ofertas que saem nos grupos do Tudo Sobre Promos, em uma página só. Sem cadastro."/>
+<meta name="description" content="Os cupons que estão valendo agora e as ofertas que saíram nos grupos do Tudo Sobre Promos. Sem cadastro."/>
+<meta name="theme-color" content="#ffffff"/>
 <meta property="og:title" content="Tudo Sobre Promos"/>
 <meta property="og:description" content="Cupons valendo agora e as ofertas que saíram no grupo."/>
 <meta property="og:type" content="website"/>
@@ -14,21 +15,48 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+/* ── Tema claro (padrão) ──────────────────────────────────────────────────
+   O laranja da marca (#ffa500) tem contraste de 1.97:1 sobre branco: serve
+   como preenchimento com texto preto por cima (10.6:1), nunca como cor de
+   texto. Para laranja em texto existe --tinta, que fecha 5.08:1.          */
 :root{
+  --bg:#f6f6f7;
+  --surface:#ffffff;
+  --surface-2:#f1f1f2;
+  --border:#e3e3e5;
+  --border-forte:#d2d2d5;
+  --accent:#ffa500;
+  --accent-hover:#f09600;
+  --tinta:#a85a08;
+  --ok:#137a3d;
+  --alerta:#c22b2b;
+  --text:#1a1a1a;
+  --muted:#6b6b6b;
+  --muted-2:#909094;
+  --sombra:0 1px 2px rgba(0,0,0,.05);
+  --sombra-alta:0 6px 20px rgba(0,0,0,.09);
+  --topo-bg:rgba(255,255,255,.9);
+  --radius:14px;
+  --font:'Montserrat',system-ui,sans-serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --max:1160px;
+}
+
+[data-tema="escuro"]{
   --bg:#0d0d0d;
   --surface:#161616;
   --surface-2:#1e1e1e;
   --border:#282828;
-  --accent:#ffa500;
-  --accent-soft:#ffb733;
+  --border-forte:#3a3a3a;
+  --tinta:#ffa500;
   --ok:#22c55e;
+  --alerta:#ef4444;
   --text:#f0f0f0;
   --muted:#9a9a9a;
   --muted-2:#6f6f6f;
-  --radius:14px;
-  --font:'Montserrat',system-ui,sans-serif;
-  --mono:'Space Mono',ui-monospace,monospace;
-  --max:1100px;
+  --sombra:none;
+  --sombra-alta:none;
+  --topo-bg:rgba(13,13,13,.92);
 }
 
 html{scroll-behavior:smooth}
@@ -39,71 +67,77 @@ body{
 }
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+:focus-visible{outline:2px solid var(--tinta);outline-offset:3px;border-radius:4px}
 
 .wrap{width:100%;max-width:var(--max);margin:0 auto;padding:0 18px}
 
 /* ── Cabeçalho ─────────────────────────────────────────────────────────── */
-.topo{
-  position:sticky;top:0;z-index:50;
-  background:rgba(13,13,13,.92);backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--border);
-}
-.topo-in{display:flex;align-items:center;justify-content:space-between;gap:14px;height:62px}
+.topo{position:sticky;top:0;z-index:50;background:var(--topo-bg);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.topo-in{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
 .marca{display:flex;flex-direction:column;line-height:1}
 .marca b{font-size:15px;font-weight:900;letter-spacing:-.4px}
-.marca b em{font-style:normal;color:var(--accent)}
-.marca small{font-size:9px;font-weight:700;letter-spacing:2.2px;color:var(--muted-2);text-transform:uppercase;margin-top:4px}
-.btn-grupo{
-  background:var(--accent);color:#000;font-size:12px;font-weight:800;
-  padding:11px 18px;border-radius:999px;letter-spacing:.2px;white-space:nowrap;
-  transition:background .15s,transform .15s;
-}
-.btn-grupo:hover{background:var(--accent-soft);transform:translateY(-1px)}
+.marca b em{font-style:normal;color:var(--tinta)}
+.marca small{font-size:9px;font-weight:700;letter-spacing:2.2px;color:var(--muted-2);
+  text-transform:uppercase;margin-top:4px}
+.topo-acoes{display:flex;align-items:center;gap:8px}
+.btn-tema{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
+  display:grid;place-items:center;font-size:14px;line-height:1;transition:border-color .15s,background .15s}
+.btn-tema:hover{border-color:var(--border-forte);background:var(--surface-2)}
+.btn-grupo{background:var(--accent);color:#000;font-size:12px;font-weight:800;
+  padding:11px 18px;border-radius:999px;white-space:nowrap;transition:background .15s,transform .15s}
+.btn-grupo:hover{background:var(--accent-hover);transform:translateY(-1px)}
 
-/* ── Abertura ──────────────────────────────────────────────────────────── */
-.hero{padding:44px 0 26px}
-.hero h1{font-size:clamp(28px,6.5vw,46px);font-weight:900;letter-spacing:-1.4px;line-height:1.04}
-.hero h1 span{color:var(--accent)}
-.hero p{color:var(--muted);font-size:15px;margin-top:12px;max-width:44ch}
-.pulso{
-  display:inline-flex;align-items:center;gap:8px;margin-top:20px;
-  font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted-2);
-}
-.pulso i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:bate 2.4s ease-in-out infinite}
-@keyframes bate{0%,100%{opacity:1}50%{opacity:.25}}
+/* ── Faixa de abertura: título à esquerda, números vivos à direita ─────── */
+.abertura{display:flex;align-items:center;justify-content:space-between;gap:28px;
+  flex-wrap:wrap;padding:26px 0 22px}
+.abertura h1{font-size:clamp(21px,3.4vw,30px);font-weight:900;letter-spacing:-1px;line-height:1.14}
+.abertura h1 span{color:var(--tinta)}
+.abertura p{color:var(--muted);font-size:13px;margin-top:6px}
+.medidores{display:flex;gap:10px;flex-wrap:wrap}
+.medidor{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--sombra);padding:11px 16px;min-width:96px}
+.medidor b{display:block;font-size:23px;font-weight:900;letter-spacing:-1px;line-height:1.1}
+.medidor span{font-size:9px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted-2)}
+.medidor.destaque b{color:var(--tinta)}
+.medidor.vivo b::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--ok);margin-left:7px;vertical-align:middle;animation:bate 2.4s ease-in-out infinite}
+@keyframes bate{0%,100%{opacity:1}50%{opacity:.2}}
 
-/* ── Abas ──────────────────────────────────────────────────────────────── */
-.abas{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);
-  border-radius:999px;padding:4px;margin:6px 0 22px;width:fit-content}
-.aba{padding:10px 22px;border-radius:999px;font-size:12px;font-weight:800;
-  letter-spacing:.6px;text-transform:uppercase;color:var(--muted);transition:background .15s,color .15s}
+/* ── Abas + busca na mesma linha ───────────────────────────────────────── */
+.barra{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:14px}
+.abas{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:999px;padding:4px}
+.aba{padding:9px 22px;border-radius:999px;font-size:12px;font-weight:800;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--muted);transition:background .15s,color .15s}
 .aba[aria-selected="true"]{background:var(--accent);color:#000}
 .aba:not([aria-selected="true"]):hover{color:var(--text)}
-.aba span{font-weight:700;opacity:.7;margin-left:6px}
-
-/* ── Filtros ───────────────────────────────────────────────────────────── */
-.filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
-.busca{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);
-  border-radius:999px;padding:11px 18px;color:var(--text);font-size:14px;font-weight:500;outline:none;
-  transition:border-color .15s}
-.busca:focus{border-color:var(--accent)}
+.aba span{font-weight:700;opacity:.75;margin-left:6px}
+.busca{width:min(320px,100%);background:var(--surface);border:1px solid var(--border);
+  border-radius:999px;padding:10px 18px;color:var(--text);font-family:var(--font);
+  font-size:13.5px;font-weight:500;outline:none;transition:border-color .15s;box-shadow:var(--sombra)}
+.busca:focus{border-color:var(--tinta)}
 .busca::placeholder{color:var(--muted-2)}
-.lojas{display:flex;gap:6px;flex-wrap:wrap}
+
+.lojas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
 .chip-loja{background:var(--surface);border:1px solid var(--border);border-radius:999px;
-  padding:9px 15px;font-size:11px;font-weight:700;color:var(--muted);transition:.15s}
-.chip-loja[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:#000}
-.chip-loja:hover{color:var(--text)}
-.chip-loja[aria-pressed="true"]:hover{color:#000}
+  padding:8px 15px;font-size:11px;font-weight:700;color:var(--muted);transition:.15s}
+.chip-loja[aria-pressed="true"]{background:var(--text);border-color:var(--text);
+  color:var(--surface)}
+.chip-loja:hover{color:var(--text);border-color:var(--border-forte)}
+.chip-loja[aria-pressed="true"]:hover{color:var(--surface)}
 
 /* ── Cartões de oferta ─────────────────────────────────────────────────── */
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:14px}
 .oferta{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;display:flex;flex-direction:column;transition:border-color .18s,transform .18s}
-.oferta:hover{border-color:#3a3a3a;transform:translateY(-2px)}
-.oferta-foto{position:relative;aspect-ratio:1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  box-shadow:var(--sombra);overflow:hidden;display:flex;flex-direction:column;
+  transition:border-color .18s,transform .18s,box-shadow .18s}
+.oferta:hover{border-color:var(--border-forte);transform:translateY(-2px);box-shadow:var(--sombra-alta)}
+.oferta-foto{position:relative;aspect-ratio:1;background:#fff;display:flex;
+  align-items:center;justify-content:center;overflow:hidden;border-bottom:1px solid var(--border)}
 .oferta-foto img{width:100%;height:100%;object-fit:contain;padding:12px}
-.oferta-foto .vazio{color:#c8c8c8;font-size:11px;font-weight:700;letter-spacing:1px}
+.oferta-foto .sem{color:#b9b9bd;font-size:10px;font-weight:800;letter-spacing:1.4px}
 .selo{position:absolute;top:9px;left:9px;background:var(--accent);color:#000;
   font-size:11px;font-weight:900;padding:4px 9px;border-radius:6px;letter-spacing:-.2px}
 .oferta-corpo{padding:13px 14px 15px;display:flex;flex-direction:column;gap:9px;flex:1}
@@ -111,22 +145,23 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .oferta-titulo{font-size:13px;font-weight:600;line-height:1.38;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .oferta-preco{margin-top:auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.oferta-preco b{font-size:21px;font-weight:800;color:var(--accent);letter-spacing:-.6px}
+.oferta-preco b{font-size:21px;font-weight:800;color:var(--tinta);letter-spacing:-.6px}
 .oferta-preco s{font-size:12px;color:var(--muted-2)}
 .oferta-cupom{font-family:var(--mono);font-size:11px;color:var(--text);
-  background:var(--surface-2);border:1px dashed #3d3d3d;border-radius:6px;padding:5px 8px;
-  display:inline-flex;align-items:center;gap:6px;align-self:flex-start}
+  background:var(--surface-2);border:1px dashed var(--border-forte);border-radius:6px;
+  padding:5px 8px;display:inline-flex;align-items:center;gap:6px;align-self:flex-start}
 .oferta-cupom em{font-family:var(--font);font-style:normal;font-size:9px;font-weight:800;
   letter-spacing:1px;color:var(--muted-2)}
+.oferta-quando{font-size:10px;color:var(--muted-2);font-weight:600}
 .oferta-btn{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
   padding:10px;font-size:12px;font-weight:800;text-align:center;transition:.15s}
 .oferta:hover .oferta-btn{background:var(--accent);border-color:var(--accent);color:#000}
-.oferta-quando{font-size:10px;color:var(--muted-2);font-weight:600}
 
-/* ── Cartões de cupom (formato de ticket) ──────────────────────────────── */
+/* ── Cupons em formato de ticket ───────────────────────────────────────── */
 .tickets{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .ticket{position:relative;background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:18px 20px 0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+  border-radius:var(--radius);box-shadow:var(--sombra);padding:18px 20px 0;
+  display:flex;flex-direction:column;gap:12px;overflow:hidden}
 /* Entalhes laterais: a silhueta de um ticket destacável. */
 .ticket::before,.ticket::after{content:"";position:absolute;bottom:56px;width:16px;height:16px;
   background:var(--bg);border:1px solid var(--border);border-radius:50%}
@@ -134,54 +169,64 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .ticket::after{right:-9px}
 .ticket-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .ticket-loja{font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted-2)}
-.ticket-valor{font-size:27px;font-weight:900;color:var(--accent);letter-spacing:-1.2px;line-height:1;white-space:nowrap}
+.ticket-valor{font-size:27px;font-weight:900;color:var(--tinta);letter-spacing:-1.2px;
+  line-height:1;white-space:nowrap}
 .ticket-regra{font-size:12.5px;color:var(--muted);line-height:1.5}
 .ticket-obs{font-size:11px;color:var(--muted-2);font-style:italic}
 .codigo-linha{display:flex;gap:8px;align-items:stretch}
 .codigo{flex:1;font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:1.5px;
-  background:var(--surface-2);border:1px dashed #3d3d3d;border-radius:9px;
+  background:var(--surface-2);border:1px dashed var(--border-forte);border-radius:9px;
   padding:12px 14px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .copiar{background:var(--accent);color:#000;font-size:11px;font-weight:900;letter-spacing:.6px;
   padding:0 18px;border-radius:9px;transition:background .15s;white-space:nowrap}
-.copiar:hover{background:var(--accent-soft)}
-.ticket.copiado .copiar{background:var(--ok);color:#04210f}
+.copiar:hover{background:var(--accent-hover)}
+.ticket.copiado .copiar{background:var(--ok);color:#fff}
 .ticket.copiado .codigo{border-color:var(--ok);border-style:solid;color:var(--ok)}
 /* Rodapé do ticket: a validade drenando é o sinal de urgência real do cupom. */
 .validade{margin:0 -20px;padding:14px 20px 16px;border-top:1px dashed var(--border);
   display:flex;align-items:center;justify-content:space-between;gap:10px;height:56px}
-.validade-txt{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.2px}
+.validade-txt{font-size:11px;font-weight:700;color:var(--muted)}
 .validade-txt b{color:var(--text)}
-.validade.urgente .validade-txt b{color:var(--accent)}
-.barra{width:82px;height:4px;background:var(--surface-2);border-radius:99px;overflow:hidden;flex-shrink:0}
-.barra i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width 1s linear}
-.validade.urgente .barra i{background:#ef4444}
+.validade.urgente .validade-txt b{color:var(--alerta)}
+.barra-tempo{width:82px;height:4px;background:var(--surface-2);border-radius:99px;
+  overflow:hidden;flex-shrink:0}
+.barra-tempo i{display:block;height:100%;background:var(--accent);border-radius:99px;
+  transition:width 1s linear}
+.validade.urgente .barra-tempo i{background:var(--alerta)}
 
 /* ── Estados ───────────────────────────────────────────────────────────── */
-.vazio-bloco{border:1px dashed var(--border);border-radius:var(--radius);padding:52px 24px;text-align:center}
+.vazio-bloco{border:1px dashed var(--border-forte);border-radius:var(--radius);
+  padding:52px 24px;text-align:center;grid-column:1/-1}
 .vazio-bloco b{display:block;font-size:16px;font-weight:800;margin-bottom:8px}
 .vazio-bloco p{color:var(--muted);font-size:13.5px;max-width:38ch;margin:0 auto 20px}
 .esqueleto{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   height:280px;animation:respira 1.6s ease-in-out infinite}
-@keyframes respira{0%,100%{opacity:.5}50%{opacity:.85}}
+@keyframes respira{0%,100%{opacity:.55}50%{opacity:1}}
 
 /* ── Rodapé ────────────────────────────────────────────────────────────── */
-.rodape{border-top:1px solid var(--border);margin-top:64px;padding:34px 0 46px}
+.rodape{border-top:1px solid var(--border);margin-top:64px;padding:32px 0 44px}
 .rodape p{font-size:11.5px;color:var(--muted-2);line-height:1.7;max-width:62ch}
 .rodape a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
 .rodape .assina{margin-top:18px;font-size:10px;font-weight:800;letter-spacing:2px;
-  text-transform:uppercase;color:#3a3a3a}
+  text-transform:uppercase;color:var(--border-forte)}
 
 .oculto{display:none !important}
 
+@media (max-width:720px){
+  .abertura{gap:18px;padding:22px 0 18px}
+  .medidores{width:100%}
+  .medidor{flex:1;min-width:0;padding:10px 12px}
+  .medidor b{font-size:20px}
+  .busca{width:100%}
+  .abas{width:100%}
+  .aba{flex:1;text-align:center;padding:9px 6px}
+}
 @media (max-width:560px){
   .topo-in{height:56px}
-  .hero{padding:32px 0 20px}
+  .btn-grupo{padding:10px 14px;font-size:11px}
   .grade{grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:11px}
   .tickets{grid-template-columns:1fr}
-  .abas{width:100%}
-  .aba{flex:1;text-align:center;padding:10px 8px}
 }
-
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition:none !important}
   html{scroll-behavior:auto}
@@ -196,31 +241,40 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
       <b>TUDO SOBRE <em>PROMOS</em></b>
       <small>Cupons e ofertas</small>
     </a>
-    <a class="btn-grupo" id="cta-topo" href="https://grupo.tudosobrepromos.com/groups" target="_blank" rel="noopener">Entrar no grupo</a>
+    <div class="topo-acoes">
+      <button class="btn-tema" id="btn-tema" aria-label="Alternar tema" title="Alternar tema">🌙</button>
+      <a class="btn-grupo" id="cta-topo" href="https://grupo.tudosobrepromos.com/groups" target="_blank" rel="noopener">Entrar no grupo</a>
+    </div>
   </div>
 </header>
 
 <main class="wrap">
 
-  <section class="hero">
-    <h1>O que saiu no grupo,<br/><span>tudo em um lugar.</span></h1>
-    <p>Os cupons que estão valendo agora e as ofertas que acabaram de sair. Sem cadastro, sem login.</p>
-    <div class="pulso"><i></i><span id="pulso-txt">Carregando</span></div>
+  <section class="abertura">
+    <div>
+      <h1>O que saiu no grupo, <span>tudo em um lugar.</span></h1>
+      <p>Sem cadastro, sem login. Copie o cupom e abra a oferta.</p>
+    </div>
+    <div class="medidores">
+      <div class="medidor destaque vivo"><b id="m-cupons">—</b><span>Cupons valendo</span></div>
+      <div class="medidor"><b id="m-ofertas">—</b><span>Ofertas na semana</span></div>
+      <div class="medidor"><b id="m-hora">—</b><span>Atualizado</span></div>
+    </div>
   </section>
 
-  <div class="abas" role="tablist" aria-label="Seções">
-    <button class="aba" id="aba-ofertas" role="tab" aria-selected="true" aria-controls="painel-ofertas">
-      Ofertas<span id="n-ofertas"></span>
-    </button>
-    <button class="aba" id="aba-cupons" role="tab" aria-selected="false" aria-controls="painel-cupons">
-      Cupons<span id="n-cupons"></span>
-    </button>
+  <div class="barra">
+    <div class="abas" role="tablist" aria-label="Seções">
+      <button class="aba" id="aba-ofertas" role="tab" aria-selected="true" aria-controls="painel-ofertas">
+        Ofertas<span id="n-ofertas"></span>
+      </button>
+      <button class="aba" id="aba-cupons" role="tab" aria-selected="false" aria-controls="painel-cupons">
+        Cupons<span id="n-cupons"></span>
+      </button>
+    </div>
+    <input class="busca" id="busca" type="search" placeholder="Buscar produto ou loja" aria-label="Buscar"/>
   </div>
 
-  <div class="filtros">
-    <input class="busca" id="busca" type="search" placeholder="Buscar produto, loja ou código" aria-label="Buscar"/>
-    <div class="lojas" id="lojas"></div>
-  </div>
+  <div class="lojas" id="lojas"></div>
 
   <section id="painel-ofertas" role="tabpanel" aria-labelledby="aba-ofertas">
     <div class="grade" id="grade-ofertas"></div>
@@ -250,9 +304,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 'use strict';
 
 // Os dois arquivos são publicados pelo servidor no repositório e servidos pelo
-// CDN do GitHub Pages, que responde com Access-Control-Allow-Origin: *. Por isso
-// a página funciona em qualquer domínio e não depende do Railway estar de pé.
-var BASE_DADOS = 'https://gestao.tudosobrepromos.com/dados/';
+// CDN do GitHub Pages, que responde com Access-Control-Allow-Origin: *.
+// Tenta primeiro o caminho relativo: quando a página e os dados estiverem no
+// mesmo repositório, nada aqui precisa ser editado. O endereço absoluto fica
+// como origem alternativa enquanto os JSON ainda moram no repo do painel.
+var FONTES = ['dados/', 'https://gestao.tudosobrepromos.com/dados/'];
 
 var estado = {
   aba: 'ofertas',
@@ -264,6 +320,27 @@ var estado = {
 };
 
 var $ = function (id) { return document.getElementById(id); };
+
+// ── Tema ──────────────────────────────────────────────────────────────────
+// Claro é o padrão. A escolha manual vence a preferência do sistema, que só
+// vale para quem nunca tocou no botão.
+(function () {
+  var salvo = null;
+  try { salvo = localStorage.getItem('tsp-tema'); } catch (e) { /* navegação privada */ }
+  var tema = salvo || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro');
+  aplicarTema(tema);
+})();
+
+function aplicarTema(t) {
+  document.documentElement.setAttribute('data-tema', t);
+  var btn = $('btn-tema');
+  if (btn) {
+    btn.textContent = t === 'escuro' ? '☀️' : '🌙';
+    btn.setAttribute('aria-label', t === 'escuro' ? 'Usar tema claro' : 'Usar tema escuro');
+  }
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t === 'escuro' ? '#0d0d0d' : '#ffffff');
+}
 
 // ── Formatação ────────────────────────────────────────────────────────────
 function brl(v) {
@@ -278,8 +355,7 @@ function valorCupom(c) {
 // mínimo é o piso do pedido, máximo é o teto do produto elegível e limite é o
 // teto do próprio desconto.
 function regraCupom(c) {
-  var partes = [];
-  partes.push(c.tipo === 'reais' ? brl(c.valor) + ' de desconto' : c.valor + '% de desconto');
+  var partes = [c.tipo === 'reais' ? brl(c.valor) + ' de desconto' : c.valor + '% de desconto'];
   if (c.minimo) partes.push('em compras acima de ' + brl(c.minimo));
   if (c.maximo) partes.push('em produtos até ' + brl(c.maximo));
   if (c.tipo === 'pct' && c.limite) partes.push('limitado a ' + brl(c.limite) + ' de desconto');
@@ -313,11 +389,17 @@ function esc(s) {
 }
 
 // ── Carregamento ──────────────────────────────────────────────────────────
-function buscarJson(nome) {
-  // O parâmetro de tempo evita que o CDN entregue a versão anterior logo depois
-  // de uma publicação.
-  return fetch(BASE_DADOS + nome + '?t=' + Math.floor(Date.now() / 60000))
-    .then(function (r) { if (!r.ok) throw new Error(nome + ' HTTP ' + r.status); return r.json(); });
+// O parâmetro de tempo evita que o CDN entregue a versão anterior logo depois
+// de uma publicação.
+function buscarJson(nome, i) {
+  i = i || 0;
+  if (i >= FONTES.length) return Promise.reject(new Error(nome + ' indisponível'));
+  return fetch(FONTES[i] + nome + '?t=' + Math.floor(Date.now() / 60000))
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .catch(function () { return buscarJson(nome, i + 1); });
 }
 
 function carregar() {
@@ -334,7 +416,7 @@ function carregar() {
 
     $('cta-topo').href = estado.grupoUrl;
     montarLojas();
-    atualizarContagens();
+    atualizarMedidores();
     render();
   });
 }
@@ -346,20 +428,19 @@ function esqueletos() {
 }
 
 function falhou() {
-  $('pulso-txt').textContent = 'Sem conexão';
+  $('m-hora').textContent = '—';
   $('grade-ofertas').innerHTML =
-    '<div class="vazio-bloco" style="grid-column:1/-1"><b>Não deu para carregar agora</b>' +
+    '<div class="vazio-bloco"><b>Não deu para carregar agora</b>' +
     '<p>Verifique sua conexão e recarregue a página.</p>' +
     '<button class="btn-grupo" onclick="location.reload()">Recarregar</button></div>';
 }
 
-function atualizarContagens() {
+function atualizarMedidores() {
+  $('m-cupons').textContent  = estado.cupons.length;
+  $('m-ofertas').textContent = estado.ofertas.length;
+  $('m-hora').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   $('n-ofertas').textContent = estado.ofertas.length ? '(' + estado.ofertas.length + ')' : '';
-  $('n-cupons').textContent = estado.cupons.length ? '(' + estado.cupons.length + ')' : '';
-  var p = [];
-  if (estado.cupons.length) p.push(estado.cupons.length + (estado.cupons.length === 1 ? ' cupom valendo' : ' cupons valendo'));
-  if (estado.ofertas.length) p.push(estado.ofertas.length + (estado.ofertas.length === 1 ? ' oferta' : ' ofertas'));
-  $('pulso-txt').textContent = p.length ? p.join(' · ') : 'Aguardando novidades';
+  $('n-cupons').textContent  = estado.cupons.length ? '(' + estado.cupons.length + ')' : '';
 }
 
 // ── Filtros ───────────────────────────────────────────────────────────────
@@ -400,12 +481,11 @@ function renderOfertas() {
   $('grade-ofertas').innerHTML = itens.map(function (o) {
     var foto = o.imagem
       ? '<img src="' + esc(o.imagem) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"/>'
-      : '<span class="vazio">SEM FOTO</span>';
-    var selo = o.desconto ? '<span class="selo">-' + Math.round(o.desconto) + '%</span>' : '';
-    var de = o.precoDe && o.preco && o.precoDe > o.preco ? '<s>' + brl(o.precoDe) + '</s>' : '';
+      : '<span class="sem">SEM FOTO</span>';
+    var selo  = o.desconto ? '<span class="selo">-' + Math.round(o.desconto) + '%</span>' : '';
+    var de    = o.precoDe && o.preco && o.precoDe > o.preco ? '<s>' + brl(o.precoDe) + '</s>' : '';
     var preco = o.preco ? '<b>' + brl(o.preco) + '</b>' : '<b>Ver preço</b>';
-    var cupom = o.cupom
-      ? '<span class="oferta-cupom"><em>CUPOM</em>' + esc(o.cupom) + '</span>' : '';
+    var cupom = o.cupom ? '<span class="oferta-cupom"><em>CUPOM</em>' + esc(o.cupom) + '</span>' : '';
     return '<article class="oferta">' +
       '<a class="oferta-foto" href="' + esc(o.link) + '" target="_blank" rel="nofollow noopener sponsored">' + foto + selo + '</a>' +
       '<div class="oferta-corpo">' +
@@ -429,8 +509,8 @@ function renderCupons() {
                            : 'Cupom nasce e vence rápido. Entre no grupo para receber na hora que sair.');
     return;
   }
-  $('grade-cupons').innerHTML = itens.map(function (c, i) {
-    return '<article class="ticket" data-i="' + i + '">' +
+  $('grade-cupons').innerHTML = itens.map(function (c) {
+    return '<article class="ticket">' +
       '<div class="ticket-topo">' +
         '<span class="ticket-loja">' + esc(c.loja) + '</span>' +
         '<span class="ticket-valor">' + valorCupom(c) + '</span>' +
@@ -443,7 +523,7 @@ function renderCupons() {
       '</div>' +
       '<div class="validade" data-ate="' + esc(c.validadeAte) + '">' +
         '<span class="validade-txt"></span>' +
-        '<span class="barra"><i></i></span>' +
+        '<span class="barra-tempo"><i></i></span>' +
       '</div>' +
     '</article>';
   }).join('');
@@ -451,14 +531,14 @@ function renderCupons() {
 }
 
 function blocoVazio(titulo, texto) {
-  return '<div class="vazio-bloco" style="grid-column:1/-1"><b>' + esc(titulo) + '</b>' +
+  return '<div class="vazio-bloco"><b>' + esc(titulo) + '</b>' +
     '<p>' + esc(texto) + '</p>' +
     '<a class="btn-grupo" href="' + esc(estado.grupoUrl) + '" target="_blank" rel="noopener">Entrar no grupo</a></div>';
 }
 
 // ── Contagem regressiva dos cupons ────────────────────────────────────────
 // A janela de referência é de 24h — é a validade padrão com que a base grava um
-// cupom capturado, então a barra cheia significa "acabou de sair".
+// cupom capturado, então barra cheia significa "acabou de sair".
 var JANELA_MS = 24 * 3600e3;
 
 function tiquetear() {
@@ -467,7 +547,7 @@ function tiquetear() {
     var el = nos[i];
     var r = restante(el.getAttribute('data-ate'));
     var txt = el.querySelector('.validade-txt');
-    var barra = el.querySelector('.barra i');
+    var barra = el.querySelector('.barra-tempo i');
     if (!r) {
       txt.textContent = 'Expirado';
       barra.style.width = '0%';
@@ -503,11 +583,19 @@ function copiarLegado(texto, feito) {
   ta.style.cssText = 'position:absolute;left:-9999px';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); feito(); } catch (e) { /* nada a fazer */ }
+  try { document.execCommand('copy'); feito(); } catch (e) { /* sem alternativa */ }
   document.body.removeChild(ta);
 }
 
 document.addEventListener('click', function (e) {
+  var btnTema = e.target.closest('#btn-tema');
+  if (btnTema) {
+    var novo = document.documentElement.getAttribute('data-tema') === 'escuro' ? 'claro' : 'escuro';
+    aplicarTema(novo);
+    try { localStorage.setItem('tsp-tema', novo); } catch (err) { /* navegação privada */ }
+    return;
+  }
+
   var btn = e.target.closest('.copiar');
   if (btn) { copiar(btn.getAttribute('data-codigo'), btn.closest('.ticket')); return; }
 
