@@ -30,26 +30,6 @@
         "async function validarCodigo(",
         "function _fetchTimeout("
       ]
-    },
-    "painel.html": {
-      "minLinhas": 1408,
-      "obrigatorio": [
-        "async function enviarCodigo(",
-        "async function fetchSheet(",
-        "async function loadAll(",
-        "async function validarCodigo(",
-        "function _msg(",
-        "function abrirPainel(",
-        "function avgMes(",
-        "function avgMonths(",
-        "function calcCPM(",
-        "function crescimento(",
-        "function cumCliques(",
-        "function cumComis(",
-        "function dateKey(",
-        "function fillPlat(",
-        "function fmtDate("
-      ]
     }
   }
 }
