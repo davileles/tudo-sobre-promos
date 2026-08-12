@@ -1,7 +1,19 @@
 {
-  "atualizadoEm": "2026-08-12T12:11:39.574790Z",
+  "atualizadoEm": "2026-08-12T12:34:00.436Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "cupons": [
+    {
+      "codigo": "ELUX20",
+      "loja": "Amazon",
+      "tipo": "pct",
+      "valor": 20,
+      "minimo": 10,
+      "maximo": null,
+      "limite": 100,
+      "observacao": null,
+      "validadeAte": "2026-08-13T12:33:41.841Z",
+      "url": "https://amzn.to/4dFRSzy"
+    },
     {
       "codigo": "COZINHAOFF",
       "loja": "Fastshop",
@@ -12,7 +24,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:02:54.082Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17590&id=1207116"
     },
     {
       "codigo": "15OFFGELOU",
@@ -24,7 +36,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:02:49.723Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17729&id=1207116"
     },
     {
       "codigo": "FAXINA15",
@@ -36,7 +48,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:16:51.554Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17729&id=1207116"
     },
     {
       "codigo": "LETSGO10",
@@ -48,7 +60,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:17:10.761Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17729&id=1207116"
     },
     {
       "codigo": "SMART10OFF",
@@ -60,7 +72,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:17:12.296Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17729&id=1207116"
     },
     {
       "codigo": "MEUIPHONE",
@@ -72,7 +84,31 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T16:02:48.256Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17729&id=1207116"
+    },
+    {
+      "codigo": "SITETODO",
+      "loja": "Mercado Livre",
+      "tipo": "reais",
+      "valor": 40,
+      "minimo": 399,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T15:00:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
+      "codigo": "COMBATESITETODO",
+      "loja": "Mercado Livre",
+      "tipo": "reais",
+      "valor": 30,
+      "minimo": 299,
+      "maximo": null,
+      "limite": null,
+      "observacao": "Cupons válidos em todo o site do Mercado Livre",
+      "validadeAte": "2026-08-13T12:15:16.994Z",
+      "url": "https://meli.la/2xystLt"
     },
     {
       "codigo": "DESCOTOSMELI",
@@ -123,7 +159,31 @@
       "url": "https://meli.la/2xystLt"
     },
     {
+      "codigo": "QUEROCUPONS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 25,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
       "codigo": "MAISPORMENOS",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 22,
+      "minimo": 29,
+      "maximo": null,
+      "limite": 500,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
+      "codigo": "ECONOMIAML",
       "loja": "Mercado Livre",
       "tipo": "pct",
       "valor": 22,
@@ -142,18 +202,6 @@
       "minimo": 29,
       "maximo": null,
       "limite": 500,
-      "observacao": null,
-      "validadeAte": "2026-08-13T02:59:00.000Z",
-      "url": "https://meli.la/2xystLt"
-    },
-    {
-      "codigo": "GANHEIMAIS",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 20,
-      "minimo": 19,
-      "maximo": null,
-      "limite": 150,
       "observacao": null,
       "validadeAte": "2026-08-13T02:59:00.000Z",
       "url": "https://meli.la/2xystLt"
@@ -207,18 +255,6 @@
       "url": "https://meli.la/2xystLt"
     },
     {
-      "codigo": "INTERNACIONAL",
-      "loja": "Mercado Livre",
-      "tipo": "pct",
-      "valor": 18,
-      "minimo": 49,
-      "maximo": null,
-      "limite": 30,
-      "observacao": null,
-      "validadeAte": "2026-09-02T02:59:00.000Z",
-      "url": "https://meli.la/2xystLt"
-    },
-    {
       "codigo": "AMOCETAPHIL",
       "loja": "Mercado Livre",
       "tipo": "pct",
@@ -227,7 +263,7 @@
       "maximo": null,
       "limite": 100,
       "observacao": null,
-      "validadeAte": "2026-08-31T02:59:00.000Z",
+      "validadeAte": "2026-08-12T18:29:11.217Z",
       "url": "https://meli.la/2xystLt"
     },
     {
@@ -243,6 +279,30 @@
       "url": "https://meli.la/2xystLt"
     },
     {
+      "codigo": "APROVEITAESSA",
+      "loja": "Mercado Livre",
+      "tipo": "pct",
+      "valor": 10,
+      "minimo": 149,
+      "maximo": null,
+      "limite": 150,
+      "observacao": null,
+      "validadeAte": "2026-08-13T02:59:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
+      "codigo": "ALLSITECOMBATE",
+      "loja": "Mercado Livre",
+      "tipo": "reais",
+      "valor": 10,
+      "minimo": 99,
+      "maximo": null,
+      "limite": null,
+      "observacao": null,
+      "validadeAte": "2026-08-12T15:00:00.000Z",
+      "url": "https://meli.la/2xystLt"
+    },
+    {
       "codigo": "Corrida15",
       "loja": "Mizuno",
       "tipo": "pct",
@@ -252,7 +312,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T15:59:38.089Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=51271&id=1207116"
     },
     {
       "codigo": "CALC20",
@@ -264,7 +324,7 @@
       "limite": null,
       "observacao": null,
       "validadeAte": "2026-08-12T15:59:36.358Z",
-      "url": null
+      "url": "https://www.awin1.com/awclick.php?mid=17698&id=1207116"
     },
     {
       "codigo": "APR0V3IT8AF",
