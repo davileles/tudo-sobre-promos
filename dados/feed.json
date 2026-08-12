@@ -1,7 +1,19 @@
 {
-  "atualizadoEm": "2026-08-12T12:57:00.143Z",
+  "atualizadoEm": "2026-08-12T13:09:02.867Z",
   "grupoUrl": "https://grupo.tudosobrepromos.com/groups",
   "ofertas": [
+    {
+      "id": "5946",
+      "loja": "Shopee",
+      "titulo": "Cesto De Roupa Suja Bambu Dobravel Organizador Forrado Banheiro 60cm Grande Cesto Retangular",
+      "link": "https://s.shopee.com.br/qidnEJwg7",
+      "imagem": null,
+      "preco": 49.99,
+      "precoDe": 99.98,
+      "desconto": 40,
+      "cupom": "D3SC0NT0SH0",
+      "enviadoEm": "2026-08-12T13:08:02.020Z"
+    },
     {
       "id": "5943",
       "loja": "Shopee",
