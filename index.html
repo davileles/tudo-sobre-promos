@@ -494,6 +494,12 @@ try {
 .res-scope .chart-label{ font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--orange); margin-bottom: 14px; }
 .res-scope .chart-wrap{ position: relative; height: 190px; }
 .res-scope .grid-3 .chart-card{ margin-bottom: 0; }
+/* Item de grid tem min-width:auto por padrao: o canvas do Chart.js segura a
+   largura antiga e a faixa de 3 graficos estoura o card, passando da margem
+   direita da pagina. min-width:0 deixa a coluna encolher de verdade. */
+.res-scope .grid-2 > *, .res-scope .grid-3 > *, .res-scope .grid-auto > *{ min-width: 0; }
+.res-scope .chart-wrap{ width: 100%; overflow: hidden; }
+.res-scope .chart-wrap canvas{ max-width: 100%; }
 /* ── LOADING OVERLAY ── */
 .res-scope #loading-overlay{
   position: fixed; inset: 0; background: #0f0f0fcc; display: flex;
@@ -1354,6 +1360,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="chart-card">
       <div class="chart-label">Membros totais</div>
       <div class="chart-wrap"><canvas id="chart-membros"></canvas></div>
+      <div id="aviso-membros-censo" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
     </div>
     <div class="chart-card">
       <div class="chart-label">Crescimento diário</div>
@@ -5904,7 +5911,25 @@ function parseComissionamento(csv) {
 }
 
 // Tráfego: cols C-J → Data, Membros, CliqAnuncio, CliqConteudo, CliqBio, Seguidores, GastoAnuncio, GastoEstrat
-function parseTrafego(csv) {
+// Censo do distribuidor: 1 medicao por dia, as 06:00 (SP). Vira a fonte de
+// membros dos dias em que a planilha ficou sem preencher a coluna Membros.
+async function fetchCenso(dias) {
+  try {
+    const r = await fetch(SERVER + '/grupos/censo/historico?dias=' + (dias || 400) + '&t=' + Date.now(), { cache: 'no-cache' });
+    const d = await r.json();
+    if (!d || !d.ok) return new Map();
+    const m = new Map();
+    (d.serie || []).forEach(function (p) {
+      if (p && p.dia && typeof p.total === 'number' && p.total > 0) m.set(p.dia, p.total);
+    });
+    return m;
+  } catch (e) {
+    console.warn('[censo] indisponivel —', e.message);
+    return new Map();
+  }
+}
+
+function parseTrafego(csv, censo) {
   const rows = parseCSV(csv);
   if (rows.length < 2) return [];
   const hdr = rows[0].map(h => h.replace(/"/g,'').trim().toLowerCase());
@@ -5932,11 +5957,18 @@ function parseTrafego(csv) {
     const r = rows[i];
     const d = parseDate(r[iData]);
     if (!d) continue;
-    const membros = numVal(r[iMembros]);
+    let membros = numVal(r[iMembros]);
+    let imputado = false;
+    // Planilha em branco no dia: usa a medicao do censo do distribuidor.
+    if (membros < 10 && censo && censo.size) {
+      const doCenso = censo.get(dateKey(d));
+      if (doCenso > 0) { membros = doCenso; imputado = true; }
+    }
     if (membros < 10) continue;
     result.push({
       date:        d,
       membros:     membros,
+      imputado:    imputado,
       cliqAnuncio: numVal(r[iCliqAnu]),
       cliqConteudo:numVal(r[iCliqCon]),
       cliqBio:     numVal(r[iCliqBio]),
@@ -6107,6 +6139,7 @@ function processAll(comisRaw, trafRows) {
       cliqML:       d.cliqML     || 0,
       cliqShopee:   d.cliqShopee || 0,
       membros:      t.membros || 0,
+      membrosImputado: !!t.imputado,
       crescimento:  cres,
       cpc:          t.cliqAnuncio > 0 ? (t.gastoAnuncio||0) / t.cliqAnuncio : null,
       cpc2:         t.cliqAnuncio > 0 ? ((t.gastoAnuncio||0) + (t.gastoEstrat||0)) / t.cliqAnuncio : null,
@@ -6369,16 +6402,31 @@ function renderCharts(S) {
     }
   });
 
+  // Dias sem preenchimento na planilha entram pelo censo do distribuidor —
+  // marcados com ponto azul para nao passarem por medicao da planilha.
+  const impMembros = D.map(r => !!r.membrosImputado);
   mk('chart-membros', {
     type: 'line',
     data: { labels, datasets: [{ label: 'Membros', data: D.map(r => r.membros || null),
-      borderColor: '#ffa500', backgroundColor: '#ffa50018', fill: true, tension: 0.3, pointRadius: 0 }]},
+      borderColor: '#ffa500', backgroundColor: '#ffa50018', fill: true, tension: 0.3,
+      pointRadius: impMembros.map(v => v ? 3 : 0),
+      pointBackgroundColor: '#60a5fa', pointBorderColor: '#60a5fa' }]},
     options: { responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false }},
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => ' ' + N0(c.raw || 0) + ' membros'
+          + (impMembros[c.dataIndex] ? ' (censo do distribuidor)' : '') }}},
       scales: { x: { grid: { display: false }}, y: { ticks: { callback: v => N0(v) }}}
     }
   });
+
+  const elAvisoCenso = document.getElementById('aviso-membros-censo');
+  if (elAvisoCenso) {
+    const nImp = impMembros.filter(Boolean).length;
+    elAvisoCenso.textContent = nImp
+      ? nImp + ' dia(s) sem preenchimento na planilha — total medido pelo censo do distribuidor (06:00 SP), marcado em azul.'
+      : '';
+  }
 
   mk('chart-crescimento', {
     type: 'bar',
@@ -6786,13 +6834,14 @@ async function loadAll() {
   document.getElementById('loading-overlay').classList.remove('hidden');
   setStatus('loading', 'Carregando planilha...');
   try {
-    const [comisText, trafText] = await Promise.all([
+    const [comisText, trafText, censo] = await Promise.all([
       fetchSheet('comissionamento'),
       fetchSheet('trafego'),
+      fetchCenso(400),
     ]);
 
     const comisRaw = parseComissionamento(comisText);
-    const trafRows = parseTrafego(trafText);
+    const trafRows = parseTrafego(trafText, censo);
 
     if (comisRaw.length < 3)  throw new Error('Comissão insuficiente (' + comisRaw.length + ' linhas)');
     if (trafRows.length < 3)  throw new Error('Tráfego insuficiente (' + trafRows.length + ' linhas)');
