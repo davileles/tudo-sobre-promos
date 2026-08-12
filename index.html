@@ -971,7 +971,12 @@ body.travado > *:not(#login-screen){display:none !important}
     Busque pelo nome nos campos abaixo — a lista vem da sessão do WhatsApp, sem precisar copiar ID de grupo.
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
-  <div class="sec-label">🎯 Seleção de grupos</div>
+  <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>🎯 Seleção de grupos</span>
+    <button class="btn btn-copy btn-sm" id="btn-grupos-refresh" onclick="atualizarListaGrupos()"
+            title="Busca a lista atual no WhatsApp — use depois de criar um grupo novo">🔄 Atualizar lista</button>
+  </div>
+  <div id="grupos-refresh-fb" style="font-size:11px;font-weight:700;min-height:14px;margin:-4px 0 8px;color:var(--muted)"></div>
   <div class="sel-grupos-4 sel-grupos">
     <div class="field sel-box">
       <label>Adicionar grupo FONTE <span class="tag">de onde as ofertas vêm</span></label>
@@ -5679,6 +5684,28 @@ async function salvarGruposCfg(cupons, operador) {
   else { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
 }
 
+// Botao "Atualizar lista": o GET /grupos responde do cache NOMES_GRUPOS, que so
+// era preenchido na conexao do WhatsApp. Grupo criado depois nao aparecia ate
+// reconectar. ?refresh=1 (via carregarGrupos(true)) refaz o fetch no WhatsApp.
+async function atualizarListaGrupos() {
+  var btn = document.getElementById('btn-grupos-refresh');
+  var fb  = document.getElementById('grupos-refresh-fb');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Buscando…'; }
+  if (fb)  { fb.style.color = 'var(--muted)'; fb.textContent = 'Consultando o WhatsApp… pode levar alguns segundos.'; }
+  try {
+    var ok = await carregarGrupos(true);
+    if (fb) {
+      if (ok) { fb.style.color = 'var(--green)'; fb.textContent = '✓ Lista atualizada — ' + GRUPOS_CACHE.length + ' grupo(s).'; }
+      else    { fb.style.color = 'var(--red)';   fb.textContent = 'Não deu para atualizar — veja o aviso acima.'; }
+    }
+  } catch(e) {
+    if (fb) { fb.style.color = 'var(--red)'; fb.textContent = 'Falhou: ' + e.message; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Atualizar lista'; }
+    setTimeout(function(){ if (fb) fb.textContent = ''; }, 6000);
+  }
+}
+
 async function carregarGrupos(forcar) {
   await carregarPapeis();
   // Sem a config TSP a tela nao sabe quem e so-cupons nem quem e operador, e
@@ -5690,10 +5717,12 @@ async function carregarGrupos(forcar) {
     if (!d.ok) throw new Error(d.erro || 'falha');
     GRUPOS_CACHE = d.grupos || [];
     renderGrupos();
+    return true;
   } catch(e) {
     var av = document.getElementById('grupos-persist');
     av.style.display = 'block';
     av.innerHTML = '<b>Não deu para listar os grupos.</b> Verifique se o WhatsApp está conectado e recarregue.';
+    return false;
   }
 }
 
