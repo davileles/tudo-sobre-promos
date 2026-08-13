@@ -5538,7 +5538,7 @@ function cardListaEmDisparo(l) {
         ? '<span class="ag-quando">⏸️ fora da janela</span>'
         : '<span class="ag-quando">🕐 ' + fmtHoraSP(new Date(ex.proximoEm).toISOString()) + '</span>'
           + '<span class="ag-falta">' + fmtFalta(ex.proximoEm) + '</span>');
-  var janelas = (l.janelasEfetivas || []).map(function(j){ return j[0] + '–' + j[1]; }).join(', ');
+  var janelas = (l.janelasEfetivas || []).map(function(j){ return (j.inicio || j[0]) + '–' + (j.fim || j[1]); }).join(', ');
   return '<div class="ag-card">'
     + '<div class="ag-topo">' + quando
     +   '<span class="fe-titulo">📃 ' + esc(l.nome || 'Lista') + '</span>'
