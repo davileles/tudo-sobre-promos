@@ -280,6 +280,15 @@ try {
   .fila-fb{font-size:12px;font-weight:700;text-align:center;min-height:16px;color:var(--muted)}
   .fila-fb.ok{color:var(--green)} .fila-fb.err{color:var(--red)}
   .fila-vazia,.fila-loading{text-align:center;padding:56px 20px;color:var(--muted);font-size:13px}
+  /* Aba Fila (visualizacao): contexto da janela + cards reaproveitando .ag-* */
+  .fe-ctx{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .fe-pill{font-size:11px;font-weight:700;color:var(--muted);background:var(--card-deep);border:1px solid var(--border);border-radius:8px;padding:5px 10px}
+  .fe-pill.ok{color:#34d399;border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.09)}
+  .fe-pill.off{color:#f87171;border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.09)}
+  .fe-grupo{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:18px 0 10px}
+  .fe-grupo:first-child{margin-top:0}
+  .fe-titulo{font-size:12px;font-weight:700;color:var(--text)}
+  .fe-motivo{font-size:10.5px;color:var(--muted);margin-bottom:8px}
   .ag-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;position:relative;overflow:hidden}
   .ag-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent)}
   .ag-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
@@ -621,8 +630,9 @@ body.travado > *:not(#login-screen){display:none !important}
 <div id="shell">
 <div class="main-tabs" id="main-tabs">
   <div class="side-group">Operação</div>
-  <button class="main-tab active" id="tab-fila" onclick="switchTab('fila')">📋 Fila<span class="tab-badge" id="fila-badge" style="display:none">0</span></button>
+  <button class="main-tab active" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
   <div class="side-group">Criar mensagem</div>
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
@@ -644,16 +654,28 @@ body.travado > *:not(#login-screen){display:none !important}
 <div id="shell-main">
 <div class="wrap">
 
-<!-- ════════ FILA ════════ -->
-<div class="panel active" id="panel-fila">
+<!-- ════════ FILA — o que ja vai pro grupo e so espera a hora (leitura) ════════ -->
+<div class="panel active" id="panel-filaenvio">
   <div class="fila-bar">
-    <span id="fila-status">Carregando...</span>
+    <span id="filaenvio-status">Carregando...</span>
     <div class="fila-acoes">
-      <button class="btn btn-rej btn-sm" id="btn-limpar-fila" onclick="limparFilaPendente()" disabled>🗑️ Limpar fila</button>
-      <button class="btn btn-copy btn-sm" onclick="carregarFila()">↻ Atualizar</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarFilaEnvio()">↻ Atualizar</button>
     </div>
   </div>
-  <div id="fila-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+  <div id="filaenvio-ctx"></div>
+  <div id="filaenvio-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- ════════ APROVAÇÃO — o que exige analise antes de entrar na fila ════════ -->
+<div class="panel" id="panel-aprov">
+  <div class="fila-bar">
+    <span id="aprov-status">Carregando...</span>
+    <div class="fila-acoes">
+      <button class="btn btn-rej btn-sm" id="btn-limpar-aprov" onclick="limparAprovacao()" disabled>🗑️ Limpar lista</button>
+      <button class="btn btn-copy btn-sm" onclick="carregarAprovacao()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div id="aprov-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- ════════ AGENDADOS ════════ -->
@@ -1714,21 +1736,21 @@ body.travado > *:not(#login-screen){display:none !important}
     <p class="card-title" style="margin-bottom:12px">🔗 Awin — ofertas automáticas</p>
     <div class="aviso" style="margin-bottom:12px">
       A Awin é uma rede com dezenas de lojas. O sistema varre os catálogos atrás de produtos com desconto e publica
-      sozinho, dentro das cotas abaixo. <b>Fila</b> manda tudo para aprovação manual; <b>Automático</b> dispara direto.
-      Comece em Fila.
+      sozinho, dentro das cotas abaixo. <b>Aprovação</b> manda tudo para revisão manual; <b>Automático</b> dispara direto.
+      Comece em Aprovação.
     </div>
 
     <div class="field" style="margin-bottom:12px"><label>Modo das ofertas</label>
       <select id="awin-modo">
         <option value="off">Desligado</option>
-        <option value="fila">Fila — aprovar manualmente</option>
+        <option value="fila">Aprovação — revisar antes de enviar</option>
         <option value="on">Automático — dispara direto</option>
       </select></div>
 
     <div class="field" style="margin-bottom:12px"><label>Cupons da Awin <span class="tag">Offers API</span></label>
       <select id="awin-cupons">
         <option value="off">Desligado</option>
-        <option value="fila">Fila — aprovar manualmente</option>
+        <option value="fila">Aprovação — revisar antes de enviar</option>
         <option value="on">Automático — segue o gate de cupons</option>
       </select></div>
 
@@ -1951,7 +1973,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['fila','agend','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','config'];
+var TABS = ['filaenvio','agend','aprov','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -1960,7 +1982,8 @@ function switchTab(name) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
-  if (name === 'fila') carregarFila();
+  if (name === 'filaenvio') carregarFilaEnvio();
+  if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
@@ -4492,7 +4515,7 @@ function aplicarVisaoOperador(t) {
   if (!operador) return;
   ['panel-comissao', 'panel-trafego'].forEach(function (id) {
     var el = document.getElementById(id);
-    if (el && el.classList.contains('active')) switchTab('fila');
+    if (el && el.classList.contains('active')) switchTab('filaenvio');
   });
   if (t.nome) {
     var sub = document.querySelector('.brand-sub');
@@ -5446,7 +5469,137 @@ async function cancelarAgendado(id) {
   } catch (e) { alert('Sem resposta do servidor.'); }
 }
 
-/* ══════ FILA ══════ */
+/* ══════ FILA DE ENVIO (somente visualização) ══════
+   O que JA foi liberado e so espera a hora de sair. Duas origens:
+   1) cupons aprovados pelo gate de auto-envio, presos por janela de horario ou
+      pelo intervalo minimo entre mensagens (/operacao/fila);
+   2) disparos de lista em andamento, que saem de item em item (/listas).
+   De proposito nao ha botao de aprovar, editar ou cancelar aqui: quem decide e
+   a aba Aprovacao (item por item) e a aba Vitrine e disparos (listas). Esta aba
+   responde uma pergunta so — o que vai pro grupo, e quando. */
+function fmtHoraSP(iso) {
+  if (!iso) return '—';
+  return new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Sao_Paulo',
+    hour:'2-digit', minute:'2-digit' }).format(new Date(iso));
+}
+
+function ctxFilaEnvio(d) {
+  var j = d.janela || {};
+  var dentro = j.ok
+    ? '<span class="fe-pill ok">🟢 Dentro da janela</span>'
+    : '<span class="fe-pill off">🔴 ' + esc(j.motivo || 'fora da janela') + '</span>';
+  var modo = d.modo === 'on'     ? '<span class="fe-pill ok">🤖 Auto-envio ligado</span>'
+           : d.modo === 'sombra' ? '<span class="fe-pill">👻 Modo sombra — nada sai sozinho</span>'
+           :                       '<span class="fe-pill off">🔒 Auto-envio desligado</span>';
+  var intervalo = d.intervaloSeg != null
+    ? '<span class="fe-pill">⏱️ ' + d.intervaloSeg + 's entre mensagens</span>' : '';
+  var horario = (j.inicio && j.fim)
+    ? '<span class="fe-pill">🕗 ' + esc(j.inicio) + '–' + esc(j.fim) + ' SP'
+      + (j.dias === 'uteis' ? ' · dias úteis' : '') + '</span>' : '';
+  var proximo = (d.modo === 'on' && j.ok && d.total)
+    ? '<span class="fe-pill">➡️ próximo às ' + fmtHoraSP(d.proximoLiberadoEm) + '</span>' : '';
+  return '<div class="fe-ctx">' + modo + dentro + horario + intervalo + proximo + '</div>';
+}
+
+function cardFilaEnvio(it) {
+  var quando = it.previsaoEm
+    ? '<span class="ag-quando">🕐 ' + fmtHoraSP(it.previsaoEm) + '</span>'
+      + '<span class="ag-falta">' + fmtFalta(new Date(it.previsaoEm).getTime()) + '</span>'
+    : '<span class="ag-quando">⏸️ aguardando a janela</span>';
+  var origem = it.origem
+    ? '<span class="ag-tag">' + (String(it.origem).indexOf('telegram:') === 0
+        ? '✈️ ' + esc(String(it.origem).replace('telegram:',''))
+        : '👥 ' + esc(NOMES_GRUPOS_CACHE[it.origem] || String(it.origem).split('@')[0])) + '</span>'
+    : '';
+  var saindo = it.status === 'enviando' ? '<span class="ag-tag">📤 saindo agora</span>' : '';
+  // Cupom parado por muito tempo vence e cai para aprovacao manual — avisar
+  // aqui evita a surpresa de ver o item reaparecer na aba Aprovacao.
+  var expira = it.expiraEm
+    ? '<span class="ag-tag">expira ' + fmtFalta(new Date(it.expiraEm).getTime()).replace('em ','em ') + '</span>'
+    : '';
+  return '<div class="ag-card">'
+    + '<div class="ag-topo">' + quando
+    +   '<span class="ag-tag">#' + it.id + '</span>'
+    +   '<span class="fe-titulo">' + esc(it.titulo || '') + '</span>'
+    +   origem + saindo + expira
+    + '</div>'
+    + (it.motivo ? '<div class="fe-motivo">' + esc(it.motivo) + '</div>' : '')
+    + '<div class="ag-msg">' + esc(it.mensagem || '') + '</div>'
+    + '</div>';
+}
+
+function cardListaEmDisparo(l) {
+  var ex = l.execucao || {};
+  var restantes = l.restantes != null ? l.restantes : Math.max(0, (l.produtos || []).length - (ex.indice || 0));
+  var total = (l.produtos || []).length;
+  var quando = ex.pausada
+    ? '<span class="ag-quando">⏸️ pausada</span>'
+    : (l.dentroDaJanela === false
+        ? '<span class="ag-quando">⏸️ fora da janela</span>'
+        : '<span class="ag-quando">🕐 ' + fmtHoraSP(new Date(ex.proximoEm).toISOString()) + '</span>'
+          + '<span class="ag-falta">' + fmtFalta(ex.proximoEm) + '</span>');
+  var janelas = (l.janelasEfetivas || []).map(function(j){ return j[0] + '–' + j[1]; }).join(', ');
+  return '<div class="ag-card">'
+    + '<div class="ag-topo">' + quando
+    +   '<span class="fe-titulo">📃 ' + esc(l.nome || 'Lista') + '</span>'
+    +   '<span class="ag-tag">' + restantes + ' de ' + total + ' restante(s)</span>'
+    +   (l.intervaloMin ? '<span class="ag-tag">⏱️ ' + l.intervaloMin + ' min</span>' : '')
+    +   (janelas ? '<span class="ag-tag">🕗 ' + esc(janelas) + '</span>' : '')
+    +   (l.terminaAs ? '<span class="ag-tag">termina ' + esc(l.terminaAs) + '</span>' : '')
+    + '</div>'
+    + '</div>';
+}
+
+async function carregarFilaEnvio() {
+  var lista  = document.getElementById('filaenvio-lista');
+  var ctx    = document.getElementById('filaenvio-ctx');
+  var status = document.getElementById('filaenvio-status');
+  var badge  = document.getElementById('filaenvio-badge');
+  if (!Object.keys(NOMES_GRUPOS_CACHE).length) await carregarNomesGrupos();
+  try {
+    var res = await Promise.all([
+      fetch(SERVER + '/operacao/fila', { cache:'no-cache' }).then(function(r){ return r.json(); }),
+      // Falha ao ler listas nao pode derrubar a aba: o bloco de cupons e o que
+      // mais importa aqui.
+      fetch(SERVER + '/listas', { cache:'no-cache' }).then(function(r){ return r.json(); }).catch(function(){ return { listas: [] }; })
+    ]);
+    var d  = res[0] || {};
+    var ls = ((res[1] || {}).listas || []).filter(function(l){ return !!l.execucao; });
+    if (!d.ok) { ctx.innerHTML = ''; lista.innerHTML = '<div class="fila-vazia">Erro ao carregar a fila.</div>'; return; }
+
+    var itens = d.itens || [];
+    var pendentesLista = ls.reduce(function(s,l){ return s + (l.restantes || 0); }, 0);
+    var totalFila = itens.length + pendentesLista;
+
+    if (totalFila > 0) { badge.textContent = totalFila; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+
+    status.textContent = totalFila > 0
+      ? totalFila + ' mensagem(ns) na fila · ' + (d.agoraSP || '')
+      : 'Fila vazia · ' + (d.agoraSP || '');
+
+    ctx.innerHTML = ctxFilaEnvio(d);
+
+    var html = '';
+    if (itens.length) {
+      html += '<div class="fe-grupo">Cupons aguardando auto-envio</div>'
+           +  itens.map(cardFilaEnvio).join('');
+    }
+    if (ls.length) {
+      html += '<div class="fe-grupo">Disparos de lista em andamento</div>'
+           +  ls.map(cardListaEmDisparo).join('');
+    }
+    lista.innerHTML = html || '<div class="fila-vazia">Nada na fila.<br>'
+      + 'Aqui aparece o que já foi liberado e só espera a hora de sair — '
+      + 'seja pela janela de horário ou pelo intervalo entre mensagens.</div>';
+  } catch (e) {
+    ctx.innerHTML = '';
+    lista.innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
+    status.textContent = 'Erro de conexão';
+  }
+}
+
+/* ══════ APROVAÇÃO ══════ */
 var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee','oferta_magalu','oferta_awin'];
 // 'on' | 'off' — lido do servidor junto com a fila. Sem isso o card nao tem
 // como dizer POR QUE a oferta esta aguardando aprovacao.
@@ -5495,7 +5648,7 @@ function seloCupom(o) {
        + '<small>' + detalhe + '</small></div></div>';
 }
 
-async function carregarFila() {
+async function carregarAprovacao() {
   if (!Object.keys(NOMES_GRUPOS_CACHE).length) await carregarNomesGrupos();
   if (AUTO_OFERTA_MODO === null) {
     try {
@@ -5504,8 +5657,8 @@ async function carregarFila() {
       AUTO_OFERTA_MODO = dc && dc.autoEnvioOferta ? dc.autoEnvioOferta : 'off';
     } catch(e) { AUTO_OFERTA_MODO = 'off'; }
   }
-  var lista = document.getElementById('fila-lista');
-  var status = document.getElementById('fila-status');
+  var lista = document.getElementById('aprov-lista');
+  var status = document.getElementById('aprov-status');
   try {
     var r = await fetch(SERVER+'/painel-json', { signal: AbortSignal.timeout(5000) });
     var d = await r.json();
@@ -5513,7 +5666,7 @@ async function carregarFila() {
 
     var pendentes = (d.ofertas || []).filter(function(o){ return o.status === 'pendente' && ehTSP(o); });
 
-    var badge = document.getElementById('fila-badge');
+    var badge = document.getElementById('aprov-badge');
     if (pendentes.length > 0) { badge.textContent = pendentes.length; badge.style.display = 'inline-block'; }
     else { badge.style.display = 'none'; }
 
@@ -5521,7 +5674,7 @@ async function carregarFila() {
       ? pendentes.length+' item(ns) aguardando aprovação'
       : 'Nenhum item pendente';
 
-    var btnLimpar = document.getElementById('btn-limpar-fila');
+    var btnLimpar = document.getElementById('btn-limpar-aprov');
     if (btnLimpar) {
       btnLimpar.disabled = pendentes.length === 0;
       btnLimpar.textContent = pendentes.length > 0 ? '🗑️ Limpar fila ('+pendentes.length+')' : '🗑️ Limpar fila';
@@ -5622,8 +5775,8 @@ async function carregarFila() {
         +imgThumb
         +'<div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">'
         +'<div style="display:flex;gap:8px">'
-        +'<button class="btn" style="margin-top:0;flex:1" onclick="aprovarFila('+o.id+')">✓ Aprovar e enviar</button>'
-        +'<button class="btn btn-rej" style="margin-top:0;flex:1" onclick="rejeitarFila('+o.id+')">✕ Rejeitar</button>'
+        +'<button class="btn" style="margin-top:0;flex:1" onclick="aprovarItem('+o.id+')">✓ Aprovar e enviar</button>'
+        +'<button class="btn btn-rej" style="margin-top:0;flex:1" onclick="rejeitarItem('+o.id+')">✕ Rejeitar</button>'
         +'</div>'
         +'<div class="fila-fb" id="fila-fb-'+o.id+'"></div>'
         +'</div>'
@@ -5632,12 +5785,12 @@ async function carregarFila() {
 
   } catch(e) {
     lista.innerHTML = '<div class="fila-vazia">Servidor indisponível.</div>';
-    var bl = document.getElementById('btn-limpar-fila'); if (bl) bl.disabled = true;
+    var bl = document.getElementById('btn-limpar-aprov'); if (bl) bl.disabled = true;
     status.textContent = 'Erro ao conectar';
   }
 }
 
-async function aprovarFila(id) {
+async function aprovarItem(id) {
   var msg = document.getElementById('fila-msg-'+id).value;
   var fb = document.getElementById('fila-fb-'+id);
   fb.className = 'fila-fb'; fb.textContent = 'Enviando...';
@@ -5649,12 +5802,12 @@ async function aprovarFila(id) {
     if (d.ok) {
       fb.className = 'fila-fb ok'; fb.textContent = '✓ Enviado!';
       setTimeout(function(){ var c = document.getElementById('fila-card-'+id); if(c) c.style.opacity='.35'; }, 800);
-      setTimeout(carregarFila, 2000);
+      setTimeout(carregarAprovacao, 2000);
     } else { fb.className = 'fila-fb err'; fb.textContent = 'Erro: '+(d.erro||'falha'); }
   } catch(e) { fb.className='fila-fb err'; fb.textContent='Sem resposta do servidor.'; }
 }
 
-async function rejeitarFila(id) {
+async function rejeitarItem(id) {
   var fb = document.getElementById('fila-fb-'+id);
   fb.className = 'fila-fb'; fb.textContent = 'Rejeitando...';
   try {
@@ -5663,14 +5816,14 @@ async function rejeitarFila(id) {
     if (d.ok) {
       fb.textContent = 'Rejeitado';
       setTimeout(function(){ var c = document.getElementById('fila-card-'+id); if(c) c.style.opacity='.25'; }, 400);
-      setTimeout(carregarFila, 1500);
+      setTimeout(carregarAprovacao, 1500);
     }
   } catch(e) { fb.className='fila-fb err'; fb.textContent='Erro.'; }
 }
 
-async function limparFilaPendente() {
-  var btn = document.getElementById('btn-limpar-fila');
-  var status = document.getElementById('fila-status');
+async function limparAprovacao() {
+  var btn = document.getElementById('btn-limpar-aprov');
+  var status = document.getElementById('aprov-status');
   if (!confirm('Limpar a fila?\n\nTodos os itens TSP pendentes serão rejeitados. Esta ação não pode ser desfeita.')) return;
   var txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Limpando...';
@@ -5686,7 +5839,7 @@ async function limparFilaPendente() {
       status.textContent = d.removidos === 0
         ? 'Nada para limpar: nenhum item pendente.'
         : 'Fila limpa ('+d.removidos+' rejeitado(s))';
-      setTimeout(carregarFila, 1500);
+      setTimeout(carregarAprovacao, 1500);
     } else {
       status.textContent = 'Erro: '+(d.erro||'falha');
       btn.disabled = false; btn.textContent = txtOriginal;
@@ -5703,7 +5856,7 @@ async function removerImagem(id) {
   try {
     var r = await fetch(SERVER+'/painel/remover-imagem/'+id, { method:'POST' });
     var d = await r.json();
-    if (d.ok) { fb.className = 'fila-fb ok'; fb.textContent = '✓ Imagem removida'; setTimeout(carregarFila, 800); }
+    if (d.ok) { fb.className = 'fila-fb ok'; fb.textContent = '✓ Imagem removida'; setTimeout(carregarAprovacao, 800); }
     else { fb.className = 'fila-fb err'; fb.textContent = 'Erro: '+(d.erro||'falha'); }
   } catch(e) { fb.className='fila-fb err'; fb.textContent='Sem resposta do servidor.'; }
 }
@@ -5714,7 +5867,7 @@ async function atualizarBadge() {
     var d = await r.json();
     if (!d.ok) return;
     var n = (d.ofertas || []).filter(function(o){ return o.status === 'pendente' && ehTSP(o); }).length;
-    var badge = document.getElementById('fila-badge');
+    var badge = document.getElementById('aprov-badge');
     if (n > 0) { badge.textContent = n; badge.style.display = 'inline-block'; }
     else { badge.style.display = 'none'; }
   } catch(e) {}
@@ -5984,10 +6137,14 @@ async function definirPapel(jid, papel) {
 /* ══════ INIT ══════ */
 verificarServidor();
 setInterval(verificarServidor, 5000);
-carregarFila();
+carregarFilaEnvio();
+// O badge de Aprovacao precisa estar certo mesmo com a aba fechada — por isso
+// atualizarBadge() roda sempre, e o recarregamento completo so na aba visivel.
+atualizarBadge();
 setInterval(function(){
   atualizarBadge();
-  if (document.getElementById('panel-fila').classList.contains('active')) carregarFila();
+  if (document.getElementById('panel-aprov').classList.contains('active')) carregarAprovacao();
+  if (document.getElementById('panel-filaenvio').classList.contains('active')) carregarFilaEnvio();
 }, 30000);
 
 /* ══════════════════════════════════════════════════════════════════════════
