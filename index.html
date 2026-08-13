@@ -5506,6 +5506,34 @@ function ctxFilaEnvio(d) {
   return '<div class="fe-ctx">' + modo + dentro + horario + intervalo + proximo + '</div>';
 }
 
+// Rastro do que ja saiu: hora, conteudo e DE ONDE veio (grupo fonte, Telegram,
+// Awin ou manual). Capturas de grupo com auto-envio ligado saem na hora e nao
+// passam pela espera — sem esta secao a aba dava a impressao de que nada era
+// capturado dos grupos.
+var TIPO_LABEL_FILA = { cupom_tsp:'Cupom', oferta_amazon:'Amazon', oferta_ml:'Mercado Livre', oferta_shopee:'Shopee', oferta_magalu:'Magalu', oferta_awin:'Awin' };
+function origemLabelFila(o) {
+  var org = String(o.origem || '');
+  if (!org) return '✍️ manual';
+  if (org.indexOf('telegram:') === 0) return '✈️ ' + esc(org.replace('telegram:',''));
+  if (org.indexOf('awin') === 0) return '🧩 Awin' + (org.indexOf(':') > 0 ? ' · ' + esc(org.split(':')[1]) : '');
+  if (org.indexOf('@g.us') > 0) return '👥 ' + esc(o.origemNome || NOMES_GRUPOS_CACHE[org] || org.split('@')[0]);
+  return esc(org);
+}
+function cardEnviadoFila(it) {
+  var tipo = TIPO_LABEL_FILA[it.tipoConteudo] || it.tipoConteudo;
+  var dest = it.gruposDestino != null ? '<span class="ag-tag">→ ' + it.gruposDestino + ' grupo(s)</span>' : '';
+  var hora = it.enviadoEm ? fmtHoraSP(it.enviadoEm) : (it.capturadoEm ? fmtHoraSP(it.capturadoEm) : '');
+  return '<div class="ag-card">'
+    + '<div class="ag-topo">'
+    +   '<span class="ag-quando">✅ ' + hora + '</span>'
+    +   '<span class="ag-tag">#' + it.id + '</span>'
+    +   '<span class="ag-tag">' + esc(tipo) + '</span>'
+    +   '<span class="fe-titulo">' + esc(it.titulo || '') + '</span>'
+    +   '<span class="ag-tag">' + origemLabelFila(it) + '</span>'
+    +   dest
+    + '</div>'
+    + '</div>';
+}
 function cardFilaEnvio(it) {
   var quando;
   if (it.travado) {
@@ -5614,6 +5642,8 @@ async function carregarFilaEnvio() {
     if (itens.length)  html += '<div class="fe-grupo">Cupons aguardando auto-envio</div>' + itens.map(cardFilaEnvio).join('');
     if (listas.length) html += '<div class="fe-grupo">Disparos de lista em andamento</div>' + listas.map(cardListaEmDisparo).join('');
     if (cp)            html += '<div class="fe-grupo">Campanha ativa</div>' + cardCampanhaFila(cp);
+    var envs = d.enviados || [];
+    if (envs.length) html += '<div class="fe-grupo">Enviados recentemente</div>' + envs.map(cardEnviadoFila).join('');
     lista.innerHTML = html || '<div class="fila-vazia">Nada na fila.<br>'
       + 'Aqui aparece o que já foi liberado e só espera a hora de sair — '
       + 'seja pela janela de horário ou pelo intervalo entre mensagens.</div>';
