@@ -289,6 +289,9 @@ try {
   .fe-grupo:first-child{margin-top:0}
   .fe-titulo{font-size:12px;font-weight:700;color:var(--text)}
   .fe-motivo{font-size:10.5px;color:var(--muted);margin-bottom:8px}
+  .fe-motivo.trav{color:#f87171}
+  .ag-quando.trav{color:#f87171}
+  .ag-card.trav::before{background:#f87171}
   .ag-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;position:relative;overflow:hidden}
   .ag-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent)}
   .ag-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
@@ -5502,93 +5505,113 @@ function ctxFilaEnvio(d) {
 }
 
 function cardFilaEnvio(it) {
-  var quando = it.previsaoEm
-    ? '<span class="ag-quando">🕐 ' + fmtHoraSP(it.previsaoEm) + '</span>'
-      + '<span class="ag-falta">' + fmtFalta(new Date(it.previsaoEm).getTime()) + '</span>'
-    : '<span class="ag-quando">⏸️ aguardando a janela</span>';
+  var quando;
+  if (it.travado) {
+    quando = '<span class="ag-quando trav">⚠️ envio travado</span>'
+      + (it.enviandoDesde ? '<span class="ag-falta">parado desde ' + fmtHoraSP(it.enviandoDesde) + '</span>' : '');
+  } else if (it.status === 'enviando') {
+    quando = '<span class="ag-quando">📤 saindo agora</span>';
+  } else if (it.previsaoEm) {
+    quando = '<span class="ag-quando">🕐 ' + fmtHoraSP(it.previsaoEm) + '</span>'
+      + '<span class="ag-falta">' + fmtFalta(new Date(it.previsaoEm).getTime()) + '</span>';
+  } else {
+    quando = '<span class="ag-quando">⏸️ aguardando a janela</span>';
+  }
   var origem = it.origem
     ? '<span class="ag-tag">' + (String(it.origem).indexOf('telegram:') === 0
         ? '✈️ ' + esc(String(it.origem).replace('telegram:',''))
         : '👥 ' + esc(NOMES_GRUPOS_CACHE[it.origem] || String(it.origem).split('@')[0])) + '</span>'
     : '';
-  var saindo = it.status === 'enviando' ? '<span class="ag-tag">📤 saindo agora</span>' : '';
   // Cupom parado por muito tempo vence e cai para aprovacao manual — avisar
   // aqui evita a surpresa de ver o item reaparecer na aba Aprovacao.
-  var expira = it.expiraEm
-    ? '<span class="ag-tag">expira ' + fmtFalta(new Date(it.expiraEm).getTime()).replace('em ','em ') + '</span>'
+  var expira = (it.expiraEm && !it.travado && it.status !== 'enviando')
+    ? '<span class="ag-tag">expira ' + fmtFalta(new Date(it.expiraEm).getTime()) + '</span>' : '';
+  var aviso = it.travado
+    ? '<div class="fe-motivo trav">O servidor marcou este item como em envio e não concluiu. '
+      + 'Confira o grupo antes de reenviar: pode ter saído sem o registro voltar.</div>'
     : '';
-  return '<div class="ag-card">'
+  return '<div class="ag-card' + (it.travado ? ' trav' : '') + '">'
     + '<div class="ag-topo">' + quando
     +   '<span class="ag-tag">#' + it.id + '</span>'
     +   '<span class="fe-titulo">' + esc(it.titulo || '') + '</span>'
-    +   origem + saindo + expira
+    +   origem + expira
     + '</div>'
-    + (it.motivo ? '<div class="fe-motivo">' + esc(it.motivo) + '</div>' : '')
+    + aviso
+    + (it.motivo && !it.travado ? '<div class="fe-motivo">' + esc(it.motivo) + '</div>' : '')
     + '<div class="ag-msg">' + esc(it.mensagem || '') + '</div>'
     + '</div>';
 }
 
 function cardListaEmDisparo(l) {
-  var ex = l.execucao || {};
-  var restantes = l.restantes != null ? l.restantes : Math.max(0, (l.produtos || []).length - (ex.indice || 0));
-  var total = (l.produtos || []).length;
-  var quando = ex.pausada
+  var quando = l.pausada
     ? '<span class="ag-quando">⏸️ pausada</span>'
     : (l.dentroDaJanela === false
         ? '<span class="ag-quando">⏸️ fora da janela</span>'
-        : '<span class="ag-quando">🕐 ' + fmtHoraSP(new Date(ex.proximoEm).toISOString()) + '</span>'
-          + '<span class="ag-falta">' + fmtFalta(ex.proximoEm) + '</span>');
-  var janelas = (l.janelasEfetivas || []).map(function(j){ return (j.inicio || j[0]) + '–' + (j.fim || j[1]); }).join(', ');
+        : '<span class="ag-quando">🕐 ' + fmtHoraSP(l.proximoEm) + '</span>'
+          + '<span class="ag-falta">' + fmtFalta(new Date(l.proximoEm).getTime()) + '</span>');
   return '<div class="ag-card">'
     + '<div class="ag-topo">' + quando
     +   '<span class="fe-titulo">📃 ' + esc(l.nome || 'Lista') + '</span>'
-    +   '<span class="ag-tag">' + restantes + ' de ' + total + ' restante(s)</span>'
+    +   '<span class="ag-tag">' + l.restantes + ' de ' + l.total + ' restante(s)</span>'
     +   (l.intervaloMin ? '<span class="ag-tag">⏱️ ' + l.intervaloMin + ' min</span>' : '')
-    +   (janelas ? '<span class="ag-tag">🕗 ' + esc(janelas) + '</span>' : '')
+    +   (l.janelas ? '<span class="ag-tag">🕗 ' + esc(l.janelas) + '</span>' : '')
     +   (l.terminaAs ? '<span class="ag-tag">termina ' + esc(l.terminaAs) + '</span>' : '')
     + '</div>'
     + '</div>';
+}
+
+function cardCampanhaFila(cp) {
+  var quando = cp.pausaLongaAte
+    ? '<span class="ag-quando">⏸️ em pausa até ' + fmtHoraSP(cp.pausaLongaAte) + '</span>'
+    : (cp.dentroDaJanela
+        ? '<span class="ag-quando">🟢 enviando</span>'
+        : '<span class="ag-quando">⏸️ fora da janela</span>');
+  var cota = cp.limiteDiario
+    ? '<span class="ag-tag">' + cp.enviosHoje + ' de ' + cp.limiteDiario + ' hoje</span>'
+    : '<span class="ag-tag">' + cp.enviosHoje + ' hoje</span>';
+  return '<div class="ag-card">'
+    + '<div class="ag-topo">' + quando
+    +   '<span class="fe-titulo">📣 ' + esc(cp.nome || 'Campanha') + '</span>'
+    +   '<span class="ag-tag">' + cp.naFila + ' na fila</span>'
+    +   cota
+    +   (cp.janelas ? '<span class="ag-tag">🕗 ' + esc(cp.janelas) + '</span>' : '')
+    +   (cp.respondidos ? '<span class="ag-tag">💬 ' + cp.respondidos + ' respondido(s)</span>' : '')
+    + '</div>'
+    + '</div>';
+}
+
+// Guarda o ultimo total para o badge continuar certo quando a aba esta fechada.
+function pintarBadgeFila(total) {
+  var badge = document.getElementById('filaenvio-badge');
+  if (!badge) return;
+  if (total > 0) { badge.textContent = total; badge.style.display = 'inline-block'; }
+  else { badge.style.display = 'none'; }
 }
 
 async function carregarFilaEnvio() {
   var lista  = document.getElementById('filaenvio-lista');
   var ctx    = document.getElementById('filaenvio-ctx');
   var status = document.getElementById('filaenvio-status');
-  var badge  = document.getElementById('filaenvio-badge');
   if (!Object.keys(NOMES_GRUPOS_CACHE).length) await carregarNomesGrupos();
   try {
-    var res = await Promise.all([
-      fetch(SERVER + '/operacao/fila', { cache:'no-cache' }).then(function(r){ return r.json(); }),
-      // Falha ao ler listas nao pode derrubar a aba: o bloco de cupons e o que
-      // mais importa aqui.
-      fetch(SERVER + '/listas', { cache:'no-cache' }).then(function(r){ return r.json(); }).catch(function(){ return { listas: [] }; })
-    ]);
-    var d  = res[0] || {};
-    var ls = ((res[1] || {}).listas || []).filter(function(l){ return !!l.execucao; });
+    var r = await fetch(SERVER + '/operacao/fila', { cache:'no-cache', signal: AbortSignal.timeout(8000) });
+    var d = await r.json();
     if (!d.ok) { ctx.innerHTML = ''; lista.innerHTML = '<div class="fila-vazia">Erro ao carregar a fila.</div>'; return; }
 
-    var itens = d.itens || [];
-    var pendentesLista = ls.reduce(function(s,l){ return s + (l.restantes || 0); }, 0);
-    var totalFila = itens.length + pendentesLista;
+    var itens  = d.itens  || [];
+    var listas = d.listas || [];
+    var cp     = d.campanha || null;
+    var total  = d.totalNaFila != null ? d.totalNaFila : itens.length;
 
-    if (totalFila > 0) { badge.textContent = totalFila; badge.style.display = 'inline-block'; }
-    else { badge.style.display = 'none'; }
-
-    status.textContent = totalFila > 0
-      ? totalFila + ' mensagem(ns) na fila · ' + (d.agoraSP || '')
-      : 'Fila vazia · ' + (d.agoraSP || '');
-
+    pintarBadgeFila(total);
+    status.textContent = (total > 0 ? total + ' mensagem(ns) na fila' : 'Fila vazia')
+      + ' · ' + (d.agoraSP || '');
     ctx.innerHTML = ctxFilaEnvio(d);
 
     var html = '';
-    if (itens.length) {
-      html += '<div class="fe-grupo">Cupons aguardando auto-envio</div>'
-           +  itens.map(cardFilaEnvio).join('');
-    }
-    if (ls.length) {
-      html += '<div class="fe-grupo">Disparos de lista em andamento</div>'
-           +  ls.map(cardListaEmDisparo).join('');
-    }
+    if (itens.length)  html += '<div class="fe-grupo">Cupons aguardando auto-envio</div>' + itens.map(cardFilaEnvio).join('');
+    if (listas.length) html += '<div class="fe-grupo">Disparos de lista em andamento</div>' + listas.map(cardListaEmDisparo).join('');
+    if (cp)            html += '<div class="fe-grupo">Campanha ativa</div>' + cardCampanhaFila(cp);
     lista.innerHTML = html || '<div class="fila-vazia">Nada na fila.<br>'
       + 'Aqui aparece o que já foi liberado e só espera a hora de sair — '
       + 'seja pela janela de horário ou pelo intervalo entre mensagens.</div>';
@@ -5597,6 +5620,15 @@ async function carregarFilaEnvio() {
     lista.innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
     status.textContent = 'Erro de conexão';
   }
+}
+
+// Badge da Fila com a aba fechada: mesma rota, sem tocar no DOM da lista.
+async function atualizarBadgeFila() {
+  try {
+    var r = await fetch(SERVER + '/operacao/fila', { cache:'no-cache', signal: AbortSignal.timeout(5000) });
+    var d = await r.json();
+    if (d.ok) pintarBadgeFila(d.totalNaFila != null ? d.totalNaFila : (d.itens || []).length);
+  } catch (e) {}
 }
 
 /* ══════ APROVAÇÃO ══════ */
@@ -6138,14 +6170,19 @@ async function definirPapel(jid, papel) {
 verificarServidor();
 setInterval(verificarServidor, 5000);
 carregarFilaEnvio();
-// O badge de Aprovacao precisa estar certo mesmo com a aba fechada — por isso
-// atualizarBadge() roda sempre, e o recarregamento completo so na aba visivel.
+// Os badges precisam estar certos mesmo com as abas fechadas — por isso rodam
+// sempre; o recarregamento completo fica so na aba visivel.
 atualizarBadge();
 setInterval(function(){
   atualizarBadge();
   if (document.getElementById('panel-aprov').classList.contains('active')) carregarAprovacao();
-  if (document.getElementById('panel-filaenvio').classList.contains('active')) carregarFilaEnvio();
+  else if (!document.getElementById('panel-filaenvio').classList.contains('active')) atualizarBadgeFila();
 }, 30000);
+// Ciclo curto so da Fila: com 90s entre cupons e listas de 20 em 20 min, meio
+// minuto de defasagem ja mostra horario que ficou para tras.
+setInterval(function(){
+  if (document.getElementById('panel-filaenvio').classList.contains('active')) carregarFilaEnvio();
+}, 12000);
 
 /* ══════════════════════════════════════════════════════════════════════════
    PAINEL DE RESULTADOS — importado de painel.html
