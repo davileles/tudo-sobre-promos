@@ -1569,6 +1569,20 @@ body.travado > *:not(#login-screen){display:none !important}
       Daí em diante sai um produto por vez, no intervalo acima. Dá para cancelar antes de começar.
       Horário já passado hoje começa na hora.
     </p>
+    <div class="sec-label" style="margin-top:4px">Janela de envio <span class="tag">opcional</span></div>
+    <div class="mon-linha" style="margin-bottom:8px">
+      <div class="mon-campo"><label>Janela própria</label>
+        <button class="sw" id="lst-jan-ativo" onclick="this.classList.toggle('on');lstToggleJanela()"></button></div>
+      <div class="mon-campo" id="lst-jan-ini-wrap" style="display:none"><label>Das</label>
+        <input type="time" id="lst-jan-inicio" value="08:00" onchange="lstPreverFim()"/></div>
+      <div class="mon-campo" id="lst-jan-fim-wrap" style="display:none"><label>Até</label>
+        <input type="time" id="lst-jan-fim" value="20:00" onchange="lstPreverFim()"/></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-2px 0 12px;line-height:1.5">
+      Fora da janela a fila <b>pausa</b> e retoma na abertura seguinte — nenhum produto é perdido.
+      Desligado, vale a janela padrão do servidor (<b>08:00–20:00</b>, horário de Brasília).
+    </p>
+
     <div id="lst-agenda-wrap" style="display:none">
       <div class="sec-label" style="margin-top:4px">Agendamento <span class="tag">opcional</span></div>
       <div class="mon-linha" style="margin-bottom:12px">
@@ -2809,15 +2823,20 @@ function renderListas(){
       // Fila criada com hora marcada: enquanto nada saiu, o card diz que esta
       // esperando, e nao "proximo as 09:00" (que se confunde com atraso).
       var esperando = !ex.pausada && ex.indice === 0 && ex.proximoEm > Date.now();
+      // Fila parada por horario nao e atraso: o card diz que ela volta na
+      // abertura seguinte, em vez de mostrar um "proximo" que parece travado.
+      var foraJanela = !ex.pausada && l.dentroDaJanela === false && ex.indice > 0;
       var prox = ex.pausada ? 'pausada'
         : esperando ? 'aguardando o início, às ' + horaProx
+        : foraJanela ? 'fora da janela — retoma às ' + horaProx
         : 'próximo ' + horaProx;
       progresso = '<div style="margin:10px 0">'
         + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:5px">'
         +   (esperando ? '⏳ ' : '▶ ') + feitos + '/' + tot + ' · ' + ex.enviados.length + ' enviado(s)'
         +   (ex.pulados.length ? ' · ' + ex.pulados.length + ' pulado(s)' : '')
         +   (ex.falhas.length ? ' · <span style="color:var(--red)">' + ex.falhas.length + ' falha(s)</span>' : '')
-        +   ' · ' + prox + '</div>'
+        +   ' · ' + prox
+      +   (l.terminaAs ? ' · último às ' + esc(l.terminaAs) : '') + '</div>'
         + '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden">'
         +   '<div style="height:100%;width:' + pct + '%;background:var(--green)"></div></div>'
         + '</div>';
@@ -2848,7 +2867,9 @@ function renderListas(){
               + '</span>' : '')
       + '</div>'
       + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">'
-      +   '<b>' + l.produtos.length + '</b> produto(s) · a cada <b>' + l.intervaloMin + ' min</b> · ' + duracao + '</div>'
+      +   '<b>' + l.produtos.length + '</b> produto(s) · a cada <b>' + l.intervaloMin + ' min</b> · ' + duracao
+      +   ' · janela ' + esc((l.janelasEfetivas || []).map(function(j){ return j.inicio + '–' + j.fim; }).join(', '))
+      +   ((l.janelas && l.janelas.length) ? '' : ' <span class="tag">padrão</span>') + '</div>'
       + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">' + cupom + ' · ' + agenda + '</div>'
       + (l.ultimoDisparo ? '<div style="font-size:11px;color:var(--muted2)">último disparo: '
           + new Date(l.ultimoDisparo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
@@ -2898,6 +2919,72 @@ function lerCupomModo(idModo, idSelect){
   var cod = document.getElementById(idSelect).value || '';
   if (!cod) return null;
   return { modo: 'fixo', cupom: cod };
+}
+
+// Janela de envio da fila. Espelha janelaEnvioLista()/previsaoTerminoLista() do
+// server: o operador precisa ver ANTES de confirmar que 36 itens a 20 min nao
+// cabem em 12h de janela — o caso que fez uma torneira sair 20h21.
+function lstToggleJanela(){
+  var on = document.getElementById('lst-jan-ativo').classList.contains('on');
+  document.getElementById('lst-jan-ini-wrap').style.display = on ? 'flex' : 'none';
+  document.getElementById('lst-jan-fim-wrap').style.display = on ? 'flex' : 'none';
+  renderLstSel();
+}
+function lstPreverFim(){ renderLstSel(); }
+
+// [] = usa o padrao do servidor.
+function lstJanelasEscolhidas(){
+  if (!document.getElementById('lst-jan-ativo').classList.contains('on')) return [];
+  var ini = document.getElementById('lst-jan-inicio').value;
+  var fim = document.getElementById('lst-jan-fim').value;
+  if (!/^\d{2}:\d{2}$/.test(ini || '') || !/^\d{2}:\d{2}$/.test(fim || '')) return [];
+  return [{ inicio: ini, fim: fim }];
+}
+function lstHhmmMin(h){ var p = String(h||'').split(':'); return (Number(p[0])||0)*60 + (Number(p[1])||0); }
+
+// Janelas em vigor no formulario: as escolhidas, ou o padrao do servidor.
+function lstJanelasEfetivas(){
+  var j = lstJanelasEscolhidas();
+  return j.length ? j : [{ inicio:'08:00', fim:'20:00' }];
+}
+
+// Percorre a fila item a item e devolve o Date do ultimo envio. O relogio do
+// navegador do operador e o de Brasilia — o servidor recalcula e responde a
+// previsao oficial no disparo.
+function lstPrevisaoTermino(qtd, intervaloMin, inicioMs){
+  var janelas = lstJanelasEfetivas(), passo = (intervaloMin || 20) * 60000;
+  var t = inicioMs || Date.now(), adiados = 0;
+  var total = Math.min(qtd || 0, 2000);
+  for (var i = 0; i < total; i++){
+    var d = new Date(t), agora = d.getHours()*60 + d.getMinutes(), dentro = false;
+    for (var k = 0; k < janelas.length; k++){
+      var ini = lstHhmmMin(janelas[k].inicio), fim = lstHhmmMin(janelas[k].fim);
+      if (ini <= fim ? (agora >= ini && agora <= fim) : (agora >= ini || agora <= fim)) { dentro = true; break; }
+    }
+    if (!dentro){
+      var inicios = janelas.map(function(j){ return lstHhmmMin(j.inicio); }).sort(function(a,b){ return a-b; });
+      var prox = null;
+      for (var m = 0; m < inicios.length; m++) if (inicios[m] > agora) { prox = inicios[m]; break; }
+      var faltam = prox !== null ? (prox - agora) : (1440 - agora + inicios[0]);
+      t += faltam * 60000; adiados++;
+    }
+    if (i < total - 1) t += passo;
+  }
+  return { terminaEm: t, adiados: adiados, cabeNoDia: adiados === 0 };
+}
+
+function lstFmtDataHora(ms){
+  return new Date(ms).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// Texto colado na contagem de produtos: so avisa quando a fila estoura a janela.
+function lstTextoPrevisao(qtd, intervalo){
+  if (qtd < 2) return '';
+  var p = lstPrevisaoTermino(qtd, intervalo, Date.now());
+  if (p.cabeNoDia) return '';
+  var jan = lstJanelasEfetivas().map(function(j){ return j.inicio + '–' + j.fim; }).join(', ');
+  return '<br/><span style="color:var(--amber,#f59e0b)">⚠️ não cabe na janela ' + jan
+       + ' — a fila pausa e o último produto sai ' + lstFmtDataHora(p.terminaEm) + '</span>';
 }
 
 function lstToggleCupom(){
@@ -2957,6 +3044,10 @@ function novaLista(){
   document.getElementById('lst-cupom-modo').value = 'auto';
   document.getElementById('lst-inicio-modo').value = 'agora';
   document.getElementById('lst-inicio-hora').value = '09:00';
+  document.getElementById('lst-jan-ativo').classList.remove('on');
+  document.getElementById('lst-jan-inicio').value = '08:00';
+  document.getElementById('lst-jan-fim').value = '20:00';
+  lstToggleJanela();
   document.getElementById('lst-ag-ativo').classList.remove('on');
   document.getElementById('lst-ag-hora').value = '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml([]);
@@ -2985,6 +3076,11 @@ function editarLista(id){
   document.getElementById('lst-nome').value = l.nome;
   document.getElementById('lst-intervalo').value = l.intervaloMin;
   document.getElementById('lst-cupom-modo').value = l.cupomModo;
+  var _jan = (l.janelas && l.janelas.length) ? l.janelas[0] : null;
+  document.getElementById('lst-jan-ativo').classList.toggle('on', !!_jan);
+  document.getElementById('lst-jan-inicio').value = _jan ? _jan.inicio : '08:00';
+  document.getElementById('lst-jan-fim').value    = _jan ? _jan.fim    : '20:00';
+  lstToggleJanela();
   document.getElementById('lst-ag-ativo').classList.toggle('on', !!(l.agenda && l.agenda.ativo));
   document.getElementById('lst-ag-hora').value = (l.agenda && l.agenda.hora) || '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml((l.agenda && l.agenda.diasSemana) || []);
@@ -3057,7 +3153,8 @@ function renderLstSel(){
   }).join('')
   + '<div style="font-size:11px;color:var(--muted2);margin-top:8px">'
   + LST_SEL.length + ' produto(s) · duração estimada '
-  + (Math.round((LST_SEL.length - 1) * intervalo / 60 * 10) / 10) + 'h</div>';
+  + (Math.round((LST_SEL.length - 1) * intervalo / 60 * 10) / 10) + 'h'
+  + lstTextoPrevisao(LST_SEL.length, intervalo) + '</div>';
 }
 
 function salvarLista(){
@@ -3088,21 +3185,35 @@ function salvarLista(){
     var quando = !inicioHora ? 'agora'
                : jaPassou    ? 'agora (as ' + inicioHora + ' de hoje já passaram)'
                              : 'a partir das ' + inicioHora + ' de hoje';
+    // Previsao com as janelas: 36 itens a 20 min nao cabem em 12h, e o operador
+    // precisa saber disso antes de confirmar, nao no dia seguinte.
+    var _inicioMs = (inicioHora && !jaPassou)
+      ? (function(){ var pp = inicioHora.split(':'), dd = new Date();
+                     dd.setHours(Number(pp[0]), Number(pp[1]), 0, 0); return dd.getTime(); })()
+      : Date.now();
+    var _prev = lstPrevisaoTermino(produtos.length, intervalo, _inicioMs);
+    var _janTxt = lstJanelasEfetivas().map(function(j){ return j.inicio + '–' + j.fim; }).join(', ');
     if (!confirm('Disparar ' + produtos.length + ' produto(s) ' + quando + ', um a cada ' + intervalo
-      + ' min — cerca de ' + horas + 'h até o último?\n\nEste envio não fica salvo.')) return;
+      + ' min — cerca de ' + horas + 'h de fila?\n\nJanela de envio: ' + _janTxt
+      + '\nÚltimo produto sai em ' + lstFmtDataHora(_prev.terminaEm)
+      + (_prev.cabeNoDia ? '' : '\n\n⚠️ A fila não cabe na janela de hoje: ela pausa no fechamento e continua na abertura seguinte.')
+      + '\n\nEste envio não fica salvo.')) return;
     lstMsg(inicioHora && !jaPassou ? 'Agendando a fila…' : 'Abrindo a fila…');
     fetch(SERVER + '/listas/disparo-unico', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ produtos: produtos, intervaloMin: intervalo,
                              cupomModo: modo, cupomCodigo: cupomCodigo,
-                             iniciarHora: inicioHora })
+                             iniciarHora: inicioHora,
+                             janelas: lstJanelasEscolhidas() })
     })
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (!d.ok) throw new Error(d.erro || 'falhou');
-        lstMsg(d.aguardando
+        var _fim = d.terminaAs ? ' Último produto às ' + d.terminaAs + '.' : '';
+        lstMsg((d.aguardando
           ? '✓ Disparo agendado para ' + (d.iniciaAs || inicioHora) + ' — fica aguardando abaixo.'
-          : '✓ Disparo iniciado — acompanhe o andamento abaixo.');
+          : '✓ Disparo iniciado — acompanhe o andamento abaixo.') + _fim
+          + (d.aviso ? ' ⚠️ ' + d.aviso : ''));
         VIT_SEL = {}; cancelarFormLista();
         renderVitrine(); carregarListas();
       })
@@ -3127,6 +3238,7 @@ function salvarLista(){
       cupomCodigo: cupomCodigo,
       efemera: false,
       agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
+      janelas: lstJanelasEscolhidas(),
     })
   })
     .then(function(r){ return r.json(); })
