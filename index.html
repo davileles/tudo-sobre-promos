@@ -271,6 +271,8 @@ try {
   .fila-auto.sim{background:rgba(52,211,153,.09);border:1px solid rgba(52,211,153,.3)}
   .fila-auto.nao{background:var(--card-deep);border:1px solid var(--border)}
   .fila-auto.enviado{background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3)}
+  .fila-auto.trav{background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.35);color:#f87171}
+  .fila-auto.trav small{color:#f87171;opacity:.85}
   .fila-original{margin:0 16px 12px;background:var(--card-deep);border:1px solid var(--border);border-radius:10px;padding:11px 13px}
   .fila-original-label,.fila-msg-label{font-size:9px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
   .fila-original-txt{font-size:11.5px;color:var(--muted);line-height:1.5;white-space:pre-wrap;max-height:120px;overflow:auto}
@@ -5747,7 +5749,17 @@ async function carregarAprovacao() {
 
       var av = o.autoAvaliacao;
       var autoSelo = '';
-      if (!ehCupom(o)) {
+      // Envio que o servidor comecou e nao terminou (processo caiu no meio da
+      // distribuicao). Vem antes de qualquer outro diagnostico porque muda o
+      // que o operador precisa fazer: conferir antes de decidir, nao so revisar.
+      if (o.envioInterrompido) {
+        var jaEntregues = (o.enviadosParciais || []).length;
+        autoSelo = '<div class="fila-auto trav">⚠️ <div><b>Envio interrompido no meio</b><small>'
+          + (jaEntregues
+              ? jaEntregues + ' grupo(s) já receberam este cupom antes da queda. Reenviar manda só para os que faltaram.'
+              : 'Nenhum grupo chegou a receber pelo registro — mas confira antes de reenviar.')
+          + '</small></div></div>';
+      } else if (!ehCupom(o)) {
         // Oferta de produto: nunca passa por avaliarAutoEnvio(). O que decide o
         // envio direto e AUTO_ENVIO_OFERTA + preco verificado.
         var org0 = o.grupoOrigem || o.origem || '';
@@ -5807,7 +5819,10 @@ async function carregarAprovacao() {
         +imgThumb
         +'<div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">'
         +'<div style="display:flex;gap:8px">'
-        +'<button class="btn" style="margin-top:0;flex:1" onclick="aprovarItem('+o.id+')">✓ Aprovar e enviar</button>'
+        +'<button class="btn" style="margin-top:0;flex:1" onclick="aprovarItem('+o.id+')">'
+        + (o.envioInterrompido
+            ? '✓ Enviar aos grupos que faltaram'
+            : '✓ Aprovar e enviar') + '</button>'
         +'<button class="btn btn-rej" style="margin-top:0;flex:1" onclick="rejeitarItem('+o.id+')">✕ Rejeitar</button>'
         +'</div>'
         +'<div class="fila-fb" id="fila-fb-'+o.id+'"></div>'
