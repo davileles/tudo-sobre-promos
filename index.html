@@ -2141,7 +2141,7 @@ function gruposDestino(){
 }
 
 /* ══════ CENSO DE MEMBROS ══════ */
-// Contagem por grupo medida pelo servidor as 06:00 (SP) e guardada la. Aqui e
+// Contagem por grupo medida pelo servidor as 00:10 (SP) e guardada la. Aqui e
 // so leitura — "Medir agora" forca uma nova passada no WhatsApp.
 async function carregarCenso(forcar){
   var tot = document.getElementById('censo-total');
@@ -2162,7 +2162,7 @@ async function carregarCenso(forcar){
     tot.innerHTML = '<b style="color:var(--text);font-size:17px">' + (d.total || 0).toLocaleString('pt-BR') + '</b> membros'
       + ' em <b>' + grupos.length + '</b> grupo(s) de destino'
       + '<br><span style="font-size:11px;color:var(--muted2)">Última medição: ' + esc(quando)
-      + ' · atualiza sozinho todo dia às 06:00</span>';
+      + ' · atualiza sozinho todo dia às 00:10 (fecha o dia anterior)</span>';
     if (!grupos.length){
       el.innerHTML = '<div style="font-size:12px;color:var(--muted2)">Nenhum grupo marcado como destino na aba 👥 Grupos.</div>';
       return;
@@ -2191,7 +2191,7 @@ async function carregarCenso(forcar){
 function censoAtualizar(){ carregarCenso(true).then(carregarCensoHist); }
 
 /* ══════ GRÁFICO DE EVOLUÇÃO ══════ */
-// Série montada a partir das medições das 06:00 guardadas no servidor. Um ponto
+// Série montada a partir das medições das 00:10 guardadas no servidor. Um ponto
 // por dia; dia sem medição simplesmente não existe na série (não vira zero).
 var CENSO_HIST = null;
 var CENSO_CHART = null;
@@ -2260,7 +2260,7 @@ function renderCensoGrafico(){
 
   var av = document.getElementById('censo-gr-aviso');
   var nAgr = serie.filter(function(p){ return p.agregado; }).length;
-  av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, medido às 06:00 (SP)'
+  av.textContent = serie.length + ' medição(ões) · 1 ponto por dia, fechamento às 00:10 (SP) do dia seguinte'
     + (nAgr ? ' · ' + nAgr + ' ponto(s) do histórico importado só têm o total somado — sem quebra por grupo' : '');
 }
 
@@ -6160,7 +6160,8 @@ function parseComissionamento(csv) {
 }
 
 // Tráfego: cols C-J → Data, Membros, CliqAnuncio, CliqConteudo, CliqBio, Seguidores, GastoAnuncio, GastoEstrat
-// Censo do distribuidor: 1 medicao por dia, as 06:00 (SP). Vira a fonte de
+// Censo do distribuidor: 1 medicao por dia, as 00:10 (SP), gravada no dia que
+// fechou. Vira a fonte de
 // membros dos dias em que a planilha ficou sem preencher a coluna Membros.
 async function fetchCenso(dias) {
   try {
@@ -6673,7 +6674,7 @@ function renderCharts(S) {
   if (elAvisoCenso) {
     const nImp = impMembros.filter(Boolean).length;
     elAvisoCenso.textContent = nImp
-      ? nImp + ' dia(s) sem preenchimento na planilha — total medido pelo censo do distribuidor (06:00 SP), marcado em azul.'
+      ? nImp + ' dia(s) sem preenchimento na planilha — total medido pelo censo do distribuidor (fechamento às 00:10 SP), marcado em azul.'
       : '';
   }
 
