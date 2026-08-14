@@ -289,6 +289,14 @@ try {
   .fe-pill.off{color:#f87171;border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.09)}
   .fe-grupo{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:18px 0 10px}
   .fe-grupo:first-child{margin-top:0}
+  /* Secoes fixas da Fila: cada bloco sempre aparece, mesmo vazio, para o
+     operador saber de relance onde procurar cada coisa. */
+  .fe-secao{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+  .fe-secao-header{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+  .fe-secao-titulo{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--text)}
+  .fe-secao-count{font-size:10.5px;font-weight:800;color:var(--accent);background:var(--card-deep);border:1px solid var(--border);border-radius:8px;padding:2px 8px;min-width:18px;text-align:center}
+  .fe-secao-vazia{font-size:11.5px;color:var(--muted2);padding:2px 0 4px}
+  .fe-secao .ag-card:last-child{margin-bottom:0}
   .fe-titulo{font-size:12px;font-weight:700;color:var(--text)}
   .fe-motivo{font-size:10.5px;color:var(--muted);margin-bottom:8px}
   .fe-motivo.trav{color:#f87171}
@@ -5638,15 +5646,35 @@ async function carregarFilaEnvio() {
       + ' · ' + (d.agoraSP || '');
     ctx.innerHTML = ctxFilaEnvio(d);
 
-    var html = '';
-    if (itens.length)  html += '<div class="fe-grupo">Cupons aguardando auto-envio</div>' + itens.map(cardFilaEnvio).join('');
-    if (listas.length) html += '<div class="fe-grupo">Disparos de lista em andamento</div>' + listas.map(cardListaEmDisparo).join('');
-    if (cp)            html += '<div class="fe-grupo">Campanha ativa</div>' + cardCampanhaFila(cp);
     var envs = d.enviados || [];
-    if (envs.length) html += '<div class="fe-grupo">Enviados recentemente</div>' + envs.map(cardEnviadoFila).join('');
-    lista.innerHTML = html || '<div class="fila-vazia">Nada na fila.<br>'
-      + 'Aqui aparece o que já foi liberado e só espera a hora de sair — '
-      + 'seja pela janela de horário ou pelo intervalo entre mensagens.</div>';
+
+    // Tres secoes fixas, sempre visiveis: o operador aprende onde cada coisa
+    // mora e nota de relance quando uma delas esta vazia.
+    function secao(titulo, count, corpo, vazio) {
+      return '<div class="fe-secao">'
+        + '<div class="fe-secao-header">'
+        +   '<span class="fe-secao-titulo">' + titulo + '</span>'
+        +   '<span class="fe-secao-count">' + count + '</span>'
+        + '</div>'
+        + (corpo || '<div class="fe-secao-vazia">' + vazio + '</div>')
+        + '</div>';
+    }
+
+    // 1) Disparos em andamento: listas pingando de item em item + campanha ativa.
+    var corpoListas = listas.map(cardListaEmDisparo).join('') + (cp ? cardCampanhaFila(cp) : '');
+    var nListas = listas.length + (cp ? 1 : 0);
+    // 2) Aguardando envio: cupons/ofertas ja liberados, so esperando a vez.
+    var corpoItens = itens.map(cardFilaEnvio).join('');
+    // 3) Enviados recentemente: o que ja foi publicado no grupo.
+    var corpoEnvs = envs.map(cardEnviadoFila).join('');
+
+    lista.innerHTML =
+        secao('📃 Disparos de lista em andamento', nListas, corpoListas,
+          'Nenhum disparo de lista rodando agora.')
+      + secao('⏳ Aguardando envio', itens.length, corpoItens,
+          'Nada aguardando — cupons e ofertas liberados aparecem aqui até a hora de sair.')
+      + secao('✅ Enviados recentemente', envs.length, corpoEnvs,
+          'Nada publicado recentemente.');
   } catch (e) {
     ctx.innerHTML = '';
     lista.innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
