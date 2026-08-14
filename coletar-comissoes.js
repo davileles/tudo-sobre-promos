@@ -53,6 +53,7 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
 const crypto = require('crypto');
+const { atualizarDesempenho } = require('./desempenho.js');
 
 // ── utilidades ────────────────────────────────────────────────────────────
 
@@ -374,6 +375,15 @@ async function main() {
   for (const [plataforma] of falhas) {
     const d = dados.dias[ontem]?.[plataforma === 'Amazon' ? 'amazon' : plataforma === 'Shopee' ? 'shopee' : 'ml'];
     if (!d) console.warn(`[coleta] ${ontem} ficou sem dado de ${plataforma}`);
+  }
+
+  // Desempenho por produto: etapa independente e isolada. Roda depois da
+  // gravação principal justamente para que uma falha aqui (schema da Shopee
+  // mudou, ledger indisponível) não leve junto o número consolidado do dia.
+  try {
+    await atualizarDesempenho(janela, inicioDoDia, fimDoDia);
+  } catch (e) {
+    console.warn('[desempenho] falhou:', e.message);
   }
 
   if (falhas.length) {
