@@ -5528,7 +5528,11 @@ function origemLabelFila(o) {
   return esc(org);
 }
 function cardEnviadoFila(it) {
-  var tipo = TIPO_LABEL_FILA[it.tipoConteudo] || it.tipoConteudo;
+  // Disparo manual: o rotulo vem do subtipo escolhido na hora do envio
+  // (Cupom / Oferta / Mensagem); a etiqueta de origem ja diz "manual".
+  var tipo = it.tipoConteudo === 'manual_tsp'
+    ? ({ cupom:'Cupom', oferta:'Oferta' }[it.subtipo] || 'Mensagem')
+    : (TIPO_LABEL_FILA[it.tipoConteudo] || it.tipoConteudo);
   var dest = it.gruposDestino != null ? '<span class="ag-tag">→ ' + it.gruposDestino + ' grupo(s)</span>' : '';
   var hora = it.enviadoEm ? fmtHoraSP(it.enviadoEm) : (it.capturadoEm ? fmtHoraSP(it.capturadoEm) : '');
   return '<div class="ag-card">'
