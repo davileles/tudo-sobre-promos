@@ -24,6 +24,12 @@ const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
 const SHOPEE_APP_ID = process.env.SHOPEE_APP_ID;
 const SHOPEE_SECRET = process.env.SHOPEE_SECRET;
 
+const AMAZON_COOKIE = process.env.AMAZON_COOKIE;
+// Nome do query param que filtra o relatório por tracking ID no Associates
+// Central novo. Não é documentado; se a descoberta automática falhar, capture
+// a URL real via DevTools (mesmo caminho usado no ML) e fixe aqui via env.
+const AMAZON_TAG_PARAM = process.env.AMAZON_TAG_PARAM || '';
+
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
@@ -202,6 +208,136 @@ async function shopeeCliquesPorSubId(inicio, fim) {
   return out;
 }
 
+// ── Amazon por tracking ID ────────────────────────────────────────────────
+//
+// A página /p/reporting/earnings é a mesma que coletar-comissoes.js já lê: o
+// servidor renderiza a série diária dentro do HTML. A UI de relatórios guarda
+// os filtros na URL, então filtrar por tracking ID deve ser só um query param
+// a mais — o problema é que o NOME do param não é documentado. A descoberta
+// abaixo testa candidatos com um tracking ID canário (inexistente): se a série
+// do canário vier igual à agregada, a Amazon ignorou o param; se vier vazia ou
+// zerada, o filtro pegou. Isso evita o pior cenário, que é gravar o número
+// agregado da conta repetido em todos os 10 produtos como se fosse por tag.
+
+const AMAZON_CANARIO = 'cdvcanario0-20';
+
+async function amazonSerie(params) {
+  const url = 'https://associados.amazon.com.br/p/reporting/earnings'
+    + (params ? `?${params}` : '');
+  const r = await req(url, {
+    headers: { 'user-agent': UA, 'accept-language': 'pt-BR,pt;q=0.9', cookie: AMAZON_COOKIE },
+    redirect: 'manual',
+  });
+  if (r.status >= 300 && r.status < 400) throw new Error('sessão expirada (302) — renove AMAZON_COOKIE');
+  if (!r.ok) return null; // param inválido pode responder 4xx; trata como "não funcionou"
+
+  const html = (await r.text())
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c));
+
+  const blocos = html.match(/\{[^{}]*"day":"\d{4}-\d{2}-\d{2}"[^{}]*\}/g) || [];
+  const out = {};
+  for (const b of blocos) {
+    let o;
+    try { o = JSON.parse(b); } catch { continue; }
+    if (!o.day || o.clicks === undefined) continue;
+    out[o.day] = {
+      cliques: parseInt(o.clicks, 10) || 0,
+      pedidos: parseInt(o.ordered_items ?? o.orders ?? 0, 10) || 0,
+      vendas: num(parseFloat(o.revenue || 0) - parseFloat(o.returned_revenue || 0)),
+      comissao: num(o.total_earnings_with_hva ?? o.total_earnings ?? 0),
+    };
+  }
+  return out;
+}
+
+// Assinatura estável de uma série para comparação (dias ordenados).
+function assinaturaSerie(serie) {
+  if (!serie) return 'null';
+  return Object.keys(serie).sort()
+    .map((d) => `${d}:${serie[d].cliques}:${serie[d].vendas}:${serie[d].comissao}`)
+    .join('|');
+}
+
+let _paramTag; // undefined = ainda não descoberto; '' = descoberta falhou
+
+async function descobrirParamTag(serieAgg) {
+  if (_paramTag !== undefined) return _paramTag;
+  if (AMAZON_TAG_PARAM) { _paramTag = AMAZON_TAG_PARAM; return _paramTag; }
+
+  const assAgg = assinaturaSerie(serieAgg);
+  for (const cand of ['trackingId', 'tracking_id', 'trackingIds', 'tag']) {
+    const canario = await amazonSerie(`${cand}=${encodeURIComponent(AMAZON_CANARIO)}`);
+    await new Promise((res) => setTimeout(res, 500));
+    if (canario === null) continue; // 4xx: candidato rejeitado pelo servidor
+    const soZeros = Object.values(canario).every((d) => !d.cliques && !d.vendas && !d.comissao);
+    if (!Object.keys(canario).length || soZeros || assinaturaSerie(canario) !== assAgg) {
+      console.log(`[desempenho] param de tracking ID na Amazon: ${cand}`);
+      _paramTag = cand;
+      return _paramTag;
+    }
+  }
+  console.warn('[desempenho] Amazon ignorou todos os candidatos de param — '
+    + 'capture a URL do filtro por tracking ID via DevTools e defina AMAZON_TAG_PARAM');
+  _paramTag = '';
+  return _paramTag;
+}
+
+// Na Amazon o pool de refs rotaciona: o mesmo tracking ID aponta para produtos
+// diferentes em dias diferentes. A atribuição válida para o dia D é a mais
+// recente com data <= D — diferente da Shopee, onde o ref é determinístico.
+function resolutorAmazon(atribuicoes) {
+  const porRef = new Map();
+  for (const a of atribuicoes) {
+    if (!a.ref || String(a.loja || '').toLowerCase() !== 'amazon') continue;
+    if (!porRef.has(a.ref)) porRef.set(a.ref, []);
+    porRef.get(a.ref).push(a);
+  }
+  for (const lista of porRef.values()) lista.sort((x, y) => String(x.ts || x.data || '').localeCompare(String(y.ts || y.data || '')));
+  return {
+    refs: [...porRef.keys()],
+    resolver(ref, dia) {
+      const lista = porRef.get(ref) || [];
+      let achado = null;
+      for (const a of lista) { if ((a.data || '') <= dia) achado = a; else break; }
+      return achado;
+    },
+  };
+}
+
+async function desempenhoAmazon(janela, atribuicoes, registrar) {
+  if (!AMAZON_COOKIE) {
+    console.log('[desempenho] AMAZON_COOKIE ausente — Amazon por tag ignorada');
+    return 0;
+  }
+  const { refs, resolver } = resolutorAmazon(atribuicoes);
+  if (!refs.length) { console.log('[desempenho] ledger sem refs da Amazon'); return 0; }
+
+  const serieAgg = await amazonSerie('');
+  if (!serieAgg || !Object.keys(serieAgg).length) throw new Error('série agregada veio vazia — layout pode ter mudado');
+  const temTrafego = janela.some((d) => serieAgg[d] && serieAgg[d].cliques > 0);
+  if (!temTrafego) { console.log('[desempenho] Amazon sem cliques na janela — nada a atribuir'); return 0; }
+
+  const param = await descobrirParamTag(serieAgg);
+  if (!param) return 0;
+
+  let mudou = 0;
+  for (const ref of refs) {
+    const serie = await amazonSerie(`${param}=${encodeURIComponent(ref)}`);
+    await new Promise((res) => setTimeout(res, 500));
+    if (serie === null) { console.warn(`[desempenho] Amazon rejeitou consulta da tag ${ref}`); continue; }
+    for (const dia of janela) {
+      const d = serie[dia];
+      if (!d || (!d.cliques && !d.vendas && !d.comissao)) continue;
+      const attr = resolver(ref, dia);
+      if (!attr) continue; // tráfego anterior à primeira atribuição desse ref
+      mudou += registrar(dia, attr, {
+        cliques: d.cliques, pedidos: d.pedidos, vendas: d.vendas, comissao: d.comissao,
+      });
+    }
+  }
+  return mudou;
+}
+
 // ── consolidação ──────────────────────────────────────────────────────────
 
 // Chave normalizada: a mesma para qualquer loja, para o ranking do painel poder
@@ -214,33 +350,22 @@ function chaveProduto(loja, asin) {
  * Casa o que a plataforma reportou com o produto que foi disparado e grava o
  * acumulado. Recebe os dias já coletados; só toca no arquivo se algo mudou.
  */
-async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
-  if (!GH_TOKEN) throw new Error('GH_TOKEN_DADOS ausente');
+async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar) {
   if (!SHOPEE_COOKIE || !SHOPEE_APP_ID || !SHOPEE_SECRET) {
-    console.log('[desempenho] credenciais da Shopee ausentes — etapa ignorada');
-    return;
+    console.log('[desempenho] credenciais da Shopee ausentes — Shopee ignorada');
+    return 0;
   }
 
-  const { dados: ledger } = await lerJson(ARQ_RASTREIO, { atribuicoes: [] });
-  const atribuicoes = ledger?.atribuicoes || [];
-  if (!atribuicoes.length) {
-    console.log('[desempenho] ledger vazio — nada disparado com marcação ainda');
-    return;
-  }
-
-  // ref -> atribuição mais recente daquele ref dentro da janela. Na Shopee o ref
-  // é determinístico por item, então o mesmo ref reaparece em vários dias: o
+  // ref -> atribuição mais recente daquele ref. Na Shopee o ref é
+  // determinístico por item, então o mesmo ref reaparece em vários dias: o
   // registro serve só para saber QUAL produto é, não em que dia saiu.
   const porRef = new Map();
   for (const a of atribuicoes) {
-    if (!a.ref) continue;
+    if (!a.ref || String(a.loja || '').toLowerCase() === 'amazon') continue;
     const ant = porRef.get(a.ref);
     if (!ant || (a.data || '') > (ant.data || '')) porRef.set(a.ref, a);
   }
-
-  const { dados: arquivo } = await lerJson(ARQ_DESEMPENHO, { produtos: {}, dias: {} });
-  arquivo.produtos = arquivo.produtos || {};
-  arquivo.dias = arquivo.dias || {};
+  if (!porRef.size) { console.log('[desempenho] ledger sem refs da Shopee'); return 0; }
 
   let mudou = 0;
   for (const data of janela) {
@@ -250,30 +375,61 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     ]);
 
     const refs = new Set([...Object.keys(cliques), ...Object.keys(conversoes)]);
-    if (!refs.size) continue;
-
-    const doDia = (arquivo.dias[data] = arquivo.dias[data] || {});
     for (const ref of refs) {
       const attr = porRef.get(ref);
       if (!attr) continue; // ref que não saiu por nós (link antigo, outro canal)
-      const chave = chaveProduto(attr.loja, attr.asin);
       const conv = conversoes[ref] || { pedidos: 0, vendas: 0, comissao: 0 };
-      const registro = {
+      mudou += registrar(data, attr, {
         cliques: cliques[ref] || 0,
         pedidos: conv.pedidos, vendas: conv.vendas, comissao: conv.comissao,
-      };
-      const antes = JSON.stringify(doDia[chave] || null);
-      if (antes === JSON.stringify(registro)) continue;
-      doDia[chave] = registro;
-      mudou++;
-
-      const p = arquivo.produtos[chave] || (arquivo.produtos[chave] = {
-        loja: attr.loja || '', asin: attr.asin, nome: attr.nome || '', ref,
-        cliques: 0, pedidos: 0, vendas: 0, comissao: 0, disparos: 0,
       });
-      if (attr.nome && !p.nome) p.nome = attr.nome;
-      p.ref = ref;
     }
+  }
+  return mudou;
+}
+
+async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
+  if (!GH_TOKEN) throw new Error('GH_TOKEN_DADOS ausente');
+
+  const { dados: ledger } = await lerJson(ARQ_RASTREIO, { atribuicoes: [] });
+  const atribuicoes = ledger?.atribuicoes || [];
+  if (!atribuicoes.length) {
+    console.log('[desempenho] ledger vazio — nada disparado com marcação ainda');
+    return;
+  }
+
+  const { dados: arquivo } = await lerJson(ARQ_DESEMPENHO, { produtos: {}, dias: {} });
+  arquivo.produtos = arquivo.produtos || {};
+  arquivo.dias = arquivo.dias || {};
+
+  // Registrador comum: grava dia+produto no arquivo, pulando se nada mudou.
+  // Retorna 1 se tocou o arquivo, 0 se o registro já era idêntico.
+  const registrar = (data, attr, registro) => {
+    const chave = chaveProduto(attr.loja, attr.asin);
+    const doDia = (arquivo.dias[data] = arquivo.dias[data] || {});
+    if (JSON.stringify(doDia[chave] || null) === JSON.stringify(registro)) return 0;
+    doDia[chave] = registro;
+
+    const p = arquivo.produtos[chave] || (arquivo.produtos[chave] = {
+      loja: attr.loja || '', asin: attr.asin, nome: attr.nome || '', ref: attr.ref,
+      cliques: 0, pedidos: 0, vendas: 0, comissao: 0, disparos: 0,
+    });
+    if (attr.nome && !p.nome) p.nome = attr.nome;
+    p.ref = attr.ref;
+    return 1;
+  };
+
+  // Cada loja é isolada: falha em uma não derruba a outra nem a coleta principal.
+  let mudou = 0;
+  try {
+    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Shopee falhou:', e.message);
+  }
+  try {
+    mudou += await desempenhoAmazon(janela, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Amazon falhou:', e.message);
   }
 
   if (!mudou) { console.log('[desempenho] nada novo'); return; }
