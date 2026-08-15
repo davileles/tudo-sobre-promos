@@ -1147,6 +1147,23 @@ body.travado > *:not(#login-screen){display:none !important}
     <div id="censo-gr-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
   </div>
 
+  <div class="card" id="dist-gr-card" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span class="card-title" style="flex:1">📊 Cliques por dia</span>
+      <select id="dist-gr-modo" onchange="renderDistGrafico()" style="max-width:150px">
+        <option value="links" selected>Por link</option>
+        <option value="total">Total somado</option>
+      </select>
+      <select id="dist-gr-dias" onchange="renderDistGrafico()" style="max-width:120px">
+        <option value="30" selected>30 dias</option>
+        <option value="90">90 dias</option>
+        <option value="365">1 ano</option>
+      </select>
+    </div>
+    <div style="position:relative;height:230px"><canvas id="dist-chart"></canvas></div>
+    <div id="dist-gr-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
+  </div>
+
   <div class="sec-label">Links cadastrados</div>
   <div id="dist-lista"></div>
 </div>
@@ -2066,6 +2083,7 @@ async function carregarDist(){
     var totalCliques = DIST_CACHE.reduce(function(s,l){ return s + (l.cliques||0); }, 0);
     st.textContent = DIST_CACHE.length + ' link(s) · ' + totalCliques + ' clique(s) no total';
     renderDist();
+    renderDistGrafico();
   } catch(e){
     st.textContent = 'Não foi possível carregar os links.';
     document.getElementById('dist-lista').innerHTML =
@@ -2124,6 +2142,82 @@ function renderDist(){
       + '</div>'
       + '</div>';
   }).join('');
+}
+
+/* ── Gráfico de cliques por dia ── */
+// Série montada a partir de cliquesDia (gravado pelo proxy no fuso de SP).
+// Dia sem clique vira zero — diferente do censo, onde dia sem medição não existe.
+var DIST_CHART = null;
+var DIST_GR_CORES = ['#ff9900','#22c55e','#3b82f6','#f4654a','#a855f7','#eab308',
+                     '#14b8a6','#ec4899','#84cc16','#06b6d4','#f97316','#8b5cf6'];
+
+function distDiaSP(offsetDias){
+  var d = new Date(Date.now() - 3*60*60*1000 - (offsetDias||0)*24*60*60*1000);
+  return d.toISOString().slice(0,10);
+}
+
+function renderDistGrafico(){
+  var card = document.getElementById('dist-gr-card');
+  if (!card || typeof Chart === 'undefined') return;
+  var comDados = DIST_CACHE.filter(function(l){ return l.cliquesDia && Object.keys(l.cliquesDia).length; });
+  if (!comDados.length){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  var nDias = Number(document.getElementById('dist-gr-dias').value) || 30;
+  var modo  = document.getElementById('dist-gr-modo').value;
+
+  // Eixo: últimos N dias, do mais antigo ao mais recente (dias sem clique = 0)
+  var dias = [];
+  for (var i = nDias - 1; i >= 0; i--) dias.push(distDiaSP(i));
+  var labels = dias.map(function(d){ return d.slice(8,10) + '/' + d.slice(5,7); });
+
+  var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
+  var grade  = escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
+  var texto  = escuro ? '#9aa0aa' : '#6b7280';
+  var ds;
+
+  if (modo === 'total'){
+    var soma = dias.map(function(d){
+      return comDados.reduce(function(s,l){ return s + (l.cliquesDia[d] || 0); }, 0);
+    });
+    ds = [{ label:'Total', data: soma,
+            borderColor:'#ff9900', backgroundColor:'rgba(255,153,0,.14)',
+            fill:true, tension:.3, pointRadius:2, borderWidth:2 }];
+  } else {
+    ds = comDados.map(function(l, i){
+      return { label: l.nome || l.slug,
+               data: dias.map(function(d){ return l.cliquesDia[d] || 0; }),
+               borderColor: DIST_GR_CORES[i % DIST_GR_CORES.length],
+               backgroundColor:'transparent', fill:false, tension:.3,
+               pointRadius:2, borderWidth:2 };
+    });
+  }
+
+  var ctx = document.getElementById('dist-chart');
+  if (DIST_CHART) DIST_CHART.destroy();
+  DIST_CHART = new Chart(ctx, {
+    type:'line',
+    data:{ labels: labels, datasets: ds },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display: modo !== 'total', labels:{ color:texto, boxWidth:10, font:{ size:10 } } },
+        tooltip:{ callbacks:{ label:function(it){
+          return it.dataset.label + ': ' + it.parsed.y.toLocaleString('pt-BR') + ' clique(s)';
+        } } }
+      },
+      scales:{
+        x:{ grid:{ color:grade }, ticks:{ color:texto, maxTicksLimit:10, font:{ size:10 } } },
+        y:{ grid:{ color:grade }, ticks:{ color:texto, font:{ size:10 }, precision:0 }, beginAtZero:true }
+      }
+    }
+  });
+
+  var primeiro = comDados.map(function(l){ return Object.keys(l.cliquesDia).sort()[0]; }).sort()[0];
+  document.getElementById('dist-gr-aviso').textContent =
+    'Cliques por dia (fuso de SP), registrados desde ' + primeiro.slice(8,10) + '/' + primeiro.slice(5,7) + '/' + primeiro.slice(0,4)
+    + ' — cliques anteriores a essa data existem só no total acumulado.';
 }
 
 function distCopiar(slug){
