@@ -5643,6 +5643,9 @@ function cardEnviadoFila(it) {
     : (TIPO_LABEL_FILA[it.tipoConteudo] || it.tipoConteudo);
   var dest = it.gruposDestino != null ? '<span class="ag-tag">→ ' + it.gruposDestino + ' grupo(s)</span>' : '';
   var hora = it.enviadoEm ? fmtHoraSP(it.enviadoEm) : (it.capturadoEm ? fmtHoraSP(it.capturadoEm) : '');
+  // Mesmo padrao da secao Aguardando: previa de como a publicacao saiu no grupo.
+  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', temImagem: !!it.temImagem };
+  var aberta = _previasAbertas.has(String(it.id));
   return '<div class="ag-card">'
     + '<div class="ag-topo">'
     +   '<span class="ag-quando">✅ ' + hora + '</span>'
@@ -5652,6 +5655,9 @@ function cardEnviadoFila(it) {
     +   '<span class="ag-tag">' + origemLabelFila(it) + '</span>'
     +   dest
     + '</div>'
+    + '<button class="ag-previa-btn' + (aberta ? ' aberta' : '') + '" id="wa-btn-' + it.id + '" data-id="' + it.id + '" onclick="togglePreviaFila(this.dataset.id)">'
+    +   (aberta ? '👁 Ocultar prévia' : '👁 Prévia no grupo') + '</button>'
+    + '<div class="wa-prev' + (aberta ? ' aberta' : '') + '" id="wa-prev-' + it.id + '"></div>'
     + '</div>';
 }
 function cardFilaEnvio(it) {
@@ -5868,8 +5874,9 @@ async function carregarFilaEnvio() {
       + secao('✅ Enviados recentemente', envs.length, corpoEnvs,
           'Nada publicado recentemente.');
 
-    // Item que saiu da fila nao deve segurar estado de previa aberta.
-    var idsAtuais = new Set(itens.map(function(i){ return String(i.id); }));
+    // Item que saiu da fila (e do rastro de enviados) nao deve segurar
+    // estado de previa aberta.
+    var idsAtuais = new Set(itens.concat(envs).map(function(i){ return String(i.id); }));
     _previasAbertas.forEach(function(id){ if (!idsAtuais.has(id)) _previasAbertas.delete(id); });
     // Re-render devolve as previas abertas (o innerHTML acima as zerou).
     _previasAbertas.forEach(function(id){ renderPreviaFila(id); });
