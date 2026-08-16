@@ -5996,7 +5996,7 @@ async function carregarAprovacao() {
 async function aprovarItem(id) {
   var msg = document.getElementById('fila-msg-'+id).value;
   var fb = document.getElementById('fila-fb-'+id);
-  fb.className = 'fila-fb'; fb.textContent = 'Enviando...';
+  fb.className = 'fila-fb'; fb.textContent = 'Enviando aos grupos... (o espaçamento entre grupos pode levar alguns minutos)';
   try {
     var r = await fetch(SERVER+'/painel/aprovar/'+id, {
       method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mensagem: msg})
@@ -6006,8 +6006,20 @@ async function aprovarItem(id) {
       fb.className = 'fila-fb ok'; fb.textContent = '✓ Enviado!';
       setTimeout(function(){ var c = document.getElementById('fila-card-'+id); if(c) c.style.opacity='.35'; }, 800);
       setTimeout(carregarAprovacao, 2000);
-    } else { fb.className = 'fila-fb err'; fb.textContent = 'Erro: '+(d.erro||'falha'); }
-  } catch(e) { fb.className='fila-fb err'; fb.textContent='Sem resposta do servidor.'; }
+    } else {
+      fb.className = 'fila-fb err'; fb.textContent = 'Erro: '+(d.erro||'falha');
+      // 409 = já enviando/enviado (clique duplo ou aba desatualizada) — a
+      // recarga mostra o estado real e remove o card se ele já saiu da fila.
+      setTimeout(carregarAprovacao, 1500);
+    }
+  } catch(e) {
+    // Conexão cortada no meio de um envio longo NÃO significa que o envio
+    // falhou: o servidor marca o item como 'enviando' antes de despachar.
+    // A recarga tira o card da tela; a aba Fila mostra o andamento.
+    fb.className='fila-fb err';
+    fb.textContent='Conexão perdida — o envio pode estar em andamento. Atualizando a lista...';
+    setTimeout(carregarAprovacao, 2500);
+  }
 }
 
 async function rejeitarItem(id) {
