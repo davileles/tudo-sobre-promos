@@ -309,6 +309,20 @@ try {
   .ag-falta{font-size:11px;color:var(--muted);font-weight:600}
   .ag-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 7px}
   .ag-msg{font-size:12px;line-height:1.5;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden;background:var(--card-deep);border-radius:10px;padding:10px 12px}
+  .ag-previa-btn{background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:inherit;font-size:10.5px;font-weight:700;padding:5px 10px;cursor:pointer;margin-top:8px;transition:color .15s,border-color .15s}
+  .ag-previa-btn:hover{color:var(--text);border-color:var(--accent)}
+  .ag-previa-btn.aberta{color:var(--accent);border-color:var(--accent)}
+  /* Prévia estilo WhatsApp: fundo escuro do app + bolha de mensagem recebida */
+  .wa-prev{display:none;margin-top:10px;background:#0b141a;border:1px solid var(--border);border-radius:12px;padding:16px 14px}
+  .wa-prev.aberta{display:block}
+  .wa-bolha{background:#1f2c34;border-radius:10px;border-top-left-radius:2px;padding:7px 9px 8px;max-width:420px;box-shadow:0 1px 1px rgba(0,0,0,.3);position:relative}
+  .wa-remetente{font-size:11.5px;font-weight:700;color:#53bdeb;margin-bottom:3px}
+  .wa-img{width:100%;max-width:400px;border-radius:8px;display:block;margin-bottom:6px}
+  .wa-txt{font-size:13px;line-height:1.45;color:#e9edef;white-space:pre-wrap;word-break:break-word}
+  .wa-txt a{color:#53bdeb;text-decoration:none;pointer-events:none}
+  .wa-txt code{font-family:monospace;background:rgba(255,255,255,.06);border-radius:4px;padding:0 3px}
+  .wa-hora{font-size:10px;color:#8696a0;text-align:right;margin-top:3px}
+  .wa-prev-carregando{font-size:11px;color:#8696a0;padding:4px 0}
   .ag-acoes{display:flex;justify-content:flex-end;margin-top:10px}
 
   /* ══ GRUPOS ══ */
@@ -5666,6 +5680,10 @@ function cardFilaEnvio(it) {
     ? '<div class="fe-motivo trav">O servidor marcou este item como em envio e não concluiu. '
       + 'Confira o grupo antes de reenviar: pode ter saído sem o registro voltar.</div>'
     : '';
+  // Mensagem fica num mapa (nao em atributo HTML) para a previa nao sofrer
+  // com escape de aspas/quebras; sobrevive ao re-render do ciclo de 12s.
+  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', temImagem: !!it.temImagem };
+  var aberta = _previasAbertas.has(String(it.id));
   return '<div class="ag-card' + (it.travado ? ' trav' : '') + '">'
     + '<div class="ag-topo">' + quando
     +   '<span class="ag-tag">#' + it.id + '</span>'
@@ -5675,7 +5693,83 @@ function cardFilaEnvio(it) {
     + aviso
     + (it.motivo && !it.travado ? '<div class="fe-motivo">' + esc(it.motivo) + '</div>' : '')
     + '<div class="ag-msg">' + esc(it.mensagem || '') + '</div>'
+    + '<button class="ag-previa-btn' + (aberta ? ' aberta' : '') + '" id="wa-btn-' + it.id + '" data-id="' + it.id + '" onclick="togglePreviaFila(this.dataset.id)">'
+    +   (aberta ? '👁 Ocultar prévia' : '👁 Prévia no grupo') + '</button>'
+    + '<div class="wa-prev' + (aberta ? ' aberta' : '') + '" id="wa-prev-' + it.id + '"></div>'
     + '</div>';
+}
+
+/* ══════ PRÉVIA WHATSAPP (aba Fila) ══════ */
+// Estado fora do DOM: a lista e redesenhada a cada 12s e a previa aberta
+// precisa continuar aberta. Imagens ficam em cache para nao rebuscar a cada ciclo.
+var _FILA_MSGS = {};
+var _previasAbertas = new Set();
+var _previaImgCache = {};
+
+// Formatacao do WhatsApp -> HTML: *negrito*, _italico_, ~riscado~, ```mono```.
+// Mesmas regras do app, aplicadas apos escapar o HTML.
+function waFormatar(txt) {
+  var t = esc(txt);
+  t = t.replace(/```([\s\S]+?)```/g, '<code>$1</code>');
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s.,!?;:)])/gm, '$1<b>$2</b>');
+  t = t.replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s.,!?;:)])/gm, '$1<i>$2</i>');
+  t = t.replace(/(^|[\s(])~([^~\n]+)~(?=$|[\s.,!?;:)])/gm, '$1<s>$2</s>');
+  t = t.replace(/(https?:\/\/[^\s<]+)/g, '<a>$1</a>');
+  return t;
+}
+
+function renderPreviaFila(id) {
+  var box = document.getElementById('wa-prev-' + id);
+  if (!box) return;
+  var dados = _FILA_MSGS[id] || { mensagem: '', temImagem: false };
+  var agora = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' });
+  var img = '';
+  if (dados.temImagem) {
+    var cache = _previaImgCache[id];
+    if (cache && cache.base64) {
+      img = '<img class="wa-img" src="data:' + cache.mime + ';base64,' + cache.base64 + '" alt="imagem"/>';
+    } else if (cache && cache.semImagem) {
+      img = '';
+    } else {
+      img = '<div class="wa-prev-carregando">Carregando imagem…</div>';
+      buscarImagemPrevia(id);
+    }
+  }
+  box.innerHTML = '<div class="wa-bolha">'
+    + '<div class="wa-remetente">Tudo Sobre Promos</div>'
+    + img
+    + '<div class="wa-txt">' + waFormatar(dados.mensagem) + '</div>'
+    + '<div class="wa-hora">' + agora + '</div>'
+    + '</div>';
+}
+
+function buscarImagemPrevia(id) {
+  fetch(SERVER + '/operacao/fila/imagem/' + encodeURIComponent(id), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _previaImgCache[id] = (d.ok && d.temImagem)
+        ? { mime: d.mime, base64: d.base64 }
+        : { semImagem: true };
+      if (_previasAbertas.has(String(id))) renderPreviaFila(id);
+    })
+    .catch(function(){ _previaImgCache[id] = { semImagem: true }; if (_previasAbertas.has(String(id))) renderPreviaFila(id); });
+}
+
+function togglePreviaFila(id) {
+  id = String(id);
+  var box = document.getElementById('wa-prev-' + id);
+  var btn = document.getElementById('wa-btn-' + id);
+  if (!box || !btn) return;
+  if (_previasAbertas.has(id)) {
+    _previasAbertas.delete(id);
+    box.classList.remove('aberta'); box.innerHTML = '';
+    btn.classList.remove('aberta'); btn.textContent = '👁 Prévia no grupo';
+  } else {
+    _previasAbertas.add(id);
+    box.classList.add('aberta');
+    btn.classList.add('aberta'); btn.textContent = '👁 Ocultar prévia';
+    renderPreviaFila(id);
+  }
 }
 
 function cardListaEmDisparo(l) {
@@ -5773,6 +5867,12 @@ async function carregarFilaEnvio() {
           'Nada aguardando — cupons e ofertas liberados aparecem aqui até a hora de sair.')
       + secao('✅ Enviados recentemente', envs.length, corpoEnvs,
           'Nada publicado recentemente.');
+
+    // Item que saiu da fila nao deve segurar estado de previa aberta.
+    var idsAtuais = new Set(itens.map(function(i){ return String(i.id); }));
+    _previasAbertas.forEach(function(id){ if (!idsAtuais.has(id)) _previasAbertas.delete(id); });
+    // Re-render devolve as previas abertas (o innerHTML acima as zerou).
+    _previasAbertas.forEach(function(id){ renderPreviaFila(id); });
   } catch (e) {
     ctx.innerHTML = '';
     lista.innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
