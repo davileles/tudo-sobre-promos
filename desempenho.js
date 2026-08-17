@@ -347,32 +347,62 @@ function resolutorAmazon(atribuicoes) {
 }
 
 /**
- * Itens pedidos por ASIN — inclui o que o publico comprou sem ser divulgado
- * por nos. Mesma API do desempenho por tag, trocando o group_by; uma chamada
- * pela janela inteira, porque aqui interessa o produto e nao o dia da tag.
+ * Itens pedidos por ASIN — o que o publico comprou, inclusive sem termos
+ * divulgado. Mesma API do desempenho por tag, trocando o group_by.
+ *
+ * A Amazon responde 400 com corpo VAZIO quando nao gosta do par
+ * group_by/columns, entao o vocabulario aceito nao pode ser lido do erro:
+ * varremos as variantes plausiveis numa mesma execucao e ficamos com a
+ * primeira que responder 200. O nome da variante vencedora vai para o log e
+ * pode ser fixado depois em AMAZON_VARIANTE_ITENS.
  */
+const VARIANTES_ITENS_AMAZON = [
+  ['overview/asin/basico', 'overview', 'asin', 'asin,clicks,total_ordered_items,total_earnings'],
+  ['overview/asin/nome', 'overview', 'asin', 'asin,product_title,total_ordered_items,total_earnings'],
+  ['overview/asin/title', 'overview', 'asin', 'asin,title,total_ordered_items,total_earnings'],
+  ['earning/asin/basico', 'earning', 'asin', 'asin,total_ordered_items,total_earnings'],
+  ['earning/asin/itens', 'earning', 'asin', 'asin,items_shipped,earnings'],
+  ['orders/asin', 'orders', 'asin', 'asin,items_shipped,earnings'],
+  ['overview/product', 'overview', 'product', 'product,total_ordered_items,total_earnings'],
+  ['overview/asin/so_id', 'overview', 'asin', 'asin'],
+];
+
 async function amazonItensPedidos(ctx, de, ate) {
-  const qs = new URLSearchParams({
-    'query[type]': 'earning',
-    'query[start_date]': de, 'query[end_date]': ate,
-    'query[group_by]': 'asin',
-    'query[columns]': 'asin,title,category,items_shipped,price,earnings',
-    'query[order]': 'desc', 'query[sort]': 'earnings',
-    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
-    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
-    store_id: ctx.storeId,
-  });
-  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
-    { headers: ctx.headers });
-  // O corpo do 400 nomeia a coluna/group_by recusado — sem ele, descobrir o
-  // vocabulario aceito vira tentativa e erro as cegas.
-  if (!r.ok) {
-    let detalhe = '';
-    try { detalhe = ' — ' + (await r.text()).slice(0, 300).replace(/\s+/g, ' '); } catch (_) {}
-    throw new Error(`itens pedidos: status ${r.status}${detalhe}`);
+  const fixa = process.env.AMAZON_VARIANTE_ITENS;
+  const lista = fixa
+    ? VARIANTES_ITENS_AMAZON.filter((v) => v[0] === fixa)
+    : VARIANTES_ITENS_AMAZON;
+  const recusadas = [];
+
+  for (const [nome, tipo, groupBy, colunas] of lista) {
+    const qs = new URLSearchParams({
+      'query[type]': tipo,
+      'query[start_date]': de, 'query[end_date]': ate,
+      'query[group_by]': groupBy,
+      'query[columns]': colunas,
+      'query[order]': 'desc', 'query[sort]': colunas.split(',')[1] || 'asin',
+      'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+      'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+      store_id: ctx.storeId,
+    });
+    const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+      { headers: ctx.headers });
+    if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
+    if (r.ok) {
+      const j = await r.json();
+      const registros = j.records || [];
+      console.log(`[desempenho] Amazon: itens pedidos via variante "${nome}" `
+        + `(${registros.length} registros)`);
+      if (registros[0]) {
+        console.log('[desempenho] Amazon: campos do registro — '
+          + Object.keys(registros[0]).join(', '));
+      }
+      return registros;
+    }
+    recusadas.push(`${nome}:${r.status}`);
+    await new Promise((res) => setTimeout(res, 500));
   }
-  const j = await r.json();
-  return j.records || [];
+  throw new Error('nenhuma variante aceita — ' + recusadas.join(', '));
 }
 
 async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida) {
@@ -420,14 +450,18 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         .filter((a) => /amazon/i.test(String(a.loja || '')))
         .map((a) => String(a.asin || '').toUpperCase()));
       for (const it of await amazonItensPedidos(ctx, dias[0], dias[dias.length - 1])) {
-        const asin = String(it.asin || '').toUpperCase();
-        const unidades = Math.round(numApi(it.items_shipped));
+        // Os nomes de campo variam conforme a variante que a API aceitou.
+        const asin = String(it.asin || it.product || '').toUpperCase();
+        const unidades = Math.round(numApi(it.total_ordered_items ?? it.items_shipped));
         if (!asin || doLedger.has(asin) || !unidades) continue;
         coletarNaoAtribuida({
           loja: 'Amazon', id: asin, dia: null, tipo: 'nao_divulgado',
-          nome: it.title || '', categoria: it.category || '', vendedor: '',
+          nome: it.product_title || it.title || it.product || '',
+          categoria: it.category || '', vendedor: '',
           link: 'https://www.amazon.com.br/dp/' + asin,
-          unidades, vendas: numApi(it.price), comissao: numApi(it.earnings),
+          unidades,
+          vendas: numApi(it.shipped_revenue ?? it.price ?? 0),
+          comissao: numApi(it.total_earnings ?? it.earnings ?? 0),
         });
       }
     } catch (e) {
