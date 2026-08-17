@@ -379,16 +379,50 @@ const COLUNAS_VINCULADOS = [
 const CAT_PAGINA = 200;
 const CAT_MAX_PAGINAS = 6;
 
-async function amazonCategoriasPorAsin(ctx, de, ate) {
+/**
+ * Relatorios candidatos a devolver asin e categoria juntos. O top_seller e o
+ * unico confirmado, mas na pratica lista so o topo da janela (uma rodada real
+ * trouxe 9 linhas para 13 produtos comprados) — e a cauda longa e justamente
+ * quem interessa aqui. Entao, quando sobra ASIN sem categoria, tentamos os
+ * outros formatos em vez de desistir.
+ *
+ * Mesma logica do descobrirCampoSubId da Shopee: em vez de chutar a forma da
+ * API e quebrar, tentamos e registramos no log qual respondeu. Formato que nao
+ * existe devolve erro ou vem sem os campos, e simplesmente nao contribui.
+ */
+const RELATORIOS_CATEGORIA = [
+  { nome: 'overview/top_seller', type: 'overview', group_by: 'top_seller',
+    columns: 'rank,product,category,purchase_type', sort: 'total_ordered_items' },
+  { nome: 'earnings/product', type: 'earnings', group_by: 'product',
+    columns: 'product,category,seller,total_ordered_items,total_earnings', sort: 'total_earnings' },
+  { nome: 'orders/product', type: 'orders', group_by: 'product',
+    columns: 'product,category,total_ordered_items', sort: 'total_ordered_items' },
+  { nome: 'earnings/asin', type: 'earnings', group_by: 'asin',
+    columns: 'asin,product,category,total_earnings', sort: 'total_earnings' },
+];
+
+// O nome dos campos varia entre relatorios (asin solto, product aninhado,
+// category como texto ou objeto). Normalizamos aqui para que acrescentar um
+// candidato na lista acima nao exija mexer no parser.
+function parAsinCategoria(it) {
+  const bruto = it.asin || it.product_asin || it.linked_product
+    || (it.product && (it.product.asin || it.product.id)) || '';
+  const asin = String(bruto).toUpperCase();
+  const cat = it.category || it.category_name || it.product_category || '';
+  const nome = typeof cat === 'object' && cat ? (cat.name || cat.label || '') : cat;
+  return asin && nome ? [asin, String(nome)] : null;
+}
+
+async function categoriasDoRelatorio(ctx, rel, de, ate) {
   const mapa = new Map();
   let token = '';
   for (let pagina = 0; pagina < CAT_MAX_PAGINAS; pagina++) {
     const qs = new URLSearchParams({
-      'query[type]': 'overview',
+      'query[type]': rel.type,
       'query[start_date]': de, 'query[end_date]': ate,
-      'query[group_by]': 'top_seller',
-      'query[columns]': 'rank,product,category,purchase_type',
-      'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
+      'query[group_by]': rel.group_by,
+      'query[columns]': rel.columns,
+      'query[order]': 'desc', 'query[sort]': rel.sort,
       'query[skip]': String(pagina * CAT_PAGINA),
       'query[limit]': String(CAT_PAGINA),
       'query[next_token]': token,
@@ -400,16 +434,46 @@ async function amazonCategoriasPorAsin(ctx, de, ate) {
     // Falha no meio da paginacao devolve o que ja foi lido: categoria parcial
     // e melhor que nenhuma, e a coleta principal nao depende disto.
     if (!r.ok) break;
-    const j = await r.json();
-    const registros = j.records || [];
+    let j;
+    try { j = await r.json(); } catch (e) { break; }
+    const registros = j.records || j.rows || [];
     for (const it of registros) {
-      const asin = String(it.asin || '').toUpperCase();
-      if (asin && it.category) mapa.set(asin, String(it.category));
+      const par = parAsinCategoria(it);
+      if (par) mapa.set(par[0], par[1]);
     }
     // A API ora pagina por skip, ora por next_token; mandamos os dois e
     // paramos quando a pagina vem incompleta, que vale nos dois modos.
     token = j.nextToken || j.next_token || '';
     if (registros.length < CAT_PAGINA) break;
+    await new Promise((res) => setTimeout(res, 400));
+  }
+  return mapa;
+}
+
+/**
+ * Mapa asin -> categoria. O relatorio linked_product ignora qualquer coluna de
+ * categoria que se peca (responde 200 sem o campo), entao a categoria precisa
+ * vir de outro agrupamento. `alvos` sao os ASIN que ainda faltam: enquanto
+ * houver falta, tentamos o proximo relatorio da lista; quando nao ha alvo em
+ * aberto, paramos no primeiro — o custo extra so aparece quando serve.
+ */
+async function amazonCategoriasPorAsin(ctx, de, ate, alvos = null) {
+  const mapa = new Map();
+  for (const rel of RELATORIOS_CATEGORIA) {
+    let parcial = new Map();
+    try { parcial = await categoriasDoRelatorio(ctx, rel, de, ate); }
+    catch (e) { console.warn(`[desempenho] Amazon: ${rel.nome} falhou — ${e.message}`); }
+
+    let novos = 0;
+    for (const [asin, cat] of parcial) { if (!mapa.has(asin)) novos++; mapa.set(asin, cat); }
+    if (parcial.size) {
+      console.log(`[desempenho] Amazon: ${rel.nome} -> ${parcial.size} par(es) asin/categoria `
+        + `(${novos} inedito(s))`);
+    }
+
+    if (!alvos || !alvos.size) break;
+    const faltam = [...alvos].filter((a) => !mapa.has(a)).length;
+    if (!faltam) break;
     await new Promise((res) => setTimeout(res, 400));
   }
   return mapa;
@@ -540,8 +604,15 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
       // Categoria vem de outro agrupamento; falha aqui nao pode custar a coleta.
       const salvas = await carregarCategoriasSalvas();
+      // Alvos = ASIN comprado nesta janela que o cache ainda nao conhece. E o
+      // que decide se vale gastar chamada com os relatorios alternativos.
+      const alvos = new Set();
+      for (const it of vinculados) {
+        const a = String(it.linked_product || '').toUpperCase();
+        if (a && !(salvas[a] && salvas[a].categoria)) alvos.add(a);
+      }
       let categorias = new Map();
-      try { categorias = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1]); }
+      try { categorias = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1], alvos); }
       catch (e) { console.warn('[desempenho] Amazon: categorias falhou —', e.message); }
 
       // Descoberta da rodada tem prioridade sobre o cache (categoria pode ter
