@@ -445,8 +445,9 @@ async function categoriasDoRelatorio(ctx, rel, de, ate) {
     if (pagina === 0 && (!registros.length || !parAsinCategoria(registros[0]))) {
       console.log(`[desempenho] Amazon: ${rel.nome} sem par utilizavel — `
         + `${registros.length} linha(s), campos: `
-        + (registros.length ? Object.keys(registros[0]).join(',') : '(vazio) chaves da resposta: '
-          + Object.keys(j || {}).join(',')));
+        + (registros.length ? Object.keys(registros[0]).join(',')
+          : '(vazio) metadata=' + JSON.stringify(j && j.metadata).slice(0, 600)
+            + ' query=' + JSON.stringify(j && j.query).slice(0, 400)));
     }
     for (const it of registros) {
       const par = parAsinCategoria(it);
