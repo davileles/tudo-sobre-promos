@@ -364,6 +364,36 @@ const COLUNAS_VINCULADOS = [
   'total_ordered_revenue', 'shipped_items', 'shipped_revenue', 'total_earnings',
 ].join(',');
 
+/**
+ * Mapa asin -> categoria. O relatorio linked_product ignora qualquer coluna de
+ * categoria que se peca (responde 200 sem o campo), mas o agrupamento
+ * top_seller devolve asin e category juntos — e o unico lugar da API que
+ * vincula os dois. Cobre os mais vendidos da janela, que e justamente onde a
+ * analise por categoria interessa; o que faltar cai em "(sem categoria)".
+ */
+async function amazonCategoriasPorAsin(ctx, de, ate) {
+  const qs = new URLSearchParams({
+    'query[type]': 'overview',
+    'query[start_date]': de, 'query[end_date]': ate,
+    'query[group_by]': 'top_seller',
+    'query[columns]': 'rank,product,category,purchase_type',
+    'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
+    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+    store_id: ctx.storeId,
+  });
+  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+    { headers: ctx.headers });
+  if (!r.ok) return new Map();
+  const j = await r.json();
+  const mapa = new Map();
+  for (const it of j.records || []) {
+    const asin = String(it.asin || '').toUpperCase();
+    if (asin && it.category) mapa.set(asin, String(it.category));
+  }
+  return mapa;
+}
+
 async function amazonProdutosVinculados(ctx, de, ate) {
   const qs = new URLSearchParams({
     'query[type]': 'overview',
@@ -430,6 +460,10 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         .filter((a) => /amazon/i.test(String(a.loja || '')))
         .map((a) => String(a.asin || '').toUpperCase()));
       const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
+      // Categoria vem de outro agrupamento; falha aqui nao pode custar a coleta.
+      let categorias = new Map();
+      try { categorias = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1]); }
+      catch (e) { console.warn('[desempenho] Amazon: categorias falhou —', e.message); }
       for (const it of vinculados) {
         const asin = String(it.linked_product || '').toUpperCase();
         if (!asin) continue;
@@ -445,7 +479,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         coletarNaoAtribuida({
           loja: 'Amazon', id: asin, dia: null,
           tipo: noLedger ? 'indireta' : 'nao_divulgado',
-          nome: it.linked_product_title || '', categoria: '', vendedor: '',
+          nome: it.linked_product_title || '', categoria: categorias.get(asin) || '', vendedor: '',
           link: 'https://www.amazon.com.br/dp/' + asin,
           unidades,
           vendas: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue) * proporcao),
@@ -630,7 +664,42 @@ function chaveProduto(loja, asin) {
  * Casa o que a plataforma reportou com o produto que foi disparado e grava o
  * acumulado. Recebe os dias já coletados; só toca no arquivo se algo mudou.
  */
-async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar) {
+/**
+ * Itens comprados por conversao, com o sub_id que originou. Serve para separar
+ * o que o publico levou alem do produto divulgado: se o item comprado nao e o
+ * do ref, e venda indireta; se nao ha ref nosso, e compra de link antigo ou de
+ * outro canal e fica de fora.
+ */
+async function shopeeItensComprados(inicio, fim) {
+  const campo = await descobrirCampoSubId();
+  if (!campo) return [];
+
+  const saida = [];
+  let scrollId = null, guard = 0;
+  do {
+    const sc = scrollId ? `, scrollId:"${scrollId}"` : '';
+    const d = await shopeeGql(`{ conversionReport(purchaseTimeStart:${inicio}, `
+      + `purchaseTimeEnd:${fim}, limit:500${sc}){ `
+      + `nodes { ${campo} orders { items { itemId itemName itemPrice qty `
+      + 'actualAmount itemTotalCommission globalCategoryLv1Name shopName } } } '
+      + 'pageInfo { hasNextPage scrollId } } }');
+
+    const rep = d?.conversionReport;
+    if (!rep) break;
+    for (const n of rep.nodes || []) {
+      const bruto = n[campo];
+      const ref = Array.isArray(bruto) ? String(bruto[0] || '') : String(bruto || '');
+      for (const o of n.orders || []) {
+        for (const it of o.items || []) saida.push({ ref, item: it });
+      }
+    }
+    scrollId = rep.pageInfo?.hasNextPage ? rep.pageInfo.scrollId : null;
+  } while (scrollId && ++guard < 30);
+
+  return saida;
+}
+
+async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida) {
   if (!SHOPEE_COOKIE || !SHOPEE_APP_ID || !SHOPEE_SECRET) {
     console.log('[desempenho] credenciais da Shopee ausentes — Shopee ignorada');
     return 0;
@@ -668,6 +737,30 @@ async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, regi
         cliques: cliques[ref] || 0,
         pedidos: conv.pedidos, vendas: conv.vendas, comissao: conv.comissao,
       });
+    }
+
+    // O item comprado nem sempre e o divulgado: quando difere, e venda
+    // indireta e vira leitura de mercado, nao desempenho daquele disparo.
+    if (coletarNaoAtribuida) {
+      try {
+        for (const { ref, item } of await shopeeItensComprados(inicioDoDia(data), fimDoDia(data))) {
+          const attr = porRef.get(ref);
+          if (!attr) continue;
+          const idComprado = String(item.itemId || '');
+          if (!idComprado || idComprado === String(attr.asin || '')) continue;
+          coletarNaoAtribuida({
+            loja: 'Shopee', id: idComprado, dia: data, tipo: 'indireta',
+            nome: item.itemName || '', categoria: item.globalCategoryLv1Name || '',
+            vendedor: item.shopName || '',
+            link: 'https://shopee.com.br/product/0/' + idComprado,
+            unidades: Math.max(1, parseInt(item.qty, 10) || 1),
+            vendas: parseFloat(item.actualAmount || item.itemPrice || 0) || 0,
+            comissao: parseFloat(item.itemTotalCommission || 0) || 0,
+          });
+        }
+      } catch (e) {
+        console.warn(`[desempenho] Shopee: itens comprados ${data} —`, e.message);
+      }
     }
   }
   return mudou;
@@ -728,7 +821,7 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   // Cada loja é isolada: falha em uma não derruba a outra nem a coleta principal.
   let mudou = 0;
   try {
-    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar);
+    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida);
   } catch (e) {
     console.warn('[desempenho] Shopee falhou:', e.message);
   }
