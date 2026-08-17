@@ -67,20 +67,28 @@ async function lerJson(caminho, padrao = null) {
 }
 
 async function gravarJson(caminho, dados, mensagem) {
-  // SHA sempre relido imediatamente antes do PUT — o baileys escreve no mesmo
-  // repo e um SHA de segundos atrás já pode estar velho.
-  const atual = await lerJson(caminho, null);
-  const corpo = {
-    message: mensagem,
-    content: Buffer.from(JSON.stringify(dados, null, 1), 'utf8').toString('base64'),
-  };
-  if (atual.sha) corpo.sha = atual.sha;
-  const r = await req(`https://api.github.com/repos/${REPO_DADOS}/contents/${caminho}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(corpo),
-  }, 60000);
-  if (!r.ok) throw new Error(`gravação de ${caminho}: status ${r.status} — ${(await r.text()).slice(0, 200)}`);
+  // 503/502 do GitHub e 409 por SHA velho sao transitorios: o SHA e relido a
+  // cada tentativa (o baileys escreve no mesmo repo), entao repetir resolve os
+  // dois casos. Sem retry, uma indisponibilidade de segundos custava a rodada.
+  let ultimo = '';
+  for (let tent = 0; tent < 3; tent++) {
+    const atual = await lerJson(caminho, null);
+    const corpo = {
+      message: mensagem,
+      content: Buffer.from(JSON.stringify(dados, null, 1), 'utf8').toString('base64'),
+    };
+    if (atual.sha) corpo.sha = atual.sha;
+    const r = await req(`https://api.github.com/repos/${REPO_DADOS}/contents/${caminho}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    }, 60000);
+    if (r.ok) return;
+    ultimo = `status ${r.status} — ${(await r.text()).slice(0, 200)}`;
+    if (![409, 500, 502, 503].includes(r.status)) break;
+    await new Promise((res) => setTimeout(res, 2000 * (tent + 1)));
+  }
+  throw new Error(`gravação de ${caminho}: ${ultimo}`);
 }
 
 // ── Shopee ────────────────────────────────────────────────────────────────
