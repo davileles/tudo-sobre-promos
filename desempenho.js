@@ -380,30 +380,21 @@ const CAT_PAGINA = 200;
 const CAT_MAX_PAGINAS = 6;
 
 /**
- * Relatorios candidatos a devolver asin e categoria juntos. O top_seller e o
- * unico confirmado, mas na pratica lista so o topo da janela (uma rodada real
- * trouxe 9 linhas para 13 produtos comprados) — e a cauda longa e justamente
- * quem interessa aqui. Entao, quando sobra ASIN sem categoria, tentamos os
- * outros formatos em vez de desistir.
+ * Unico relatorio da API que devolve asin e categoria na mesma linha. O
+ * agrupamento linked_product — que e o que lista os produtos comprados —
+ * ignora qualquer coluna de categoria que se peca: responde 200 sem o campo.
  *
- * Mesma logica do descobrirCampoSubId da Shopee: em vez de chutar a forma da
- * API e quebrar, tentamos e registramos no log qual respondeu. Formato que nao
- * existe devolve erro ou vem sem os campos, e simplesmente nao contribui.
+ * Testados e descartados (respondem 200 com total_results:0, ou seja, a
+ * combinacao nao existe): earnings/product, earnings/asin, orders/product.
  */
-const RELATORIOS_CATEGORIA = [
-  { nome: 'overview/top_seller', type: 'overview', group_by: 'top_seller',
-    columns: 'rank,product,category,purchase_type', sort: 'total_ordered_items' },
-  { nome: 'earnings/product', type: 'earnings', group_by: 'product',
-    columns: 'product,category,seller,total_ordered_items,total_earnings', sort: 'total_earnings' },
-  { nome: 'orders/product', type: 'orders', group_by: 'product',
-    columns: 'product,category,total_ordered_items', sort: 'total_ordered_items' },
-  { nome: 'earnings/asin', type: 'earnings', group_by: 'asin',
-    columns: 'asin,product,category,total_earnings', sort: 'total_earnings' },
-];
+const REL_TOP_SELLER = {
+  nome: 'top_seller', type: 'overview', group_by: 'top_seller',
+  columns: 'rank,product,category,purchase_type', sort: 'total_ordered_items',
+};
 
 // O nome dos campos varia entre relatorios (asin solto, product aninhado,
-// category como texto ou objeto). Normalizamos aqui para que acrescentar um
-// candidato na lista acima nao exija mexer no parser.
+// category como texto ou objeto). Normalizar aqui evita que uma mudanca de
+// forma da API vire categoria vazia silenciosa.
 function parAsinCategoria(it) {
   const bruto = it.asin || it.product_asin || it.linked_product
     || (it.product && (it.product.asin || it.product.id)) || '';
@@ -433,22 +424,10 @@ async function categoriasDoRelatorio(ctx, rel, de, ate) {
       { headers: ctx.headers });
     // Falha no meio da paginacao devolve o que ja foi lido: categoria parcial
     // e melhor que nenhuma, e a coleta principal nao depende disto.
-    if (!r.ok) {
-      if (pagina === 0) console.log(`[desempenho] Amazon: ${rel.nome} recusado (status ${r.status})`);
-      break;
-    }
+    if (!r.ok) break;
     let j;
     try { j = await r.json(); } catch (e) { break; }
     const registros = j.records || j.rows || [];
-    // Diagnostico: relatorio que responde 200 mas nao entrega o par asin/categoria
-    // so ensina alguma coisa se soubermos QUAIS campos ele entregou.
-    if (pagina === 0 && (!registros.length || !parAsinCategoria(registros[0]))) {
-      console.log(`[desempenho] Amazon: ${rel.nome} sem par utilizavel — `
-        + `${registros.length} linha(s), campos: `
-        + (registros.length ? Object.keys(registros[0]).join(',')
-          : '(vazio) metadata=' + JSON.stringify(j && j.metadata).slice(0, 600)
-            + ' query=' + JSON.stringify(j && j.query).slice(0, 400)));
-    }
     for (const it of registros) {
       const par = parAsinCategoria(it);
       if (par) mapa.set(par[0], par[1]);
@@ -463,31 +442,43 @@ async function categoriasDoRelatorio(ctx, rel, de, ate) {
 }
 
 /**
- * Mapa asin -> categoria. O relatorio linked_product ignora qualquer coluna de
- * categoria que se peca (responde 200 sem o campo), entao a categoria precisa
- * vir de outro agrupamento. `alvos` sao os ASIN que ainda faltam: enquanto
- * houver falta, tentamos o proximo relatorio da lista; quando nao ha alvo em
- * aberto, paramos no primeiro — o custo extra so aparece quando serve.
+ * Mapa asin -> categoria para os produtos comprados na janela.
+ *
+ * O top_seller e um ranking, nao uma listagem: ignora o limit e devolve so o
+ * topo do recorte pedido (uma rodada real trouxe 9 linhas para 13 produtos,
+ * com limit=200 e paginacao). Como e ranking, o jeito de alcancar a cauda e
+ * encolher o recorte — cada DIA tem o seu proprio topo, e um produto de 1
+ * unidade que some no ranking de 15 dias costuma aparecer no ranking do dia em
+ * que foi vendido.
+ *
+ * A varredura diaria so roda quando ainda falta alguem (`alvos`), e para assim
+ * que todos forem resolvidos: no caso normal — cache quente — nao custa nada.
  */
-async function amazonCategoriasPorAsin(ctx, de, ate, alvos = null) {
+async function amazonCategoriasPorAsin(ctx, dias, alvos = null) {
   const mapa = new Map();
-  for (const rel of RELATORIOS_CATEGORIA) {
-    let parcial = new Map();
-    try { parcial = await categoriasDoRelatorio(ctx, rel, de, ate); }
-    catch (e) { console.warn(`[desempenho] Amazon: ${rel.nome} falhou — ${e.message}`); }
+  const juntar = (parcial) => { for (const [a, cat] of parcial) mapa.set(a, cat); };
+  const faltam = () => (alvos ? [...alvos].filter((a) => !mapa.has(a)).length : 0);
 
-    let novos = 0;
-    for (const [asin, cat] of parcial) { if (!mapa.has(asin)) novos++; mapa.set(asin, cat); }
-    if (parcial.size) {
-      console.log(`[desempenho] Amazon: ${rel.nome} -> ${parcial.size} par(es) asin/categoria `
-        + `(${novos} inedito(s))`);
+  try { juntar(await categoriasDoRelatorio(ctx, REL_TOP_SELLER, dias[0], dias[dias.length - 1])); }
+  catch (e) { console.warn('[desempenho] Amazon: top_seller da janela falhou —', e.message); }
+  const daJanela = mapa.size;
+
+  let varridos = 0;
+  if (alvos && alvos.size) {
+    // Do dia mais recente para o mais antigo: compra nova e a que tende a
+    // faltar, e assim a varredura costuma terminar antes de gastar a janela.
+    for (const dia of [...dias].reverse()) {
+      if (!faltam()) break;
+      await new Promise((res) => setTimeout(res, 400));
+      try { juntar(await categoriasDoRelatorio(ctx, REL_TOP_SELLER, dia, dia)); }
+      catch (e) { console.warn(`[desempenho] Amazon: top_seller ${dia} —`, e.message); }
+      varridos++;
     }
-
-    if (!alvos || !alvos.size) break;
-    const faltam = [...alvos].filter((a) => !mapa.has(a)).length;
-    if (!faltam) break;
-    await new Promise((res) => setTimeout(res, 400));
   }
+
+  console.log(`[desempenho] Amazon: categorias — ${daJanela} pela janela`
+    + (varridos ? `, +${mapa.size - daJanela} em ${varridos} dia(s) varrido(s)` : '')
+    + (alvos ? `, ${faltam()} alvo(s) sem resposta` : ''));
   return mapa;
 }
 
@@ -624,7 +615,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         if (a && !(salvas[a] && salvas[a].categoria)) alvos.add(a);
       }
       let categorias = new Map();
-      try { categorias = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1], alvos); }
+      try { categorias = await amazonCategoriasPorAsin(ctx, dias, alvos); }
       catch (e) { console.warn('[desempenho] Amazon: categorias falhou —', e.message); }
 
       // Descoberta da rodada tem prioridade sobre o cache (categoria pode ter
