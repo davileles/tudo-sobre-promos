@@ -347,64 +347,40 @@ function resolutorAmazon(atribuicoes) {
 }
 
 /**
- * Itens pedidos por ASIN — o que o publico comprou, inclusive sem termos
- * divulgado. Mesma API do desempenho por tag, trocando o group_by.
+ * Produtos vinculados (aba "Produto relacionado" do painel): o que o publico
+ * comprou tendo entrado por um link nosso.
  *
- * A Amazon responde 400 com corpo VAZIO quando nao gosta do par
- * group_by/columns, entao o vocabulario aceito nao pode ser lido do erro:
- * varremos as variantes plausiveis numa mesma execucao e ficamos com a
- * primeira que responder 200. O nome da variante vencedora vai para o log e
- * pode ser fixado depois em AMAZON_VARIANTE_ITENS.
+ * Vocabulario capturado da propria pagina em 17/08/2026 — os valores aceitos
+ * em group_by sao linked_product, tag_id, purchased_asin_product_category,
+ * day e top_seller; "asin" nao existe e por isso respondia 400 de corpo vazio.
+ *
+ * Aqui a Amazon entrega o que o ML nao entrega: direct_ordered_items e
+ * indirect_ordered_items separados POR produto divulgado, ou seja, quanto de
+ * venda indireta cada link nosso puxou.
  */
-const VARIANTES_ITENS_AMAZON = [
-  ['orders/asin/completo', 'orders', 'asin', 'asin,product_title,category,items_shipped,shipped_revenue,earnings'],
-  ['orders/asin/ordered', 'orders', 'asin', 'asin,product_title,total_ordered_items,total_earnings'],
-  ['orders/asin/titulo', 'orders', 'asin', 'asin,title,items_shipped,earnings'],
-  ['orders/asin/basico', 'orders', 'asin', 'asin,items_shipped,earnings'],
-  ['earning/asin/itens', 'earning', 'asin', 'asin,items_shipped,earnings'],
-  ['earning/asin/ordered', 'earning', 'asin', 'asin,total_ordered_items,total_earnings'],
-  ['overview/asin/basico', 'overview', 'asin', 'asin,clicks,total_ordered_items,total_earnings'],
-  ['overview/asin/nome', 'overview', 'asin', 'asin,product_title,total_ordered_items,total_earnings'],
-  ['overview/product', 'overview', 'product', 'product,total_ordered_items,total_earnings'],
-];
+const COLUNAS_VINCULADOS = [
+  'linked_product', 'linked_product_title', 'clicks',
+  'indirect_ordered_items', 'direct_ordered_items', 'total_ordered_items',
+  'total_ordered_revenue', 'shipped_items', 'shipped_revenue', 'total_earnings',
+].join(',');
 
-async function amazonItensPedidos(ctx, de, ate) {
-  const fixa = process.env.AMAZON_VARIANTE_ITENS;
-  const lista = fixa
-    ? VARIANTES_ITENS_AMAZON.filter((v) => v[0] === fixa)
-    : VARIANTES_ITENS_AMAZON;
-  const recusadas = [];
-
-  for (const [nome, tipo, groupBy, colunas] of lista) {
-    const qs = new URLSearchParams({
-      'query[type]': tipo,
-      'query[start_date]': de, 'query[end_date]': ate,
-      'query[group_by]': groupBy,
-      'query[columns]': colunas,
-      'query[order]': 'desc', 'query[sort]': colunas.split(',')[1] || 'asin',
-      'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
-      'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
-      store_id: ctx.storeId,
-    });
-    const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
-      { headers: ctx.headers });
-    if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
-    if (r.ok) {
-      const j = await r.json();
-      const registros = j.records || [];
-      // 200 com zero registros nao prova nada: a combinacao pode ser valida e
-      // simplesmente nao ser o relatorio que queremos. Guarda e segue tentando.
-      if (!registros.length) { recusadas.push(`${nome}:vazia`); await new Promise((res) => setTimeout(res, 500)); continue; }
-      console.log(`[desempenho] Amazon: itens pedidos via variante "${nome}" `
-        + `(${registros.length} registros)`);
-      console.log('[desempenho] Amazon: campos do registro — '
-        + Object.keys(registros[0]).join(', '));
-      return registros;
-    }
-    recusadas.push(`${nome}:${r.status}`);
-    await new Promise((res) => setTimeout(res, 500));
-  }
-  throw new Error('nenhuma variante com dados — ' + recusadas.join(', '));
+async function amazonProdutosVinculados(ctx, de, ate) {
+  const qs = new URLSearchParams({
+    'query[type]': 'overview',
+    'query[start_date]': de, 'query[end_date]': ate,
+    'query[group_by]': 'linked_product',
+    'query[columns]': COLUNAS_VINCULADOS,
+    'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
+    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+    store_id: ctx.storeId,
+  });
+  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+    { headers: ctx.headers });
+  if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
+  if (!r.ok) throw new Error(`produtos vinculados: status ${r.status}`);
+  const j = await r.json();
+  return j.records || [];
 }
 
 async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida) {
@@ -443,38 +419,41 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
     await new Promise((res) => setTimeout(res, 400));
   }
 
-  // Produtos comprados na janela que nao estao no ledger: leitura de mercado,
-  // nao desempenho de disparo (a Amazon nao diz por qual link vieram).
-  //
-  // DESLIGADO por padrao (AMAZON_ITENS=on para religar). O relatorio de itens
-  // pedidos NAO sai desta rota: /reporting/table aceita group_by=asin apenas
-  // com type=orders, e ai responde 200 sempre vazio; nos demais types recusa
-  // com 400 de corpo vazio. Sem o vocabulario certo, cada rodada gastaria 9
-  // requisicoes para nada. Retomar capturando a chamada real da aba "Produtos
-  // pedidos" do painel de Associados, como foi feito com o relatorio por tag.
-  if (coletarNaoAtribuida && process.env.AMAZON_ITENS === 'on') {
+  // Produtos comprados na janela: o ledger diz quais divulgamos, e o resto e
+  // leitura de mercado. Como a Amazon separa direto de indireto por produto,
+  // registramos os dois lados — ate para item que JA esta no ledger, porque a
+  // parcela indireta dele nao e desempenho do disparo.
+  if (coletarNaoAtribuida) {
     try {
       const dias = [...janela].sort();
       const doLedger = new Set(atribuicoes
         .filter((a) => /amazon/i.test(String(a.loja || '')))
         .map((a) => String(a.asin || '').toUpperCase()));
-      for (const it of await amazonItensPedidos(ctx, dias[0], dias[dias.length - 1])) {
-        // Os nomes de campo variam conforme a variante que a API aceitou.
-        const asin = String(it.asin || it.product || '').toUpperCase();
-        const unidades = Math.round(numApi(it.total_ordered_items ?? it.items_shipped));
-        if (!asin || doLedger.has(asin) || !unidades) continue;
+      const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
+      for (const it of vinculados) {
+        const asin = String(it.linked_product || '').toUpperCase();
+        if (!asin) continue;
+        const indiretos = Math.round(numApi(it.indirect_ordered_items));
+        const total = Math.round(numApi(it.total_ordered_items));
+        const noLedger = doLedger.has(asin);
+        // Item divulgado sem parcela indireta ja esta coberto pelo desempenho
+        // por tag: repetir aqui seria contar a mesma venda duas vezes.
+        if (noLedger && !indiretos) continue;
+        const unidades = noLedger ? indiretos : total;
+        if (!unidades) continue;
+        const proporcao = total > 0 ? unidades / total : 1;
         coletarNaoAtribuida({
-          loja: 'Amazon', id: asin, dia: null, tipo: 'nao_divulgado',
-          nome: it.product_title || it.title || it.product || '',
-          categoria: it.category || '', vendedor: '',
+          loja: 'Amazon', id: asin, dia: null,
+          tipo: noLedger ? 'indireta' : 'nao_divulgado',
+          nome: it.linked_product_title || '', categoria: '', vendedor: '',
           link: 'https://www.amazon.com.br/dp/' + asin,
           unidades,
-          vendas: numApi(it.shipped_revenue ?? it.price ?? 0),
-          comissao: numApi(it.total_earnings ?? it.earnings ?? 0),
+          vendas: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue) * proporcao),
+          comissao: num(numApi(it.total_earnings) * proporcao),
         });
       }
     } catch (e) {
-      console.warn('[desempenho] Amazon: itens pedidos falhou —', e.message);
+      console.warn('[desempenho] Amazon: produtos vinculados falhou —', e.message);
     }
   }
   return mudou;
