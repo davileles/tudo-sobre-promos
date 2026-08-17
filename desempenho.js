@@ -19,6 +19,7 @@ const REPO_DADOS = process.env.REPO_DADOS || 'davileles/cdv-tsp-dados';
 const ARQ_DESEMPENHO = process.env.ARQUIVO_DESEMPENHO || 'tsp/desempenho-produtos.json';
 const ARQ_RASTREIO = process.env.ARQUIVO_RASTREIO || 'tsp/rastreio.json';
 const ARQ_DESCOBERTAS = process.env.ARQUIVO_DESCOBERTAS || 'tsp/vendas-descobertas.json';
+const ARQ_CATEGORIAS = process.env.ARQUIVO_CATEGORIAS || 'tsp/categorias-amazon.json';
 const GH_TOKEN = process.env.GH_TOKEN_DADOS;
 
 const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
@@ -368,30 +369,107 @@ const COLUNAS_VINCULADOS = [
  * Mapa asin -> categoria. O relatorio linked_product ignora qualquer coluna de
  * categoria que se peca (responde 200 sem o campo), mas o agrupamento
  * top_seller devolve asin e category juntos — e o unico lugar da API que
- * vincula os dois. Cobre os mais vendidos da janela, que e justamente onde a
- * analise por categoria interessa; o que faltar cai em "(sem categoria)".
+ * vincula os dois.
+ *
+ * O top_seller e ordenado por unidades, entao uma unica pagina cobre so os
+ * campeoes da janela — e a cauda longa e justamente onde moram as compras nao
+ * divulgadas, que sao o objeto desta coleta. Por isso paginamos: sem isso,
+ * item que vendeu 1 unidade caia em "(sem categoria)" por construcao.
  */
+const CAT_PAGINA = 200;
+const CAT_MAX_PAGINAS = 6;
+
 async function amazonCategoriasPorAsin(ctx, de, ate) {
-  const qs = new URLSearchParams({
-    'query[type]': 'overview',
-    'query[start_date]': de, 'query[end_date]': ate,
-    'query[group_by]': 'top_seller',
-    'query[columns]': 'rank,product,category,purchase_type',
-    'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
-    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
-    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
-    store_id: ctx.storeId,
-  });
-  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
-    { headers: ctx.headers });
-  if (!r.ok) return new Map();
-  const j = await r.json();
   const mapa = new Map();
-  for (const it of j.records || []) {
-    const asin = String(it.asin || '').toUpperCase();
-    if (asin && it.category) mapa.set(asin, String(it.category));
+  let token = '';
+  for (let pagina = 0; pagina < CAT_MAX_PAGINAS; pagina++) {
+    const qs = new URLSearchParams({
+      'query[type]': 'overview',
+      'query[start_date]': de, 'query[end_date]': ate,
+      'query[group_by]': 'top_seller',
+      'query[columns]': 'rank,product,category,purchase_type',
+      'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
+      'query[skip]': String(pagina * CAT_PAGINA),
+      'query[limit]': String(CAT_PAGINA),
+      'query[next_token]': token,
+      'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+      store_id: ctx.storeId,
+    });
+    const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+      { headers: ctx.headers });
+    // Falha no meio da paginacao devolve o que ja foi lido: categoria parcial
+    // e melhor que nenhuma, e a coleta principal nao depende disto.
+    if (!r.ok) break;
+    const j = await r.json();
+    const registros = j.records || [];
+    for (const it of registros) {
+      const asin = String(it.asin || '').toUpperCase();
+      if (asin && it.category) mapa.set(asin, String(it.category));
+    }
+    // A API ora pagina por skip, ora por next_token; mandamos os dois e
+    // paramos quando a pagina vem incompleta, que vale nos dois modos.
+    token = j.nextToken || j.next_token || '';
+    if (registros.length < CAT_PAGINA) break;
+    await new Promise((res) => setTimeout(res, 400));
   }
   return mapa;
+}
+
+// Cache persistente asin -> categoria (cdv-tsp-dados). O top_seller so enxerga
+// a janela corrente: um ASIN visto ontem e ausente do top de hoje voltaria a
+// ficar sem categoria. Guardando o que ja foi descoberto, cada rodada precisa
+// resolver apenas o que e novo — e o rotulo para de oscilar entre as coletas.
+const CAT_VALIDADE_DIAS = 180;
+const CAT_REFRESCO_DIAS = 30;
+
+async function carregarCategoriasSalvas() {
+  try {
+    const { dados } = await lerJson(ARQ_CATEGORIAS, { categorias: {} });
+    return dados?.categorias || {};
+  } catch (e) {
+    console.warn('[desempenho] Amazon: cache de categorias ilegivel —', e.message);
+    return {};
+  }
+}
+
+function diaISO(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+async function salvarCategorias(salvas, conhecidas) {
+  const hoje = diaISO(Date.now());
+  const corte = diaISO(Date.now() - CAT_REFRESCO_DIAS * 86400000);
+  let novos = 0, refrescados = 0;
+
+  for (const [asin, categoria] of conhecidas) {
+    const atual = salvas[asin];
+    if (!atual || atual.categoria !== categoria) {
+      salvas[asin] = { categoria, visto: hoje };
+      novos++;
+    } else if ((atual.visto || '') < corte) {
+      // Marca de uso: ASIN que continua vendendo nao pode ser podado so por
+      // ter saido do top_seller. So reescrevemos quando a marca ja envelheceu,
+      // para nao gerar commit diario sem conteudo novo.
+      atual.visto = hoje;
+      refrescados++;
+    }
+  }
+
+  // Poda: ASIN sem sinal ha meses nao volta e so infla o arquivo.
+  const limite = diaISO(Date.now() - CAT_VALIDADE_DIAS * 86400000);
+  let podados = 0;
+  for (const asin of Object.keys(salvas)) {
+    if ((salvas[asin].visto || '') < limite) { delete salvas[asin]; podados++; }
+  }
+
+  if (!novos && !refrescados && !podados) return;
+  await gravarJson(ARQ_CATEGORIAS, {
+    atualizadoEm: new Date().toISOString(),
+    total: Object.keys(salvas).length,
+    categorias: salvas,
+  }, `chore: categorias Amazon (+${novos} / -${podados})`);
+  console.log(`[desempenho] Amazon: categorias +${novos} nova(s), ${refrescados} refrescada(s), `
+    + `-${podados} podada(s) — ${Object.keys(salvas).length} no cache`);
 }
 
 async function amazonProdutosVinculados(ctx, de, ate) {
@@ -461,9 +539,20 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         .map((a) => String(a.asin || '').toUpperCase()));
       const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
       // Categoria vem de outro agrupamento; falha aqui nao pode custar a coleta.
+      const salvas = await carregarCategoriasSalvas();
       let categorias = new Map();
       try { categorias = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1]); }
       catch (e) { console.warn('[desempenho] Amazon: categorias falhou —', e.message); }
+
+      // Descoberta da rodada tem prioridade sobre o cache (categoria pode ter
+      // sido recategorizada pela Amazon); o cache cobre quem ficou de fora.
+      const aplicadas = new Map(categorias);
+      const categoriaDe = (asin) => {
+        const c = categorias.get(asin) || (salvas[asin] && salvas[asin].categoria) || '';
+        if (c) aplicadas.set(asin, c);
+        return c;
+      };
+      let semCategoria = 0;
       for (const it of vinculados) {
         const asin = String(it.linked_product || '').toUpperCase();
         if (!asin) continue;
@@ -476,16 +565,25 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         const unidades = noLedger ? indiretos : total;
         if (!unidades) continue;
         const proporcao = total > 0 ? unidades / total : 1;
+        if (!categoriaDe(asin)) semCategoria++;
         coletarNaoAtribuida({
           loja: 'Amazon', id: asin, dia: null,
           tipo: noLedger ? 'indireta' : 'nao_divulgado',
-          nome: it.linked_product_title || '', categoria: categorias.get(asin) || '', vendedor: '',
+          nome: it.linked_product_title || '', categoria: categoriaDe(asin), vendedor: '',
           link: 'https://www.amazon.com.br/dp/' + asin,
           unidades,
           vendas: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue) * proporcao),
           comissao: num(numApi(it.total_earnings) * proporcao),
         });
       }
+      if (semCategoria) {
+        console.log(`[desempenho] Amazon: ${semCategoria} produto(s) sem categoria `
+          + `(fora do top_seller e do cache)`);
+      }
+      // Cache atualizado depois do uso: assim a marca de uso cobre tambem o
+      // ASIN que veio do cache e nao apareceu no top_seller desta janela.
+      try { await salvarCategorias(salvas, aplicadas); }
+      catch (e) { console.warn('[desempenho] Amazon: cache de categorias nao gravou —', e.message); }
     } catch (e) {
       console.warn('[desempenho] Amazon: produtos vinculados falhou —', e.message);
     }
@@ -814,7 +912,12 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     g.comissao = num(g.comissao + v.comissao);
     g.ocorrencias += 1;
     if (v.dia && !g.dias.includes(v.dia)) g.dias.push(v.dia);
+    // O grupo nasce com os campos da primeira ocorrencia; se ela veio incompleta
+    // (categoria vazia, por exemplo), a proxima preenche em vez de descartar.
     if (!g.nome && v.nome) g.nome = v.nome;
+    if (!g.categoria && v.categoria) g.categoria = v.categoria;
+    if (!g.vendedor && v.vendedor) g.vendedor = v.vendedor;
+    if (!g.link && v.link) g.link = v.link;
     naoAtribuidas.set(chave, g);
   };
 
