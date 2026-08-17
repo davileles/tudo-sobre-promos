@@ -228,19 +228,23 @@ async function amazonContexto() {
   if (!r.ok) throw new Error(`página de relatórios: status ${r.status}`);
   const html = await r.text();
 
-  const mTok = html.match(/<meta[^>]+name="csrf-token"[^>]+content="([^"]+)"/)
-    || html.match(/<meta[^>]+content="([^"]+)"[^>]+name="csrf-token"/);
-  if (!mTok) throw new Error('meta csrf-token não encontrado — layout da página mudou');
-
-  const mPs = html.match(/id="pageState"[^>]*data-page-state="([^"]*)"/)
+  // No HTML servido o atributo vem entre aspas simples com JSON puro dentro;
+  // no DOM pós-JS aparece com aspas duplas e entidades. Cobrimos os dois. O
+  // meta csrf-token só existe no DOM (injetado por JS) e a API aceita GET sem
+  // ele — comprovado em 17/08/2026 — então não é requisito.
+  const mPs = html.match(/id="pageState"[^>]*data-page-state='([^']*)'/)
+    || html.match(/id="pageState"[^>]*data-page-state="([^"]*)"/)
+    || html.match(/data-page-state='([^']*)'[^>]*id="pageState"/)
     || html.match(/data-page-state="([^"]*)"[^>]*id="pageState"/);
   if (!mPs) throw new Error('#pageState não encontrado — layout da página mudou');
 
   let ps;
   try {
-    ps = JSON.parse(mPs[1]
-      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&amp;/g, '&'));
+    const bruto = mPs[1].includes('&quot;')
+      ? mPs[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+          .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&amp;/g, '&')
+      : mPs[1];
+    ps = JSON.parse(bruto);
   } catch { throw new Error('data-page-state não parseou como JSON — layout mudou'); }
   if (!ps.associateIdentityToken) throw new Error('associateIdentityToken ausente no pageState');
 
@@ -248,7 +252,6 @@ async function amazonContexto() {
     storeId: ps.storeId,
     headers: {
       'user-agent': UA, cookie: AMAZON_COOKIE, accept: 'application/json',
-      'x-csrf-token': mTok[1],
       authorization: 'Bearer ' + ps.associateIdentityToken,
       marketplaceid: ps.marketplaceId || '', locale: ps.locale || 'pt_BR',
       storeid: ps.storeId || '', customerid: ps.customerId || '',
