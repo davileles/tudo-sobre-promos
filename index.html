@@ -1080,6 +1080,26 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="grp-resumo" id="grp-resumo"></div>
   <div id="grupos-lista" style="display:none"></div>
 
+  <div class="sec-label" style="margin-top:20px">⏱️ Espaçamento entre grupos</div>
+  <div class="aviso">
+    Pausa aplicada entre <b>um grupo e o próximo</b> quando a mesma mensagem é replicada
+    (cupons, ofertas do radar, mensagem manual e disparo da vitrine). A pausa é sorteada
+    dentro da faixa a cada envio — disparo simultâneo em vários grupos é o padrão que o
+    WhatsApp usa para identificar automação. <b>Não confunda</b> com o intervalo mínimo da
+    aba Base de Cupons, que separa duas publicações diferentes.
+  </div>
+  <div class="card">
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Mínimo <span class="tag">segundos</span></label>
+        <input type="number" id="eg-min" min="0" max="600" step="1" value="3" oninput="egPrever()"/></div>
+      <div class="field"><label>Máximo <span class="tag">segundos</span></label>
+        <input type="number" id="eg-max" min="0" max="600" step="1" value="5" oninput="egPrever()"/></div>
+    </div>
+    <p class="send-ok" id="eg-previsao" style="color:var(--muted);margin-bottom:12px"></p>
+    <button class="btn" id="eg-btn" onclick="salvarEspacGrupos()">Salvar espaçamento</button>
+    <p class="send-ok" id="eg-status"></p>
+  </div>
+
   <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
     <span>⏱️ Monitoramento dos grupos fonte</span>
     <span style="font-weight:600;text-transform:none;letter-spacing:0" id="mon-agora"></span>
@@ -6446,6 +6466,7 @@ async function carregarPapeis() {
     var r = await fetch(SERVER+'/mkt/config', { signal: AbortSignal.timeout(3000) });
     if (r.ok) {
       var d = await r.json();
+      if (d) aplicarEspacGrupos(d.espacamentoGrupos);
       if (d && d.papeis) { PAPEIS = d.papeis; PERSIST_SERVER = true; return; }
     }
   } catch(e) {}
@@ -6459,6 +6480,68 @@ async function carregarPapeis() {
   el.style.display = 'block';
   el.innerHTML = '<b>Servidor indisponível.</b> As marcações de fonte/destino vivem no servidor e não puderam ser lidas. '
     + 'Não altere nada agora — recarregue quando a conexão voltar.';
+}
+
+/* ══════ ESPACAMENTO ENTRE GRUPOS ══════ */
+// Vive no radar_config do servidor, junto da janela de cupons: quem aplica a
+// pausa e o Railway, entao o painel nunca guarda uma copia local disso.
+function aplicarEspacGrupos(e) {
+  e = e || {};
+  var min = document.getElementById('eg-min'), max = document.getElementById('eg-max');
+  if (!min || !max) return;
+  min.value = e.minSeg != null ? e.minSeg : 3;
+  max.value = e.maxSeg != null ? e.maxSeg : 5;
+  egPrever();
+}
+
+// Quantos grupos existem hoje: a faixa so faz sentido junto do tempo total que
+// a distribuicao vai levar — 10s em 20 grupos e mais de 3 minutos de disparo.
+function egPrever() {
+  var el = document.getElementById('eg-previsao');
+  if (!el) return;
+  var min = Number(document.getElementById('eg-min').value) || 0;
+  var max = Number(document.getElementById('eg-max').value) || 0;
+  if (max < min) { el.style.color = 'var(--red)'; el.textContent = 'O máximo não pode ser menor que o mínimo.'; return; }
+  var qtd = 0;
+  try {
+    var g = cfgGrupos();
+    var jids = {};
+    for (var j in PAPEIS) if (PAPEIS[j] === 'destino') jids[j] = 1;
+    for (var i = 0; i < g.cupons.length; i++) jids[g.cupons[i]] = 1;
+    qtd = Object.keys(jids).length;
+  } catch(e) { qtd = 0; }
+  el.style.color = 'var(--muted)';
+  if (qtd < 2) { el.textContent = 'Pausa de ' + min + 's a ' + max + 's entre um grupo e o próximo.'; return; }
+  var medio = Math.round((qtd - 1) * (min + max) / 2);
+  el.textContent = 'Pausa de ' + min + 's a ' + max + 's · com ' + qtd
+    + ' grupo(s) recebendo, a distribuição leva cerca de '
+    + (medio >= 60 ? Math.round(medio / 60 * 10) / 10 + ' min' : medio + 's') + ' do primeiro ao último.';
+}
+
+function salvarEspacGrupos() {
+  var btn = document.getElementById('eg-btn');
+  var s   = document.getElementById('eg-status');
+  var payload = { espacamentoGrupos: {
+    minSeg: Number(document.getElementById('eg-min').value) || 0,
+    maxSeg: Number(document.getElementById('eg-max').value) || 0
+  }};
+  if (payload.espacamentoGrupos.maxSeg < payload.espacamentoGrupos.minSeg) {
+    s.className = 'send-ok send-err'; s.textContent = 'O máximo não pode ser menor que o mínimo.';
+    return;
+  }
+  btn.disabled = true; s.className = 'send-ok'; s.textContent = 'Salvando...';
+  fetch(SERVER + '/mkt/config', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var e = d.espacamentoGrupos || payload.espacamentoGrupos;
+    aplicarEspacGrupos(e);
+    s.textContent = '✓ Pausa de ' + e.minSeg + 's a ' + e.maxSeg + 's entre um grupo e o próximo.';
+  })
+  .catch(function(e){ s.className = 'send-ok send-err'; s.textContent = 'Não salvou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
 }
 
 async function salvarPapeis() {
