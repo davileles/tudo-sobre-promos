@@ -378,14 +378,78 @@ const COLUNAS_VINCULADOS = [
  */
 const CAT_PAGINA = 200;
 const CAT_MAX_PAGINAS = 6;
+// Teto de paginas de produto lidas por rodada. O que passar disso fica para a
+// proxima: com o cache, cada ASIN e lido uma unica vez na vida.
+const CAT_MAX_LEITURAS = 40;
+const CAT_PAUSA_LEITURA = 800;
 
 /**
- * Unico relatorio da API que devolve asin e categoria na mesma linha. O
- * agrupamento linked_product — que e o que lista os produtos comprados —
- * ignora qualquer coluna de categoria que se peca: responde 200 sem o campo.
+ * Categoria pelo breadcrumb da propria pagina do produto — fonte primaria.
  *
- * Testados e descartados (respondem 200 com total_results:0, ou seja, a
- * combinacao nao existe): earnings/product, earnings/asin, orders/product.
+ * O relatorio da conta so conhece o topo: comprovado em rodada real, o
+ * top_seller devolveu 9 pares asin/categoria para 13 produtos comprados, e nem
+ * paginar (limit 200, 6 paginas) nem varrer dia a dia acrescentou uma linha.
+ * Como Descobertas existe justamente para enxergar a cauda longa, depender do
+ * relatorio era garantir que o item mais interessante caisse em "(sem
+ * categoria)".
+ *
+ * A pagina do ASIN resolve todos e ainda usa sempre a mesma taxonomia, o que
+ * mantem o grafico "onde esta o dinheiro" somavel. Guardamos o caminho inteiro
+ * e usamos o primeiro nivel como rotulo: departamento e o recorte que responde
+ * "o que o publico compra", subcategoria fragmentaria demais.
+ */
+async function categoriaDaPagina(asin) {
+  const r = await req('https://www.amazon.com.br/dp/' + asin, {
+    headers: {
+      'User-Agent': UA,
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+    },
+    redirect: 'follow',
+  }, 15000);
+  if (!r.ok) return null;
+  const html = await r.text();
+  const bloco = html.match(/wayfinding-breadcrumbs_feature_div([\s\S]{0,4000}?)<\/ul>/);
+  // Sem breadcrumb = pagina de captcha, ASIN morto ou layout diferente. Nos
+  // tres casos nao ha o que inventar: devolve null e o relatorio decide.
+  if (!bloco) return null;
+  const trilha = [...bloco[1].matchAll(/>\s*([^<>]{2,60}?)\s*</g)]
+    .map((m) => m[1].trim())
+    .filter((t) => t && t !== '\u203a' && !/^&\w+;$/.test(t));
+  if (!trilha.length) return null;
+  return { categoria: trilha[0], caminho: trilha.slice(0, 5).join(' > ') };
+}
+
+/**
+ * Le a pagina dos ASIN que o cache ainda nao conhece, em serie e com pausa —
+ * paralelizar leitura de vitrine e o caminho curto para tomar bloqueio, e esta
+ * coleta nao tem pressa nenhuma.
+ */
+async function categoriasPorPagina(asins) {
+  const mapa = new Map();
+  if (!asins.length) return mapa;
+  let falhas = 0;
+  for (const asin of asins.slice(0, CAT_MAX_LEITURAS)) {
+    try {
+      const achado = await categoriaDaPagina(asin);
+      if (achado) mapa.set(asin, achado); else falhas++;
+    } catch (e) {
+      falhas++;
+    }
+    await new Promise((res) => setTimeout(res, CAT_PAUSA_LEITURA));
+  }
+  const lidos = Math.min(asins.length, CAT_MAX_LEITURAS);
+  console.log(`[desempenho] Amazon: categoria por pagina — ${mapa.size}/${lidos} resolvido(s)`
+    + (falhas ? `, ${falhas} sem breadcrumb` : '')
+    + (asins.length > lidos ? `, ${asins.length - lidos} adiado(s) para a proxima rodada` : ''));
+  return mapa;
+}
+
+/**
+ * Fonte secundaria: o unico relatorio da API que traz asin e categoria na
+ * mesma linha. Fica so como rede de seguranca para o ASIN cuja pagina nao
+ * abriu. Testados e descartados por responderem total_results:0 —
+ * earnings/product, earnings/asin, orders/product.
  */
 const REL_TOP_SELLER = {
   nome: 'top_seller', type: 'overview', group_by: 'top_seller',
@@ -404,16 +468,16 @@ function parAsinCategoria(it) {
   return asin && nome ? [asin, String(nome)] : null;
 }
 
-async function categoriasDoRelatorio(ctx, rel, de, ate) {
+async function amazonCategoriasPorAsin(ctx, de, ate) {
   const mapa = new Map();
   let token = '';
   for (let pagina = 0; pagina < CAT_MAX_PAGINAS; pagina++) {
     const qs = new URLSearchParams({
-      'query[type]': rel.type,
+      'query[type]': REL_TOP_SELLER.type,
       'query[start_date]': de, 'query[end_date]': ate,
-      'query[group_by]': rel.group_by,
-      'query[columns]': rel.columns,
-      'query[order]': 'desc', 'query[sort]': rel.sort,
+      'query[group_by]': REL_TOP_SELLER.group_by,
+      'query[columns]': REL_TOP_SELLER.columns,
+      'query[order]': 'desc', 'query[sort]': REL_TOP_SELLER.sort,
       'query[skip]': String(pagina * CAT_PAGINA),
       'query[limit]': String(CAT_PAGINA),
       'query[next_token]': token,
@@ -438,47 +502,6 @@ async function categoriasDoRelatorio(ctx, rel, de, ate) {
     if (registros.length < CAT_PAGINA) break;
     await new Promise((res) => setTimeout(res, 400));
   }
-  return mapa;
-}
-
-/**
- * Mapa asin -> categoria para os produtos comprados na janela.
- *
- * O top_seller e um ranking, nao uma listagem: ignora o limit e devolve so o
- * topo do recorte pedido (uma rodada real trouxe 9 linhas para 13 produtos,
- * com limit=200 e paginacao). Como e ranking, o jeito de alcancar a cauda e
- * encolher o recorte — cada DIA tem o seu proprio topo, e um produto de 1
- * unidade que some no ranking de 15 dias costuma aparecer no ranking do dia em
- * que foi vendido.
- *
- * A varredura diaria so roda quando ainda falta alguem (`alvos`), e para assim
- * que todos forem resolvidos: no caso normal — cache quente — nao custa nada.
- */
-async function amazonCategoriasPorAsin(ctx, dias, alvos = null) {
-  const mapa = new Map();
-  const juntar = (parcial) => { for (const [a, cat] of parcial) mapa.set(a, cat); };
-  const faltam = () => (alvos ? [...alvos].filter((a) => !mapa.has(a)).length : 0);
-
-  try { juntar(await categoriasDoRelatorio(ctx, REL_TOP_SELLER, dias[0], dias[dias.length - 1])); }
-  catch (e) { console.warn('[desempenho] Amazon: top_seller da janela falhou —', e.message); }
-  const daJanela = mapa.size;
-
-  let varridos = 0;
-  if (alvos && alvos.size) {
-    // Do dia mais recente para o mais antigo: compra nova e a que tende a
-    // faltar, e assim a varredura costuma terminar antes de gastar a janela.
-    for (const dia of [...dias].reverse()) {
-      if (!faltam()) break;
-      await new Promise((res) => setTimeout(res, 400));
-      try { juntar(await categoriasDoRelatorio(ctx, REL_TOP_SELLER, dia, dia)); }
-      catch (e) { console.warn(`[desempenho] Amazon: top_seller ${dia} —`, e.message); }
-      varridos++;
-    }
-  }
-
-  console.log(`[desempenho] Amazon: categorias — ${daJanela} pela janela`
-    + (varridos ? `, +${mapa.size - daJanela} em ${varridos} dia(s) varrido(s)` : '')
-    + (alvos ? `, ${faltam()} alvo(s) sem resposta` : ''));
   return mapa;
 }
 
@@ -508,10 +531,15 @@ async function salvarCategorias(salvas, conhecidas) {
   const corte = diaISO(Date.now() - CAT_REFRESCO_DIAS * 86400000);
   let novos = 0, refrescados = 0;
 
-  for (const [asin, categoria] of conhecidas) {
+  for (const [asin, achado] of conhecidas) {
+    const reg = typeof achado === 'string' ? { categoria: achado, fonte: 'relatorio' } : achado;
+    if (!reg || !reg.categoria) continue;
     const atual = salvas[asin];
-    if (!atual || atual.categoria !== categoria) {
-      salvas[asin] = { categoria, visto: hoje };
+    if (!atual || atual.categoria !== reg.categoria) {
+      salvas[asin] = {
+        categoria: reg.categoria, caminho: reg.caminho || '',
+        fonte: reg.fonte || 'pagina', visto: hoje,
+      };
       novos++;
     } else if ((atual.visto || '') < corte) {
       // Marca de uso: ASIN que continua vendendo nao pode ser podado so por
@@ -607,24 +635,32 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
       // Categoria vem de outro agrupamento; falha aqui nao pode custar a coleta.
       const salvas = await carregarCategoriasSalvas();
-      // Alvos = ASIN comprado nesta janela que o cache ainda nao conhece. E o
-      // que decide se vale gastar chamada com os relatorios alternativos.
-      const alvos = new Set();
+      // Alvos = ASIN comprado nesta janela que o cache ainda nao conhece. Em
+      // regime, essa lista e quase sempre pequena: so produto inedito entra.
+      const alvos = [];
       for (const it of vinculados) {
         const a = String(it.linked_product || '').toUpperCase();
-        if (a && !(salvas[a] && salvas[a].categoria)) alvos.add(a);
+        if (a && !(salvas[a] && salvas[a].categoria) && !alvos.includes(a)) alvos.push(a);
       }
-      let categorias = new Map();
-      try { categorias = await amazonCategoriasPorAsin(ctx, dias, alvos); }
-      catch (e) { console.warn('[desempenho] Amazon: categorias falhou —', e.message); }
 
-      // Descoberta da rodada tem prioridade sobre o cache (categoria pode ter
-      // sido recategorizada pela Amazon); o cache cobre quem ficou de fora.
-      const aplicadas = new Map(categorias);
+      const porPagina = await categoriasPorPagina(alvos);
+
+      // Relatorio so entra se a pagina deixou buraco — nao gasta chamada a toa.
+      let porApi = new Map();
+      if (alvos.some((a) => !porPagina.has(a))) {
+        try { porApi = await amazonCategoriasPorAsin(ctx, dias[0], dias[dias.length - 1]); }
+        catch (e) { console.warn('[desempenho] Amazon: top_seller falhou —', e.message); }
+      }
+
+      const aplicadas = new Map();
       const categoriaDe = (asin) => {
-        const c = categorias.get(asin) || (salvas[asin] && salvas[asin].categoria) || '';
-        if (c) aplicadas.set(asin, c);
-        return c;
+        const salvo = salvas[asin] && salvas[asin].categoria;
+        if (salvo) { aplicadas.set(asin, salvas[asin]); return salvo; }
+        const pag = porPagina.get(asin);
+        if (pag) { aplicadas.set(asin, { ...pag, fonte: 'pagina' }); return pag.categoria; }
+        const api = porApi.get(asin);
+        if (api) { aplicadas.set(asin, { categoria: api, fonte: 'relatorio' }); return api; }
+        return '';
       };
       let semCategoria = 0;
       for (const it of vinculados) {
@@ -651,8 +687,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         });
       }
       if (semCategoria) {
-        console.log(`[desempenho] Amazon: ${semCategoria} produto(s) sem categoria `
-          + `(fora do top_seller e do cache)`);
+        console.log(`[desempenho] Amazon: ${semCategoria} produto(s) seguem sem categoria`);
       }
       // Cache atualizado depois do uso: assim a marca de uso cobre tambem o
       // ASIN que veio do cache e nao apareceu no top_seller desta janela.
