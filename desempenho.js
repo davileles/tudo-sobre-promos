@@ -445,7 +445,14 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
 
   // Produtos comprados na janela que nao estao no ledger: leitura de mercado,
   // nao desempenho de disparo (a Amazon nao diz por qual link vieram).
-  if (coletarNaoAtribuida) {
+  //
+  // DESLIGADO por padrao (AMAZON_ITENS=on para religar). O relatorio de itens
+  // pedidos NAO sai desta rota: /reporting/table aceita group_by=asin apenas
+  // com type=orders, e ai responde 200 sempre vazio; nos demais types recusa
+  // com 400 de corpo vazio. Sem o vocabulario certo, cada rodada gastaria 9
+  // requisicoes para nada. Retomar capturando a chamada real da aba "Produtos
+  // pedidos" do painel de Associados, como foi feito com o relatorio por tag.
+  if (coletarNaoAtribuida && process.env.AMAZON_ITENS === 'on') {
     try {
       const dias = [...janela].sort();
       const doLedger = new Set(atribuicoes
