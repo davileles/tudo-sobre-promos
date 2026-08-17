@@ -407,9 +407,13 @@ async function categoriaDaPagina(asin) {
     },
     redirect: 'follow',
   }, 15000);
-  if (!r.ok) return null;
+  if (!r.ok) { console.log(`[desempenho] Amazon: pagina ${asin} status ${r.status}`); return null; }
   const html = await r.text();
   const bloco = html.match(/wayfinding-breadcrumbs_feature_div([\s\S]{0,4000}?)<\/ul>/);
+  if (!bloco) {
+    const t = (html.match(/<title>([\s\S]{0,120}?)<\/title>/) || [, '(sem title)'])[1].trim();
+    console.log(`[desempenho] Amazon: pagina ${asin} sem breadcrumb — ${html.length} bytes, title="${t}"`);
+  }
   // Sem breadcrumb = pagina de captcha, ASIN morto ou layout diferente. Nos
   // tres casos nao ha o que inventar: devolve null e o relatorio decide.
   if (!bloco) return null;
