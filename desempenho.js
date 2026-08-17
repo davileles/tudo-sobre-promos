@@ -266,6 +266,11 @@ async function amazonContexto() {
       programid: campo('programId') || '',
       roles: camposArr('roles').join(','),
       language: campo('language') || 'pt_BR', 'x-requested-with': 'XMLHttpRequest',
+      // Sem referer/origin a API devolve 401 mesmo com token e sessão válidos
+      // (comprovado no runner em 17/08/2026 — variantes A/B 401, C 200).
+      referer: 'https://associados.amazon.com.br/p/reporting/earnings',
+      origin: 'https://associados.amazon.com.br',
+      'accept-language': 'pt-BR,pt;q=0.9',
     },
   };
 }
