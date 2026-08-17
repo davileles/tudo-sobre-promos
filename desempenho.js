@@ -357,14 +357,15 @@ function resolutorAmazon(atribuicoes) {
  * pode ser fixado depois em AMAZON_VARIANTE_ITENS.
  */
 const VARIANTES_ITENS_AMAZON = [
+  ['orders/asin/completo', 'orders', 'asin', 'asin,product_title,category,items_shipped,shipped_revenue,earnings'],
+  ['orders/asin/ordered', 'orders', 'asin', 'asin,product_title,total_ordered_items,total_earnings'],
+  ['orders/asin/titulo', 'orders', 'asin', 'asin,title,items_shipped,earnings'],
+  ['orders/asin/basico', 'orders', 'asin', 'asin,items_shipped,earnings'],
+  ['earning/asin/itens', 'earning', 'asin', 'asin,items_shipped,earnings'],
+  ['earning/asin/ordered', 'earning', 'asin', 'asin,total_ordered_items,total_earnings'],
   ['overview/asin/basico', 'overview', 'asin', 'asin,clicks,total_ordered_items,total_earnings'],
   ['overview/asin/nome', 'overview', 'asin', 'asin,product_title,total_ordered_items,total_earnings'],
-  ['overview/asin/title', 'overview', 'asin', 'asin,title,total_ordered_items,total_earnings'],
-  ['earning/asin/basico', 'earning', 'asin', 'asin,total_ordered_items,total_earnings'],
-  ['earning/asin/itens', 'earning', 'asin', 'asin,items_shipped,earnings'],
-  ['orders/asin', 'orders', 'asin', 'asin,items_shipped,earnings'],
   ['overview/product', 'overview', 'product', 'product,total_ordered_items,total_earnings'],
-  ['overview/asin/so_id', 'overview', 'asin', 'asin'],
 ];
 
 async function amazonItensPedidos(ctx, de, ate) {
@@ -391,18 +392,19 @@ async function amazonItensPedidos(ctx, de, ate) {
     if (r.ok) {
       const j = await r.json();
       const registros = j.records || [];
+      // 200 com zero registros nao prova nada: a combinacao pode ser valida e
+      // simplesmente nao ser o relatorio que queremos. Guarda e segue tentando.
+      if (!registros.length) { recusadas.push(`${nome}:vazia`); await new Promise((res) => setTimeout(res, 500)); continue; }
       console.log(`[desempenho] Amazon: itens pedidos via variante "${nome}" `
         + `(${registros.length} registros)`);
-      if (registros[0]) {
-        console.log('[desempenho] Amazon: campos do registro — '
-          + Object.keys(registros[0]).join(', '));
-      }
+      console.log('[desempenho] Amazon: campos do registro — '
+        + Object.keys(registros[0]).join(', '));
       return registros;
     }
     recusadas.push(`${nome}:${r.status}`);
     await new Promise((res) => setTimeout(res, 500));
   }
-  throw new Error('nenhuma variante aceita — ' + recusadas.join(', '));
+  throw new Error('nenhuma variante com dados — ' + recusadas.join(', '));
 }
 
 async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida) {
