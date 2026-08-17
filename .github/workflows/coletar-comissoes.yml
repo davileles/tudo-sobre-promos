@@ -43,5 +43,4 @@ jobs:
           SHOPEE_APP_ID: ${{ secrets.SHOPEE_APP_ID }}
           SHOPEE_SECRET: ${{ secrets.SHOPEE_SECRET }}
           GH_TOKEN_DADOS: ${{ secrets.GH_TOKEN_DADOS }}
-          AMAZON_TAG_PARAM: ${{ secrets.AMAZON_TAG_PARAM }}
         run: node coletar-comissoes.js
