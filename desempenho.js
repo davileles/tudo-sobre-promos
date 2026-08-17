@@ -399,14 +399,26 @@ const CAT_PAUSA_LEITURA = 800;
  * "o que o publico compra", subcategoria fragmentaria demais.
  */
 async function categoriaDaPagina(asin) {
+  // O IP do runner do Actions e datacenter: sem sessao, a Amazon devolve 200
+  // com uma pagina-toco de ~3,9 KB e nenhum conteudo (comprovado em rodada
+  // real). Reaproveitamos o AMAZON_COOKIE da coleta — os cookies de sessao sao
+  // de dominio .amazon.com.br, entao valem tambem na vitrine — e mandamos o
+  // conjunto de cabecalhos que um navegador manda numa navegacao de topo.
   const r = await req('https://www.amazon.com.br/dp/' + asin, {
     headers: {
       'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'pt-BR,pt;q=0.9',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'no-cache',
+      ...(AMAZON_COOKIE ? { Cookie: AMAZON_COOKIE } : {}),
     },
     redirect: 'follow',
-  }, 15000);
+  }, 20000);
   if (!r.ok) { console.log(`[desempenho] Amazon: pagina ${asin} status ${r.status}`); return null; }
   const html = await r.text();
   const bloco = html.match(/wayfinding-breadcrumbs_feature_div([\s\S]{0,4000}?)<\/ul>/);
