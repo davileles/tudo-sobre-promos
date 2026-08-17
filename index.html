@@ -282,6 +282,25 @@ try {
   .fila-fb{font-size:12px;font-weight:700;text-align:center;min-height:16px;color:var(--muted)}
   .fila-fb.ok{color:var(--green)} .fila-fb.err{color:var(--red)}
   .fila-vazia,.fila-loading{text-align:center;padding:56px 20px;color:var(--muted);font-size:13px}
+  .desc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .desc-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .desc-kpi b{display:block;font-size:20px;font-weight:800;color:var(--text);margin-top:3px}
+  .desc-kpi span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:700}
+  .desc-cat{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px}
+  .desc-cat:last-child{border-bottom:none}
+  .desc-cat-nome{flex:1;min-width:120px;font-weight:600;color:var(--text)}
+  .desc-barra{flex:0 0 90px;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+  .desc-barra i{display:block;height:100%;background:var(--accent)}
+  .desc-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .desc-item:last-child{border-bottom:none}
+  .desc-item-info{flex:1;min-width:0}
+  .desc-item-nome{font-size:13px;font-weight:600;color:var(--text);line-height:1.35}
+  .desc-item-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .desc-nums{display:flex;gap:16px;text-align:right;flex-wrap:wrap;justify-content:flex-end}
+  .desc-num b{display:block;font-size:14px;font-weight:800;color:var(--text)}
+  .desc-num span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .desc-acoes{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+  @media(max-width:640px){.desc-item{flex-wrap:wrap}.desc-nums{width:100%;justify-content:flex-start}}
   /* Aba Fila (visualizacao): contexto da janela + cards reaproveitando .ag-* */
   .fe-ctx{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .fe-pill{font-size:11px;font-weight:700;color:var(--muted);background:var(--card-deep);border:1px solid var(--border);border-radius:8px;padding:5px 10px}
@@ -675,6 +694,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
   <div class="side-group">Sistema</div>
+  <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
 </div>
 
@@ -1707,6 +1727,46 @@ body.travado > *:not(#login-screen){display:none !important}
 </div>
 
 <!-- ════════ TEMPLATES ════════ -->
+<!-- ════════ DESCOBERTAS ════════ -->
+<div class="panel" id="panel-descobertas">
+  <div class="aviso">
+    O que o público comprou <b>além do que disparamos</b>: venda indireta (entrou por um link nosso
+    e levou outro produto) e itens ainda fora da base. Serve para decidir o que divulgar depois —
+    use <b>➕ Enviar para a base</b> para copiar o link e cadastrar na aba Vitrine.
+  </div>
+
+  <div class="card" id="desc-resumo" style="display:none">
+    <div class="desc-cards" id="desc-cards"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px" id="desc-janela"></div>
+  </div>
+
+  <div class="sec-label" style="margin-top:22px">Por categoria <span class="tag" style="text-transform:none">onde está o dinheiro</span></div>
+  <div id="desc-categorias"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="sec-label" style="margin-top:26px">Produtos</div>
+  <div class="fila-bar">
+    <span id="desc-status">Carregando...</span>
+    <div class="fila-acoes">
+      <input type="text" id="desc-busca" class="busca-mini" autocomplete="off" placeholder="Buscar produto ou categoria…" oninput="renderDescobertas()"/>
+      <select id="desc-loja" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <select id="desc-tipo" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="">Todos os tipos</option>
+        <option value="indireta">Venda indireta</option>
+        <option value="direta_fora_do_ledger">Direta fora da base</option>
+        <option value="nao_divulgado">Não divulgado</option>
+      </select>
+      <select id="desc-ordem" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="comissao">Maior comissão</option>
+        <option value="unidades">Mais unidades</option>
+        <option value="vendas">Maior faturamento</option>
+        <option value="ocorrencias">Mais pedidos</option>
+      </select>
+      <button class="btn btn-copy btn-sm" onclick="carregarDescobertas()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div id="desc-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
   <div class="aviso">
@@ -2017,7 +2077,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['filaenvio','agend','aprov','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','config'];
+var TABS = ['filaenvio','agend','aprov','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2026,6 +2086,7 @@ function switchTab(name) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
+  if (name === 'descobertas') carregarDescobertas();
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
@@ -3425,6 +3486,158 @@ function excluirLista(id){
     .then(function(r){ return r.json(); })
     .then(function(){ carregarListas(); })
     .catch(function(e){ alert('Falhou: ' + e.message); });
+}
+
+/* ══════ DESCOBERTAS ══════ */
+// Produtos comprados que nao vieram de disparo nosso. Fonte: coletor diario
+// (tudo-sobre-promos/desempenho.js) -> cdv-tsp-dados/tsp/vendas-descobertas.json,
+// servido pelo proxy CDV.
+var DESC_CACHE = [], DESC_META = null;
+var DESC_ROTULO_TIPO = {
+  indireta: 'venda indireta',
+  direta_fora_do_ledger: 'direta fora da base',
+  nao_divulgado: 'não divulgado'
+};
+
+function descMoeda(v){
+  return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function carregarDescobertas(){
+  document.getElementById('desc-status').textContent = 'Carregando...';
+  return fetch(DIST_PROXY + '/afiliados/descobertas?limite=2000&t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) throw new Error(d && d.erro ? d.erro : 'resposta inválida');
+      DESC_CACHE = d.itens || [];
+      DESC_META  = d;
+      // Lojas do select saem dos proprios dados: cada plataforma so aparece
+      // quando tem insumo, sem opcao morta na lista.
+      var lojas = [];
+      DESC_CACHE.forEach(function(x){ if (x.loja && lojas.indexOf(x.loja) < 0) lojas.push(x.loja); });
+      lojas.sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+      var sel = document.getElementById('desc-loja'), atual = sel.value;
+      sel.innerHTML = '<option value="">Todas as lojas</option>' + lojas.map(function(l){
+        return '<option value="' + l + '">' + l + '</option>';
+      }).join('');
+      if (atual) sel.value = atual;
+      renderDescobertas();
+    })
+    .catch(function(e){
+      document.getElementById('desc-status').textContent = 'Falha: ' + e.message;
+      document.getElementById('desc-lista').innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
+      document.getElementById('desc-categorias').innerHTML = '';
+    });
+}
+
+function renderDescobertas(){
+  var termo = (document.getElementById('desc-busca').value || '').toLowerCase().trim();
+  var loja  = document.getElementById('desc-loja').value;
+  var tipo  = document.getElementById('desc-tipo').value;
+  var ordem = document.getElementById('desc-ordem').value;
+
+  var itens = DESC_CACHE.filter(function(x){
+    if (loja && x.loja !== loja) return false;
+    if (tipo && x.tipo !== tipo) return false;
+    if (termo && ((x.nome||'') + ' ' + (x.categoria||'')).toLowerCase().indexOf(termo) < 0) return false;
+    return true;
+  });
+  itens.sort(function(a,b){ return (Number(b[ordem])||0) - (Number(a[ordem])||0); });
+
+  // Resumo recalculado sobre o filtro: o numero tem de bater com a lista.
+  var tot = itens.reduce(function(t,x){
+    t.produtos += 1; t.unidades += Number(x.unidades)||0;
+    t.vendas += Number(x.vendas)||0; t.comissao += Number(x.comissao)||0;
+    return t;
+  }, {produtos:0,unidades:0,vendas:0,comissao:0});
+
+  document.getElementById('desc-resumo').style.display = itens.length ? '' : 'none';
+  document.getElementById('desc-cards').innerHTML =
+      '<div class="desc-kpi"><span>Produtos</span><b>' + tot.produtos + '</b></div>'
+    + '<div class="desc-kpi"><span>Unidades</span><b>' + tot.unidades + '</b></div>'
+    + '<div class="desc-kpi"><span>Faturamento</span><b>' + descMoeda(tot.vendas) + '</b></div>'
+    + '<div class="desc-kpi"><span>Comissão</span><b>' + descMoeda(tot.comissao) + '</b></div>';
+  if (DESC_META && DESC_META.janela) {
+    document.getElementById('desc-janela').textContent =
+      'Janela ' + DESC_META.janela.de + ' a ' + DESC_META.janela.ate
+      + (DESC_META.atualizadoEm ? ' · atualizado em ' + new Date(DESC_META.atualizadoEm).toLocaleString('pt-BR') : '');
+  }
+
+  // ── categorias ──
+  var cats = {};
+  itens.forEach(function(x){
+    var k = x.categoria || '(sem categoria)';
+    cats[k] = cats[k] || {produtos:0,unidades:0,comissao:0};
+    cats[k].produtos += 1;
+    cats[k].unidades += Number(x.unidades)||0;
+    cats[k].comissao += Number(x.comissao)||0;
+  });
+  var lista = Object.keys(cats).map(function(k){ return {nome:k, d:cats[k]}; })
+    .sort(function(a,b){ return b.d.comissao - a.d.comissao; }).slice(0,12);
+  var maior = lista.length ? lista[0].d.comissao : 0;
+  document.getElementById('desc-categorias').innerHTML = lista.length
+    ? '<div class="card" style="padding:6px 0">' + lista.map(function(c){
+        var pct = maior > 0 ? Math.round((c.d.comissao / maior) * 100) : 0;
+        return '<div class="desc-cat">'
+          + '<div class="desc-cat-nome">' + esc(c.nome) + '</div>'
+          + '<div class="desc-barra"><i style="width:' + pct + '%"></i></div>'
+          + '<div style="flex:0 0 78px;text-align:right;font-weight:700">' + descMoeda(c.d.comissao) + '</div>'
+          + '<div style="flex:0 0 88px;text-align:right;color:var(--muted)">' + c.d.produtos + ' prod · ' + c.d.unidades + ' un</div>'
+          + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Nada no filtro atual.</div>';
+
+  // ── produtos ──
+  document.getElementById('desc-status').textContent =
+    itens.length + ' produto(s)' + (DESC_CACHE.length !== itens.length ? ' de ' + DESC_CACHE.length : '');
+  document.getElementById('desc-lista').innerHTML = itens.length
+    ? '<div class="card" style="padding:0">' + itens.slice(0,300).map(function(x,i){
+        var link = x.link || '';
+        return '<div class="desc-item">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(x.nome || '(sem nome)') + '</div>'
+            + '<div class="desc-item-meta">'
+              + '<span class="tag" style="margin-left:0">' + esc(x.loja||'') + '</span>'
+              + '<span class="tag" style="margin-left:0">' + (DESC_ROTULO_TIPO[x.tipo] || x.tipo || '') + '</span>'
+              + (x.categoria ? '<span>' + esc(x.categoria) + '</span>' : '')
+              + (x.vendedor ? '<span>· ' + esc(x.vendedor) + '</span>' : '')
+              + (x.ocorrencias ? '<span>· ' + x.ocorrencias + ' pedido(s)</span>' : '')
+            + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + (x.unidades||0) + '</b><span>un</span></div>'
+            + '<div class="desc-num"><b>' + descMoeda(x.vendas) + '</b><span>vendas</span></div>'
+            + '<div class="desc-num"><b>' + descMoeda(x.comissao) + '</b><span>comissão</span></div>'
+          + '</div>'
+          + '<div class="desc-acoes">'
+            + (link ? '<a class="btn btn-copy btn-sm" href="' + esc(link) + '" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Abrir</a>' : '')
+            + (link ? '<button class="btn btn-copy btn-sm" onclick="descParaBase(' + i + ')">➕ Enviar para a base</button>' : '')
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+      + (itens.length > 300 ? '<div class="fila-bar" style="margin-top:10px">Mostrando os 300 primeiros — refine a busca para ver o resto.</div>' : '')
+    : '<div class="fila-vazia">Nada no filtro atual.</div>';
+
+  DESC_VISIVEIS = itens;
+}
+var DESC_VISIVEIS = [];
+
+// Leva o link para a aba Vitrine: o cadastro em si continua sendo o fluxo
+// normal da base, so evitamos o copia-e-cola manual.
+function descParaBase(i){
+  var x = DESC_VISIVEIS[i];
+  if (!x || !x.link) return;
+  switchTab('vitrine');
+  setTimeout(function(){
+    var campo = document.getElementById('vit-links');
+    if (!campo) return;
+    // O textarea aceita uma linha por produto e o formato "Nome | link",
+    // entao mandamos o nome junto e o cadastro ja nasce identificado.
+    var linha = (x.nome ? String(x.nome).replace(/[|\r\n]+/g,' ').trim() + ' | ' : '') + x.link;
+    campo.value = (campo.value.trim() ? campo.value.replace(/\s*$/,'') + '\n' : '') + linha;
+    campo.focus();
+    campo.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 120);
 }
 
 function carregarVitrine(){
