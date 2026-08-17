@@ -18,7 +18,7 @@ const crypto = require('crypto');
 const REPO_DADOS = process.env.REPO_DADOS || 'davileles/cdv-tsp-dados';
 const ARQ_DESEMPENHO = process.env.ARQUIVO_DESEMPENHO || 'tsp/desempenho-produtos.json';
 const ARQ_RASTREIO = process.env.ARQUIVO_RASTREIO || 'tsp/rastreio.json';
-const ARQ_VENDAS_ML = process.env.ARQUIVO_VENDAS_ML || 'tsp/vendas-ml-nao-atribuidas.json';
+const ARQ_DESCOBERTAS = process.env.ARQUIVO_DESCOBERTAS || 'tsp/vendas-descobertas.json';
 const GH_TOKEN = process.env.GH_TOKEN_DADOS;
 
 const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
@@ -346,7 +346,30 @@ function resolutorAmazon(atribuicoes) {
   };
 }
 
-async function desempenhoAmazon(janela, atribuicoes, registrar) {
+/**
+ * Itens pedidos por ASIN — inclui o que o publico comprou sem ser divulgado
+ * por nos. Mesma API do desempenho por tag, trocando o group_by; uma chamada
+ * pela janela inteira, porque aqui interessa o produto e nao o dia da tag.
+ */
+async function amazonItensPedidos(ctx, de, ate) {
+  const qs = new URLSearchParams({
+    'query[type]': 'earning',
+    'query[start_date]': de, 'query[end_date]': ate,
+    'query[group_by]': 'asin',
+    'query[columns]': 'asin,title,category,items_shipped,price,earnings',
+    'query[order]': 'desc', 'query[sort]': 'earnings',
+    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+    store_id: ctx.storeId,
+  });
+  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+    { headers: ctx.headers });
+  if (!r.ok) throw new Error(`itens pedidos: status ${r.status}`);
+  const j = await r.json();
+  return j.records || [];
+}
+
+async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida) {
   if (!AMAZON_COOKIE) {
     console.log('[desempenho] AMAZON_COOKIE ausente — Amazon por tag ignorada');
     return 0;
@@ -380,6 +403,30 @@ async function desempenhoAmazon(janela, atribuicoes, registrar) {
       mudou += registrar(dia, attr, registro);
     }
     await new Promise((res) => setTimeout(res, 400));
+  }
+
+  // Produtos comprados na janela que nao estao no ledger: leitura de mercado,
+  // nao desempenho de disparo (a Amazon nao diz por qual link vieram).
+  if (coletarNaoAtribuida) {
+    try {
+      const dias = [...janela].sort();
+      const doLedger = new Set(atribuicoes
+        .filter((a) => /amazon/i.test(String(a.loja || '')))
+        .map((a) => String(a.asin || '').toUpperCase()));
+      for (const it of await amazonItensPedidos(ctx, dias[0], dias[dias.length - 1])) {
+        const asin = String(it.asin || '').toUpperCase();
+        const unidades = Math.round(numApi(it.items_shipped));
+        if (!asin || doLedger.has(asin) || !unidades) continue;
+        coletarNaoAtribuida({
+          loja: 'Amazon', id: asin, dia: null, tipo: 'nao_divulgado',
+          nome: it.title || '', categoria: it.category || '', vendedor: '',
+          link: 'https://www.amazon.com.br/dp/' + asin,
+          unidades, vendas: numApi(it.price), comissao: numApi(it.earnings),
+        });
+      }
+    } catch (e) {
+      console.warn('[desempenho] Amazon: itens pedidos falhou —', e.message);
+    }
   }
   return mudou;
 }
@@ -456,6 +503,7 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida)
     if (!direta || !noLedger) {
       if (!direta) indiretas++; else semCasar++;
       coletarNaoAtribuida?.({
+        loja: 'Mercado Livre',
         id, dia, tipo: direta ? 'direta_fora_do_ledger' : 'indireta',
         nome: x.productName || '', categoria: x.categoryName || '',
         vendedor: x.storeName || '', link: x.link || '',
@@ -628,33 +676,16 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     return 1;
   };
 
-  // Cada loja é isolada: falha em uma não derruba a outra nem a coleta principal.
-  let mudou = 0;
-  try {
-    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar);
-  } catch (e) {
-    console.warn('[desempenho] Shopee falhou:', e.message);
-  }
-  try {
-    mudou += await desempenhoAmazon(janela, atribuicoes, registrar);
-  } catch (e) {
-    console.warn('[desempenho] Amazon falhou:', e.message);
-  }
-  try {
-    mudou += await desempenhoAwin(janela, atribuicoes, registrar);
-  } catch (e) {
-    console.warn('[desempenho] Awin falhou:', e.message);
-  }
-  // Vendas do ML que nao viram desempenho de produto nosso, agregadas por
-  // produto comprado: serve para ver o que o publico leva quando entra pelo
-  // nosso link e compra outra coisa (indiretas) ou compra algo que ainda nao
-  // esta no ledger.
+  // Vendas que NAO viram desempenho de um produto nosso, agregadas por produto
+  // comprado: e o que o publico leva alem do que divulgamos — venda indireta
+  // (entrou pelo nosso link e comprou outra coisa) ou produto ainda fora da
+  // base. Vale para qualquer loja que exponha o item comprado.
   const naoAtribuidas = new Map();
   const coletarNaoAtribuida = (v) => {
-    const chave = (v.id || v.nome || 'sem-id') + '|' + v.tipo;
+    const chave = (v.loja || '?') + '|' + (v.id || v.nome || 'sem-id') + '|' + v.tipo;
     const g = naoAtribuidas.get(chave) || {
-      id: v.id || null, tipo: v.tipo, nome: v.nome, categoria: v.categoria,
-      vendedor: v.vendedor, link: v.link,
+      loja: v.loja || '', id: v.id || null, tipo: v.tipo, nome: v.nome,
+      categoria: v.categoria, vendedor: v.vendedor, link: v.link,
       unidades: 0, vendas: 0, comissao: 0, ocorrencias: 0, dias: [],
     };
     g.unidades += v.unidades;
@@ -666,6 +697,23 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     naoAtribuidas.set(chave, g);
   };
 
+  // Cada loja é isolada: falha em uma não derruba a outra nem a coleta principal.
+  let mudou = 0;
+  try {
+    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Shopee falhou:', e.message);
+  }
+  try {
+    mudou += await desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida);
+  } catch (e) {
+    console.warn('[desempenho] Amazon falhou:', e.message);
+  }
+  try {
+    mudou += await desempenhoAwin(janela, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Awin falhou:', e.message);
+  }
   try {
     mudou += await desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida);
   } catch (e) {
@@ -682,15 +730,21 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
       comissao: num(t.comissao + x.comissao),
     }), { unidades: 0, vendas: 0, comissao: 0 });
     try {
-      await gravarJson(ARQ_VENDAS_ML, {
+      const porLoja = {};
+      for (const x of itens) {
+        const l = (porLoja[x.loja] = porLoja[x.loja] || { produtos: 0, unidades: 0, vendas: 0, comissao: 0 });
+        l.produtos += 1; l.unidades += x.unidades;
+        l.vendas = num(l.vendas + x.vendas); l.comissao = num(l.comissao + x.comissao);
+      }
+      await gravarJson(ARQ_DESCOBERTAS, {
         atualizadoEm: new Date().toISOString(),
         janela: { de: janela[0], ate: janela[janela.length - 1] },
-        totais, itens,
-      }, `chore: vendas ML nao atribuidas (${itens.length} produtos)`);
-      console.log(`[desempenho] ML: ${itens.length} produtos nao atribuidos gravados `
-        + `(R$ ${totais.comissao} em comissao)`);
+        totais, porLoja, itens,
+      }, `chore: vendas descobertas (${itens.length} produtos)`);
+      console.log(`[desempenho] descobertas: ${itens.length} produtos `
+        + `(R$ ${totais.comissao} em comissao) — ${Object.keys(porLoja).join(', ')}`);
     } catch (e) {
-      console.warn('[desempenho] gravacao das vendas ML nao atribuidas falhou:', e.message);
+      console.warn('[desempenho] gravacao das vendas descobertas falhou:', e.message);
     }
   }
 
