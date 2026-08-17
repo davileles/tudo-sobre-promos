@@ -228,6 +228,14 @@ async function amazonContexto() {
   if (!r.ok) throw new Error(`página de relatórios: status ${r.status}`);
   const html = await r.text();
 
+  // A API valida o Bearer junto com a sessão: a resposta da página emite
+  // cookies (session-id etc.) via Set-Cookie que o AMAZON_COOKIE não traz.
+  // Sem eles a /reporting/table devolve 401 mesmo com token válido.
+  const emitidos = (typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [])
+    .map((sc) => sc.split(';')[0].trim())
+    .filter((sc) => sc && !/^(deleted|=)/.test(sc));
+  const cookie = [AMAZON_COOKIE, ...emitidos].filter(Boolean).join('; ');
+
   // O pageState aparece no HTML ora como JSON puro em atributo de aspas
   // simples, ora como JSON escapado dentro de string, ora com entidades HTML
   // — o formato varia conforme cookie/UA da requisição. A extração campo a
@@ -251,7 +259,7 @@ async function amazonContexto() {
   return {
     storeId,
     headers: {
-      'user-agent': UA, cookie: AMAZON_COOKIE, accept: 'application/json',
+      'user-agent': UA, cookie, accept: 'application/json',
       authorization: 'Bearer ' + token,
       marketplaceid: campo('marketplaceId') || '', locale: campo('locale') || 'BR',
       storeid: storeId, customerid: campo('customerId') || '',
