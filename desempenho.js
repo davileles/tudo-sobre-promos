@@ -228,36 +228,36 @@ async function amazonContexto() {
   if (!r.ok) throw new Error(`página de relatórios: status ${r.status}`);
   const html = await r.text();
 
-  // No HTML servido o atributo vem entre aspas simples com JSON puro dentro;
-  // no DOM pós-JS aparece com aspas duplas e entidades. Cobrimos os dois. O
-  // meta csrf-token só existe no DOM (injetado por JS) e a API aceita GET sem
-  // ele — comprovado em 17/08/2026 — então não é requisito.
-  const mPs = html.match(/id="pageState"[^>]*data-page-state='([^']*)'/)
-    || html.match(/id="pageState"[^>]*data-page-state="([^"]*)"/)
-    || html.match(/data-page-state='([^']*)'[^>]*id="pageState"/)
-    || html.match(/data-page-state="([^"]*)"[^>]*id="pageState"/);
-  if (!mPs) throw new Error('#pageState não encontrado — layout da página mudou');
+  // O pageState aparece no HTML ora como JSON puro em atributo de aspas
+  // simples, ora como JSON escapado dentro de string, ora com entidades HTML
+  // — o formato varia conforme cookie/UA da requisição. A extração campo a
+  // campo abaixo tolera os três; validada contra o HTML cru em 17/08/2026.
+  const Q = '(?:\\\\"|"|&quot;)';
+  const campo = (nome) => {
+    const m = html.match(new RegExp(nome + Q + '\\s*:\\s*' + Q + '([^"\\\\&]+)'));
+    return m ? m[1] : null;
+  };
+  const camposArr = (nome) => {
+    const m = html.match(new RegExp(nome + Q + '\\s*:\\s*\\[([^\\]]*)\\]'));
+    if (!m) return [];
+    return [...m[1].matchAll(new RegExp(Q + '([^"\\\\&,\\]]+)' + Q, 'g'))].map((x) => x[1]);
+  };
 
-  let ps;
-  try {
-    const bruto = mPs[1].includes('&quot;')
-      ? mPs[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-          .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&amp;/g, '&')
-      : mPs[1];
-    ps = JSON.parse(bruto);
-  } catch { throw new Error('data-page-state não parseou como JSON — layout mudou'); }
-  if (!ps.associateIdentityToken) throw new Error('associateIdentityToken ausente no pageState');
+  const token = campo('associateIdentityToken');
+  if (!token) throw new Error('associateIdentityToken não encontrado — layout da página mudou');
+  const storeId = campo('storeId');
+  if (!storeId) throw new Error('storeId não encontrado no pageState');
 
   return {
-    storeId: ps.storeId,
+    storeId,
     headers: {
       'user-agent': UA, cookie: AMAZON_COOKIE, accept: 'application/json',
-      authorization: 'Bearer ' + ps.associateIdentityToken,
-      marketplaceid: ps.marketplaceId || '', locale: ps.locale || 'pt_BR',
-      storeid: ps.storeId || '', customerid: ps.customerId || '',
-      programid: ps.programId || '',
-      roles: Array.isArray(ps.roles) ? ps.roles.join(',') : String(ps.roles ?? ''),
-      language: ps.language || 'pt_BR', 'x-requested-with': 'XMLHttpRequest',
+      authorization: 'Bearer ' + token,
+      marketplaceid: campo('marketplaceId') || '', locale: campo('locale') || 'BR',
+      storeid: storeId, customerid: campo('customerId') || '',
+      programid: campo('programId') || '',
+      roles: camposArr('roles').join(','),
+      language: campo('language') || 'pt_BR', 'x-requested-with': 'XMLHttpRequest',
     },
   };
 }
