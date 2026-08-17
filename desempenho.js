@@ -26,6 +26,8 @@ const SHOPEE_SECRET = process.env.SHOPEE_SECRET;
 
 const AMAZON_COOKIE = process.env.AMAZON_COOKIE;
 
+const ML_COOKIE = process.env.ML_COOKIE;
+
 const AWIN_TOKEN = process.env.AWIN_TOKEN;
 const AWIN_PUBLISHER_ID = process.env.AWIN_PUBLISHER_ID;
 
@@ -373,6 +375,93 @@ async function desempenhoAmazon(janela, atribuicoes, registrar) {
   return mudou;
 }
 
+// ── Mercado Livre por produto ─────────────────────────────────────────────
+//
+// O relatorio /dashboard/sales/general lista VENDAS, uma por linha, com o link
+// do produto comprado. Nao existe campo de link/tag de origem, entao so as
+// vendas DIRECT (item comprado == item divulgado) sao atribuiveis; as INDIRECT
+// vem de quem clicou no nosso link e comprou outra coisa, e somar essas ao
+// produto divulgado seria inventar atribuicao. Cliques por produto o painel
+// nao expoe em nenhuma aba — o ML fica com conversao e comissao, sem clique.
+//
+// O ledger guarda o id no formato MLB{n}; os links vem como
+// /MLB-{n}-slug (item) ou /up/MLBU{n} (catalogo unificado, id diferente).
+
+const idMlDoLink = (url) => {
+  const s = String(url || '');
+  const mu = s.match(/\/up\/(MLBU\d{6,})/i);
+  if (mu) return mu[1].toUpperCase();
+  const m = s.match(/\bMLB-?(\d{6,})/i);
+  return m ? 'MLB' + m[1] : null;
+};
+
+async function desempenhoMl(janela, atribuicoes, registrar) {
+  if (!ML_COOKIE) {
+    console.log('[desempenho] ML_COOKIE ausente — Mercado Livre ignorado');
+    return 0;
+  }
+  const porId = new Map();
+  for (const a of atribuicoes) {
+    if (!/mercado\s*livre/i.test(String(a.loja || ''))) continue;
+    const id = String(a.asin || '').toUpperCase();
+    if (!id) continue;
+    const ant = porId.get(id);
+    if (!ant || (a.data || '') > (ant.data || '')) porId.set(id, a);
+  }
+  if (!porId.size) { console.log('[desempenho] ledger sem refs do Mercado Livre'); return 0; }
+
+  const dias = [...janela].sort();
+  const range = `${dias[0]}T00:00:00.000-03:00--${dias[dias.length - 1]}T23:59:59.999-03:00`;
+  const UA_ML = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+    + '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
+  const linhas = [];
+  for (let pagina = 1; pagina <= 20; pagina++) {
+    const qs = new URLSearchParams({
+      filter_time_range: range, items_per_page: '50', order_by: 'ord_date_created',
+      page: String(pagina), sort: 'desc', type: 'GENERAL',
+    });
+    const r = await req('https://www.mercadolivre.com.br/affiliate-program/api/dashboard/sales/general?' + qs,
+      { headers: { 'user-agent': UA_ML, accept: 'application/json', cookie: ML_COOKIE } });
+    if (r.status === 401 || r.status === 403) throw new Error('sessão expirada — renove ML_COOKIE');
+    if (!r.ok) throw new Error(`sales/general: status ${r.status}`);
+    const j = await r.json();
+    const lote = j.item_list || [];
+    linhas.push(...lote);
+    if (lote.length < 50 || linhas.length >= (j.total_results || 0)) break;
+    await new Promise((res) => setTimeout(res, 400));
+  }
+
+  // Agrega por (id, dia) somando apenas vendas diretas.
+  const agreg = new Map();
+  let indiretas = 0, semCasar = 0;
+  for (const x of linhas) {
+    if (String(x.saleType || '').toUpperCase() !== 'DIRECT') { indiretas++; continue; }
+    const id = idMlDoLink(x.link);
+    if (!id || !porId.has(id)) { semCasar++; continue; }
+    const m = String(x.date || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const dia = m ? `${m[3]}-${m[2]}-${m[1]}` : String(x.date || '').slice(0, 10);
+    if (!janela.includes(dia)) continue;
+    const chave = id + '|' + dia;
+    const g = agreg.get(chave) || { id, dia, pedidos: 0, vendas: 0, comissao: 0 };
+    g.pedidos += Math.max(1, parseInt(x.saleUnits, 10) || 1);
+    g.vendas = num(g.vendas + (parseFloat(x.saleValue) || 0));
+    g.comissao = num(g.comissao + (parseFloat(x.commissionValue) || 0));
+    agreg.set(chave, g);
+  }
+  if (indiretas || semCasar) {
+    console.log(`[desempenho] ML: ${indiretas} vendas indiretas (nao atribuiveis), ${semCasar} diretas sem produto no ledger`);
+  }
+
+  let mudou = 0;
+  for (const g of agreg.values()) {
+    mudou += registrar(g.dia, porId.get(g.id), {
+      cliques: 0, pedidos: g.pedidos, vendas: g.vendas, comissao: g.comissao,
+    });
+  }
+  return mudou;
+}
+
 // ── Awin por clickref ─────────────────────────────────────────────────────
 //
 // A Awin nao expoe cliques por ref, mas o relatorio de transacoes devolve os
@@ -531,6 +620,11 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     mudou += await desempenhoAwin(janela, atribuicoes, registrar);
   } catch (e) {
     console.warn('[desempenho] Awin falhou:', e.message);
+  }
+  try {
+    mudou += await desempenhoMl(janela, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Mercado Livre falhou:', e.message);
   }
 
   if (!mudou) { console.log('[desempenho] nada novo'); return; }
