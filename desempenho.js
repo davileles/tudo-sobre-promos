@@ -26,6 +26,9 @@ const SHOPEE_SECRET = process.env.SHOPEE_SECRET;
 
 const AMAZON_COOKIE = process.env.AMAZON_COOKIE;
 
+const AWIN_TOKEN = process.env.AWIN_TOKEN;
+const AWIN_PUBLISHER_ID = process.env.AWIN_PUBLISHER_ID;
+
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
@@ -370,6 +373,62 @@ async function desempenhoAmazon(janela, atribuicoes, registrar) {
   return mudou;
 }
 
+// ── Awin por clickref ─────────────────────────────────────────────────────
+//
+// A Awin nao expoe cliques por ref, mas o relatorio de transacoes devolve os
+// clickRefs de cada venda — conversao e comissao por produto, sem clique.
+// Refs da Awin comecam sempre com 'awin' (derivados de 'AWIN-{id}-{hash}'),
+// o que isola o casamento e impede colisao com refs de outras lojas.
+
+async function desempenhoAwin(janela, atribuicoes, registrar) {
+  if (!AWIN_TOKEN || !AWIN_PUBLISHER_ID) {
+    console.log('[desempenho] AWIN_TOKEN/AWIN_PUBLISHER_ID ausentes — Awin ignorada');
+    return 0;
+  }
+  const porRef = new Map();
+  for (const a of atribuicoes) {
+    if (!a.ref || !String(a.ref).startsWith('awin')) continue;
+    const ant = porRef.get(a.ref);
+    if (!ant || (a.data || '') > (ant.data || '')) porRef.set(a.ref, a);
+  }
+  if (!porRef.size) { console.log('[desempenho] ledger sem refs da Awin'); return 0; }
+
+  const dias = [...janela].sort();
+  const url = `https://api.awin.com/publishers/${AWIN_PUBLISHER_ID}/transactions/`
+    + `?startDate=${encodeURIComponent(dias[0] + 'T00:00:00')}`
+    + `&endDate=${encodeURIComponent(dias[dias.length - 1] + 'T23:59:59')}`
+    + `&timezone=America/Sao_Paulo`;
+  const r = await req(url, { headers: { Authorization: 'Bearer ' + AWIN_TOKEN, accept: 'application/json' } });
+  if (r.status === 401 || r.status === 403) throw new Error('AWIN_TOKEN recusado (' + r.status + ')');
+  if (!r.ok) throw new Error(`transacoes Awin: status ${r.status}`);
+  const trans = await r.json();
+  if (!Array.isArray(trans)) throw new Error('resposta inesperada da API de transacoes');
+
+  // Agrega por (ref, dia). Estornos vem como valores negativos e revisam o
+  // dia na rodada seguinte, como nas demais lojas.
+  const agreg = new Map();
+  for (const t of trans) {
+    const ref = String(t?.clickRefs?.clickRef || '').toLowerCase();
+    if (!ref || !porRef.has(ref)) continue;
+    const dia = String(t.transactionDate || '').slice(0, 10);
+    if (!janela.includes(dia)) continue;
+    const chave = ref + '|' + dia;
+    const g = agreg.get(chave) || { ref, dia, pedidos: 0, vendas: 0, comissao: 0 };
+    g.pedidos += 1;
+    g.vendas = num(g.vendas + parseFloat(t?.saleAmount?.amount || 0));
+    g.comissao = num(g.comissao + parseFloat(t?.commissionAmount?.amount || 0));
+    agreg.set(chave, g);
+  }
+
+  let mudou = 0;
+  for (const g of agreg.values()) {
+    mudou += registrar(g.dia, porRef.get(g.ref), {
+      cliques: 0, pedidos: g.pedidos, vendas: g.vendas, comissao: g.comissao,
+    });
+  }
+  return mudou;
+}
+
 // ── consolidação ──────────────────────────────────────────────────────────
 
 // Chave normalizada: a mesma para qualquer loja, para o ranking do painel poder
@@ -467,6 +526,11 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     mudou += await desempenhoAmazon(janela, atribuicoes, registrar);
   } catch (e) {
     console.warn('[desempenho] Amazon falhou:', e.message);
+  }
+  try {
+    mudou += await desempenhoAwin(janela, atribuicoes, registrar);
+  } catch (e) {
+    console.warn('[desempenho] Awin falhou:', e.message);
   }
 
   if (!mudou) { console.log('[desempenho] nada novo'); return; }
