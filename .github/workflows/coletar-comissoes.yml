@@ -43,4 +43,6 @@ jobs:
           SHOPEE_APP_ID: ${{ secrets.SHOPEE_APP_ID }}
           SHOPEE_SECRET: ${{ secrets.SHOPEE_SECRET }}
           GH_TOKEN_DADOS: ${{ secrets.GH_TOKEN_DADOS }}
+          AWIN_TOKEN: ${{ secrets.AWIN_TOKEN }}
+          AWIN_PUBLISHER_ID: ${{ secrets.AWIN_PUBLISHER_ID }}
         run: node coletar-comissoes.js
