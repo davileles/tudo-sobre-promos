@@ -364,7 +364,13 @@ async function amazonItensPedidos(ctx, de, ate) {
   });
   const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
     { headers: ctx.headers });
-  if (!r.ok) throw new Error(`itens pedidos: status ${r.status}`);
+  // O corpo do 400 nomeia a coluna/group_by recusado — sem ele, descobrir o
+  // vocabulario aceito vira tentativa e erro as cegas.
+  if (!r.ok) {
+    let detalhe = '';
+    try { detalhe = ' — ' + (await r.text()).slice(0, 300).replace(/\s+/g, ' '); } catch (_) {}
+    throw new Error(`itens pedidos: status ${r.status}${detalhe}`);
+  }
   const j = await r.json();
   return j.records || [];
 }
