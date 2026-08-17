@@ -46,11 +46,21 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
     await new Promise(res=>setTimeout(res,500));
   };
 
-  // Sem columns: descobrir o default de cada group_by
-  for (const gb of ['asin','product','item','tag_id']) {
-    await tenta('type=earning gb=' + gb, { 'query[type]':'earning', 'query[group_by]': gb });
+  // Controle: exatamente o que funciona em producao.
+  await tenta('CONTROLE gb=tag_id', { 'query[type]':'overview', 'query[group_by]':'tag_id',
+    'query[columns]':'tag_value,clicks,total_ordered_items,total_earnings', 'query[sort]':'clicks' });
+
+  // Mesmas colunas do controle, trocando so o group_by.
+  for (const gb of ['asin','product','item']) {
+    await tenta('gb=' + gb + ' cols=controle', { 'query[type]':'overview', 'query[group_by]': gb,
+      'query[columns]':'clicks,total_ordered_items,total_earnings', 'query[sort]':'clicks' });
   }
-  for (const tp of ['orders','item','product','earning']) {
-    await tenta('type=' + tp + ' gb=asin', { 'query[type]': tp, 'query[group_by]':'asin' });
+  // Variacoes de coluna de identificacao do produto.
+  for (const col of ['asin','item_name','product_title','title','name']) {
+    await tenta('gb=asin +' + col, { 'query[type]':'overview', 'query[group_by]':'asin',
+      'query[columns]': col + ',clicks,total_ordered_items,total_earnings', 'query[sort]':'clicks' });
   }
+  // type=earning com colunas do controle.
+  await tenta('type=earning gb=asin', { 'query[type]':'earning', 'query[group_by]':'asin',
+    'query[columns]':'clicks,total_ordered_items,total_earnings', 'query[sort]':'clicks' });
 })();
