@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const REPO_DADOS = process.env.REPO_DADOS || 'davileles/cdv-tsp-dados';
 const ARQ_DESEMPENHO = process.env.ARQUIVO_DESEMPENHO || 'tsp/desempenho-produtos.json';
 const ARQ_RASTREIO = process.env.ARQUIVO_RASTREIO || 'tsp/rastreio.json';
+const ARQ_VENDAS_ML = process.env.ARQUIVO_VENDAS_ML || 'tsp/vendas-ml-nao-atribuidas.json';
 const GH_TOKEN = process.env.GH_TOKEN_DADOS;
 
 const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
@@ -395,7 +396,7 @@ const idMlDoLink = (url) => {
   return m ? 'MLB' + m[1] : null;
 };
 
-async function desempenhoMl(janela, atribuicoes, registrar) {
+async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida) {
   if (!ML_COOKIE) {
     console.log('[desempenho] ML_COOKIE ausente — Mercado Livre ignorado');
     return 0;
@@ -436,11 +437,26 @@ async function desempenhoMl(janela, atribuicoes, registrar) {
   const agreg = new Map();
   let indiretas = 0, semCasar = 0;
   for (const x of linhas) {
-    if (String(x.saleType || '').toUpperCase() !== 'DIRECT') { indiretas++; continue; }
-    const id = idMlDoLink(x.link);
-    if (!id || !porId.has(id)) { semCasar++; continue; }
     const m = String(x.date || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     const dia = m ? `${m[3]}-${m[2]}-${m[1]}` : String(x.date || '').slice(0, 10);
+    const direta = String(x.saleType || '').toUpperCase() === 'DIRECT';
+    const id = idMlDoLink(x.link);
+    const noLedger = id && porId.has(id);
+
+    // Toda venda que nao vira desempenho de um produto NOSSO ainda diz o que o
+    // publico comprou — vai para o arquivo de nao atribuidas em vez de sumir.
+    if (!direta || !noLedger) {
+      if (!direta) indiretas++; else semCasar++;
+      coletarNaoAtribuida?.({
+        id, dia, tipo: direta ? 'direta_fora_do_ledger' : 'indireta',
+        nome: x.productName || '', categoria: x.categoryName || '',
+        vendedor: x.storeName || '', link: x.link || '',
+        unidades: Math.max(1, parseInt(x.saleUnits, 10) || 1),
+        vendas: parseFloat(x.saleValue) || 0,
+        comissao: parseFloat(x.commissionValue) || 0,
+      });
+      continue;
+    }
     if (!janela.includes(dia)) continue;
     const chave = id + '|' + dia;
     const g = agreg.get(chave) || { id, dia, pedidos: 0, vendas: 0, comissao: 0 };
@@ -621,10 +637,53 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   } catch (e) {
     console.warn('[desempenho] Awin falhou:', e.message);
   }
+  // Vendas do ML que nao viram desempenho de produto nosso, agregadas por
+  // produto comprado: serve para ver o que o publico leva quando entra pelo
+  // nosso link e compra outra coisa (indiretas) ou compra algo que ainda nao
+  // esta no ledger.
+  const naoAtribuidas = new Map();
+  const coletarNaoAtribuida = (v) => {
+    const chave = (v.id || v.nome || 'sem-id') + '|' + v.tipo;
+    const g = naoAtribuidas.get(chave) || {
+      id: v.id || null, tipo: v.tipo, nome: v.nome, categoria: v.categoria,
+      vendedor: v.vendedor, link: v.link,
+      unidades: 0, vendas: 0, comissao: 0, ocorrencias: 0, dias: [],
+    };
+    g.unidades += v.unidades;
+    g.vendas = num(g.vendas + v.vendas);
+    g.comissao = num(g.comissao + v.comissao);
+    g.ocorrencias += 1;
+    if (v.dia && !g.dias.includes(v.dia)) g.dias.push(v.dia);
+    if (!g.nome && v.nome) g.nome = v.nome;
+    naoAtribuidas.set(chave, g);
+  };
+
   try {
-    mudou += await desempenhoMl(janela, atribuicoes, registrar);
+    mudou += await desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida);
   } catch (e) {
     console.warn('[desempenho] Mercado Livre falhou:', e.message);
+  }
+
+  // Arquivo proprio: e uma leitura de mercado, nao desempenho dos disparos —
+  // misturar no ranking distorceria comissaoPorDisparo e conversao.
+  if (naoAtribuidas.size) {
+    const itens = [...naoAtribuidas.values()].sort((a, b) => b.comissao - a.comissao);
+    const totais = itens.reduce((t, x) => ({
+      unidades: t.unidades + x.unidades,
+      vendas: num(t.vendas + x.vendas),
+      comissao: num(t.comissao + x.comissao),
+    }), { unidades: 0, vendas: 0, comissao: 0 });
+    try {
+      await gravarJson(ARQ_VENDAS_ML, {
+        atualizadoEm: new Date().toISOString(),
+        janela: { de: janela[0], ate: janela[janela.length - 1] },
+        totais, itens,
+      }, `chore: vendas ML nao atribuidas (${itens.length} produtos)`);
+      console.log(`[desempenho] ML: ${itens.length} produtos nao atribuidos gravados `
+        + `(R$ ${totais.comissao} em comissao)`);
+    } catch (e) {
+      console.warn('[desempenho] gravacao das vendas ML nao atribuidas falhou:', e.message);
+    }
   }
 
   if (!mudou) { console.log('[desempenho] nada novo'); return; }
