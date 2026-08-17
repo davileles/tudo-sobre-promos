@@ -295,9 +295,15 @@ async function amazonTagsDoDia(ctx, data) {
     'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
     store_id: ctx.storeId,
   });
-  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(), {
-    headers: ctx.headers,
-  });
+  let r;
+  for (let tent = 0; ; tent++) {
+    r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(), {
+      headers: ctx.headers,
+    });
+    // 429 esporádico ao varrer a janela de 15 dias: uma pausa resolve.
+    if (r.status !== 429 || tent >= 2) break;
+    await new Promise((res) => setTimeout(res, 2500 * (tent + 1)));
+  }
   if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
   if (!r.ok) throw new Error(`reporting/table: status ${r.status}`);
   const j = await r.json();
