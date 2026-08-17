@@ -25,10 +25,6 @@ const SHOPEE_APP_ID = process.env.SHOPEE_APP_ID;
 const SHOPEE_SECRET = process.env.SHOPEE_SECRET;
 
 const AMAZON_COOKIE = process.env.AMAZON_COOKIE;
-// Nome do query param que filtra o relatório por tracking ID no Associates
-// Central novo. Não é documentado; se a descoberta automática falhar, capture
-// a URL real via DevTools (mesmo caminho usado no ML) e fixe aqui via env.
-const AMAZON_TAG_PARAM = process.env.AMAZON_TAG_PARAM || '';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
@@ -210,76 +206,86 @@ async function shopeeCliquesPorSubId(inicio, fim) {
 
 // ── Amazon por tracking ID ────────────────────────────────────────────────
 //
-// A página /p/reporting/earnings é a mesma que coletar-comissoes.js já lê: o
-// servidor renderiza a série diária dentro do HTML. A UI de relatórios guarda
-// os filtros na URL, então filtrar por tracking ID deve ser só um query param
-// a mais — o problema é que o NOME do param não é documentado. A descoberta
-// abaixo testa candidatos com um tracking ID canário (inexistente): se a série
-// do canário vier igual à agregada, a Amazon ignorou o param; se vier vazia ou
-// zerada, o filtro pegou. Isso evita o pior cenário, que é gravar o número
-// agregado da conta repetido em todos os 10 produtos como se fosse por tag.
+// O filtro por tracking ID não é um query param da página: é a API interna
+// /reporting/table, autenticada por headers. Tudo que ela exige vem embutido
+// no HTML de /p/reporting/earnings, que já baixamos com o AMAZON_COOKIE:
+//   - <meta name="csrf-token">            -> header X-CSRF-Token
+//   - #pageState[data-page-state] (JSON)  -> associateIdentityToken (Bearer)
+//                                            + contexto (marketplaceId etc.)
+// Receita levantada por engenharia reversa do bundle AssociateReportsAssets
+// (função getAuthToken + wrapper ajax de ac-utils) em 17/08/2026.
+//
+// Com group_by=tag_id e start=end=D, UMA chamada devolve todas as tags com
+// atividade no dia D — cliques, pedidos, receita e ganhos — já com o
+// tag_value em cada linha (o tag_id numérico é dispensável).
 
-const AMAZON_CANARIO = 'cdvcanario0-20';
-
-async function amazonSerie(params) {
-  const url = 'https://associados.amazon.com.br/p/reporting/earnings'
-    + (params ? `?${params}` : '');
-  const r = await req(url, {
+async function amazonContexto() {
+  const r = await req('https://associados.amazon.com.br/p/reporting/earnings', {
     headers: { 'user-agent': UA, 'accept-language': 'pt-BR,pt;q=0.9', cookie: AMAZON_COOKIE },
     redirect: 'manual',
   });
   if (r.status >= 300 && r.status < 400) throw new Error('sessão expirada (302) — renove AMAZON_COOKIE');
-  if (!r.ok) return null; // param inválido pode responder 4xx; trata como "não funcionou"
+  if (!r.ok) throw new Error(`página de relatórios: status ${r.status}`);
+  const html = await r.text();
 
-  const html = (await r.text())
-    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c));
+  const mTok = html.match(/<meta[^>]+name="csrf-token"[^>]+content="([^"]+)"/)
+    || html.match(/<meta[^>]+content="([^"]+)"[^>]+name="csrf-token"/);
+  if (!mTok) throw new Error('meta csrf-token não encontrado — layout da página mudou');
 
-  const blocos = html.match(/\{[^{}]*"day":"\d{4}-\d{2}-\d{2}"[^{}]*\}/g) || [];
-  const out = {};
-  for (const b of blocos) {
-    let o;
-    try { o = JSON.parse(b); } catch { continue; }
-    if (!o.day || o.clicks === undefined) continue;
-    out[o.day] = {
-      cliques: parseInt(o.clicks, 10) || 0,
-      pedidos: parseInt(o.ordered_items ?? o.orders ?? 0, 10) || 0,
-      vendas: num(parseFloat(o.revenue || 0) - parseFloat(o.returned_revenue || 0)),
-      comissao: num(o.total_earnings_with_hva ?? o.total_earnings ?? 0),
-    };
-  }
-  return out;
+  const mPs = html.match(/id="pageState"[^>]*data-page-state="([^"]*)"/)
+    || html.match(/data-page-state="([^"]*)"[^>]*id="pageState"/);
+  if (!mPs) throw new Error('#pageState não encontrado — layout da página mudou');
+
+  let ps;
+  try {
+    ps = JSON.parse(mPs[1]
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&amp;/g, '&'));
+  } catch { throw new Error('data-page-state não parseou como JSON — layout mudou'); }
+  if (!ps.associateIdentityToken) throw new Error('associateIdentityToken ausente no pageState');
+
+  return {
+    storeId: ps.storeId,
+    headers: {
+      'user-agent': UA, cookie: AMAZON_COOKIE, accept: 'application/json',
+      'x-csrf-token': mTok[1],
+      authorization: 'Bearer ' + ps.associateIdentityToken,
+      marketplaceid: ps.marketplaceId || '', locale: ps.locale || 'pt_BR',
+      storeid: ps.storeId || '', customerid: ps.customerId || '',
+      programid: ps.programId || '',
+      roles: Array.isArray(ps.roles) ? ps.roles.join(',') : String(ps.roles ?? ''),
+      language: ps.language || 'pt_BR', 'x-requested-with': 'XMLHttpRequest',
+    },
+  };
 }
 
-// Assinatura estável de uma série para comparação (dias ordenados).
-function assinaturaSerie(serie) {
-  if (!serie) return 'null';
-  return Object.keys(serie).sort()
-    .map((d) => `${d}:${serie[d].cliques}:${serie[d].vendas}:${serie[d].comissao}`)
-    .join('|');
-}
+// A API devolve números como string, com "-" para vazio e vírgula de milhar
+// possível em valores grandes. Este parser cobre os três casos.
+const numApi = (v) => {
+  const s = String(v ?? '').replace(/,/g, '').trim();
+  const f = parseFloat(s);
+  return Number.isFinite(f) ? f : 0;
+};
 
-let _paramTag; // undefined = ainda não descoberto; '' = descoberta falhou
-
-async function descobrirParamTag(serieAgg) {
-  if (_paramTag !== undefined) return _paramTag;
-  if (AMAZON_TAG_PARAM) { _paramTag = AMAZON_TAG_PARAM; return _paramTag; }
-
-  const assAgg = assinaturaSerie(serieAgg);
-  for (const cand of ['trackingId', 'tracking_id', 'trackingIds', 'tag']) {
-    const canario = await amazonSerie(`${cand}=${encodeURIComponent(AMAZON_CANARIO)}`);
-    await new Promise((res) => setTimeout(res, 500));
-    if (canario === null) continue; // 4xx: candidato rejeitado pelo servidor
-    const soZeros = Object.values(canario).every((d) => !d.cliques && !d.vendas && !d.comissao);
-    if (!Object.keys(canario).length || soZeros || assinaturaSerie(canario) !== assAgg) {
-      console.log(`[desempenho] param de tracking ID na Amazon: ${cand}`);
-      _paramTag = cand;
-      return _paramTag;
-    }
-  }
-  console.warn('[desempenho] Amazon ignorou todos os candidatos de param — '
-    + 'capture a URL do filtro por tracking ID via DevTools e defina AMAZON_TAG_PARAM');
-  _paramTag = '';
-  return _paramTag;
+/** Linhas (uma por tag com atividade) do dia `data` (YYYY-MM-DD). */
+async function amazonTagsDoDia(ctx, data) {
+  const qs = new URLSearchParams({
+    'query[type]': 'overview',
+    'query[start_date]': data, 'query[end_date]': data,
+    'query[group_by]': 'tag_id',
+    'query[columns]': 'tag_value,tag_id,clicks,total_ordered_items,shipped_revenue,total_earnings',
+    'query[order]': 'desc', 'query[sort]': 'clicks',
+    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+    'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
+    store_id: ctx.storeId,
+  });
+  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(), {
+    headers: ctx.headers,
+  });
+  if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
+  if (!r.ok) throw new Error(`reporting/table: status ${r.status}`);
+  const j = await r.json();
+  return j.records || [];
 }
 
 // Na Amazon o pool de refs rotaciona: o mesmo tracking ID aponta para produtos
@@ -311,29 +317,33 @@ async function desempenhoAmazon(janela, atribuicoes, registrar) {
   }
   const { refs, resolver } = resolutorAmazon(atribuicoes);
   if (!refs.length) { console.log('[desempenho] ledger sem refs da Amazon'); return 0; }
+  const doPool = new Set(refs);
 
-  const serieAgg = await amazonSerie('');
-  if (!serieAgg || !Object.keys(serieAgg).length) throw new Error('série agregada veio vazia — layout pode ter mudado');
-  const temTrafego = janela.some((d) => serieAgg[d] && serieAgg[d].cliques > 0);
-  if (!temTrafego) { console.log('[desempenho] Amazon sem cliques na janela — nada a atribuir'); return 0; }
-
-  const param = await descobrirParamTag(serieAgg);
-  if (!param) return 0;
+  const ctx = await amazonContexto();
 
   let mudou = 0;
-  for (const ref of refs) {
-    const serie = await amazonSerie(`${param}=${encodeURIComponent(ref)}`);
-    await new Promise((res) => setTimeout(res, 500));
-    if (serie === null) { console.warn(`[desempenho] Amazon rejeitou consulta da tag ${ref}`); continue; }
-    for (const dia of janela) {
-      const d = serie[dia];
-      if (!d || (!d.cliques && !d.vendas && !d.comissao)) continue;
+  for (const dia of janela) {
+    let linhas;
+    try { linhas = await amazonTagsDoDia(ctx, dia); }
+    catch (e) { console.warn(`[desempenho] Amazon ${dia}: ${e.message}`); continue; }
+
+    for (const l of linhas) {
+      const ref = String(l.tag_value || '');
+      // Fora do pool = tag padrão da conta ou tráfego de outro canal: não é
+      // atribuível a produto e ficaria errado no ranking.
+      if (!doPool.has(ref)) continue;
+      const registro = {
+        cliques: Math.round(numApi(l.clicks)),
+        pedidos: Math.round(numApi(l.total_ordered_items)),
+        vendas: num(numApi(l.shipped_revenue)),
+        comissao: num(numApi(l.total_earnings)),
+      };
+      if (!registro.cliques && !registro.pedidos && !registro.vendas && !registro.comissao) continue;
       const attr = resolver(ref, dia);
       if (!attr) continue; // tráfego anterior à primeira atribuição desse ref
-      mudou += registrar(dia, attr, {
-        cliques: d.cliques, pedidos: d.pedidos, vendas: d.vendas, comissao: d.comissao,
-      });
+      mudou += registrar(dia, attr, registro);
     }
+    await new Promise((res) => setTimeout(res, 400));
   }
   return mudou;
 }
