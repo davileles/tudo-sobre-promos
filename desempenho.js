@@ -391,9 +391,14 @@ async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, regi
   // ref -> atribuição mais recente daquele ref. Na Shopee o ref é
   // determinístico por item, então o mesmo ref reaparece em vários dias: o
   // registro serve só para saber QUAL produto é, não em que dia saiu.
+  //
+  // Filtro POSITIVO por loja: desde que ML/Magalu/Awin também registram refs
+  // no ledger, "tudo que não é Amazon" deixou de significar Shopee — um SKU
+  // numérico do Magalu pode colidir com um itemId da Shopee e roubar os
+  // cliques dele no relatório.
   const porRef = new Map();
   for (const a of atribuicoes) {
-    if (!a.ref || String(a.loja || '').toLowerCase() === 'amazon') continue;
+    if (!a.ref || !String(a.loja || '').toLowerCase().includes('shopee')) continue;
     const ant = porRef.get(a.ref);
     if (!ant || (a.data || '') > (ant.data || '')) porRef.set(a.ref, a);
   }
