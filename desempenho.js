@@ -433,10 +433,21 @@ async function categoriasDoRelatorio(ctx, rel, de, ate) {
       { headers: ctx.headers });
     // Falha no meio da paginacao devolve o que ja foi lido: categoria parcial
     // e melhor que nenhuma, e a coleta principal nao depende disto.
-    if (!r.ok) break;
+    if (!r.ok) {
+      if (pagina === 0) console.log(`[desempenho] Amazon: ${rel.nome} recusado (status ${r.status})`);
+      break;
+    }
     let j;
     try { j = await r.json(); } catch (e) { break; }
     const registros = j.records || j.rows || [];
+    // Diagnostico: relatorio que responde 200 mas nao entrega o par asin/categoria
+    // so ensina alguma coisa se soubermos QUAIS campos ele entregou.
+    if (pagina === 0 && (!registros.length || !parAsinCategoria(registros[0]))) {
+      console.log(`[desempenho] Amazon: ${rel.nome} sem par utilizavel — `
+        + `${registros.length} linha(s), campos: `
+        + (registros.length ? Object.keys(registros[0]).join(',') : '(vazio) chaves da resposta: '
+          + Object.keys(j || {}).join(',')));
+    }
     for (const it of registros) {
       const par = parAsinCategoria(it);
       if (par) mapa.set(par[0], par[1]);
