@@ -423,12 +423,18 @@ async function categoriaDaPagina(asin) {
   const html = await r.text();
   const bloco = html.match(/wayfinding-breadcrumbs_feature_div([\s\S]{0,4000}?)<\/ul>/);
   if (!bloco) {
-    const t = (html.match(/<title>([\s\S]{0,120}?)<\/title>/) || [, '(sem title)'])[1].trim();
-    console.log(`[desempenho] Amazon: pagina ${asin} sem breadcrumb — ${html.length} bytes, title="${t}"`);
+    // Parte das paginas nao traz breadcrumb, mas o title termina com o
+    // departamento ("... : Amazon.com.br: Alimentos e Bebidas") — mesma
+    // taxonomia, entao vale como segunda leitura antes de desistir.
+    const t = (html.match(/<title>([\s\S]{0,200}?)<\/title>/) || [, ''])[1].trim();
+    const dep = (t.match(/Amazon\.com\.br\s*:\s*([^:|]{3,60})\s*$/) || [])[1];
+    if (dep) return { categoria: dep.trim(), caminho: dep.trim() };
+    // Sem breadcrumb nem departamento no title = captcha, ASIN morto ou layout
+    // novo. Nos tres casos nao ha o que inventar: o relatorio decide.
+    console.log(`[desempenho] Amazon: pagina ${asin} sem categoria — ${html.length} bytes, `
+      + `title="${t.slice(0, 90) || '(sem title)'}"`);
+    return null;
   }
-  // Sem breadcrumb = pagina de captcha, ASIN morto ou layout diferente. Nos
-  // tres casos nao ha o que inventar: devolve null e o relatorio decide.
-  if (!bloco) return null;
   const trilha = [...bloco[1].matchAll(/>\s*([^<>]{2,60}?)\s*</g)]
     .map((m) => m[1].trim())
     .filter((t) => t && t !== '\u203a' && !/^&\w+;$/.test(t));
