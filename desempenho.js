@@ -762,14 +762,64 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
 // ── Mercado Livre por produto ─────────────────────────────────────────────
 //
 // O relatorio /dashboard/sales/general lista VENDAS, uma por linha, com o link
-// do produto comprado. Nao existe campo de link/tag de origem, entao so as
-// vendas DIRECT (item comprado == item divulgado) sao atribuiveis; as INDIRECT
-// vem de quem clicou no nosso link e comprou outra coisa, e somar essas ao
-// produto divulgado seria inventar atribuicao. Cliques por produto o painel
-// nao expoe em nenhuma aba — o ML fica com conversao e comissao, sem clique.
+// do produto comprado. So as vendas DIRECT (item comprado == item divulgado)
+// sao atribuiveis por produto; as INDIRECT vem de quem clicou no nosso link e
+// comprou outra coisa, e somar essas ao produto divulgado seria inventar
+// atribuicao. Cliques por produto o painel nao expoe em nenhuma aba — o ML
+// fica com conversao e comissao, sem clique.
+//
+// Origem da venda indireta: subIdMlDaLinha() varre o payload atras de um campo
+// de sub_id/tag e cai no link como plano B. O log de campos diz, a cada coleta,
+// o que o ML devolve de fato. Enquanto o disparo do ML sair com a URL intacta
+// (decisao de radar-amazon.js, para nao arriscar a atribuicao da rede), nao ha
+// marcacao nossa para o relatorio devolver e a origem fica nula.
 //
 // O ledger guarda o id no formato MLB{n}; os links vem como
 // /MLB-{n}-slug (item) ou /up/MLBU{n} (catalogo unificado, id diferente).
+
+// Sonda de origem no ML. Hoje o link do ML sai do disparo SEM parametro extra
+// (radar-amazon.js: aplicarRefNoLink devolve a URL intacta para ML), entao nao
+// existe sub_id nosso para o relatorio devolver. Esta funcao serve para duas
+// coisas: (a) provar isso com o payload real, via o log de campos abaixo, e
+// (b) passar a atribuir sozinha no dia em que o disparo comecar a marcar a URL.
+const CAMPOS_SUBID_ML = [
+  'subId', 'sub_id', 'subid', 'sub_ids', 'tag', 'tagName', 'tag_name',
+  'mattWord', 'matt_word', 'mattTool', 'matt_tool', 'sourceId', 'source_id',
+  'customTag', 'custom_tag', 'trackingId', 'tracking_id', 'campaign', 'campaignName',
+];
+
+function subIdMlDaLinha(x) {
+  for (const campo of CAMPOS_SUBID_ML) {
+    const v = x && x[campo];
+    if (v == null) continue;
+    const s = Array.isArray(v) ? String(v[0] || '') : String(v);
+    if (s && s !== 'null' && s !== 'undefined') return s.toLowerCase();
+  }
+  // Plano B: o proprio link da venda pode carregar a marcacao na query.
+  try {
+    const u = new URL(String(x?.link || ''));
+    for (const campo of ['matt_word', 'matt_tool', 'sub_id1', 'subid', 'tag']) {
+      const v = u.searchParams.get(campo);
+      if (v) return String(v).toLowerCase();
+    }
+  } catch { /* link relativo ou vazio: sem origem, segue sem */ }
+  return null;
+}
+
+// Roda uma vez por coleta: lista os campos que o ML devolve de fato. E o unico
+// jeito honesto de responder "da para atribuir venda indireta no ML?" — sem
+// isso a resposta seria chute sobre um payload que muda sem aviso.
+let _camposMlLogados = false;
+function logarCamposMl(linha) {
+  if (_camposMlLogados || !linha) return;
+  _camposMlLogados = true;
+  const campos = Object.keys(linha).sort();
+  console.log('[desempenho] ML: campos da linha de venda —', campos.join(', '));
+  const achados = CAMPOS_SUBID_ML.filter((k) => linha[k] != null);
+  console.log(achados.length
+    ? `[desempenho] ML: campo(s) de origem presente(s) — ${achados.join(', ')}`
+    : '[desempenho] ML: nenhum campo de sub_id/tag no payload — venda indireta segue sem origem');
+}
 
 const idMlDoLink = (url) => {
   const s = String(url || '');
@@ -817,6 +867,19 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
   }
   marcarColeta?.('Mercado Livre');
 
+  logarCamposMl(linhas[0]);
+
+  // ref -> atribuicao, para traduzir um eventual sub_id de volta ao produto que
+  // divulgamos. Enquanto o ML nao devolver origem, o mapa fica sem uso — e de
+  // proposito: no dia em que devolver, a atribuicao passa a sair sozinha.
+  const porRefMl = new Map();
+  for (const a of atribuicoes) {
+    if (!/mercado\s*livre/i.test(String(a.loja || '')) || !a.ref) continue;
+    const ant = porRefMl.get(a.ref);
+    if (!ant || (a.data || '') > (ant.data || '')) porRefMl.set(String(a.ref).toLowerCase(), a);
+  }
+  let comOrigem = 0;
+
   // Agrega por (id, dia) somando apenas vendas diretas.
   const agreg = new Map();
   let indiretas = 0, semCasar = 0;
@@ -831,9 +894,14 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
     // publico comprou — vai para o arquivo de nao atribuidas em vez de sumir.
     if (!direta || !noLedger) {
       if (!direta) indiretas++; else semCasar++;
+      const origem = porRefMl.get(subIdMlDaLinha(x) || '') || null;
+      if (origem) comOrigem++;
       coletarNaoAtribuida?.({
         loja: 'Mercado Livre',
         id, dia, tipo: direta ? 'direta_fora_do_ledger' : 'indireta',
+        refOrigem: origem ? origem.ref : null,
+        origemId: origem ? origem.asin : null,
+        origemNome: origem ? (origem.nome || '') : '',
         nome: x.productName || '', categoria: x.categoryName || '',
         vendedor: x.storeName || '', link: x.link || '',
         unidades: Math.max(1, parseInt(x.saleUnits, 10) || 1),
@@ -851,7 +919,8 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
     agreg.set(chave, g);
   }
   if (indiretas || semCasar) {
-    console.log(`[desempenho] ML: ${indiretas} vendas indiretas (nao atribuiveis), ${semCasar} diretas sem produto no ledger`);
+    console.log(`[desempenho] ML: ${indiretas} vendas indiretas, ${semCasar} diretas sem produto no ledger`
+      + ` — ${comOrigem} com link de origem identificado`);
   }
 
   let mudou = 0;
@@ -1019,6 +1088,9 @@ async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, regi
           if (!idComprado || idComprado === String(attr.asin || '')) continue;
           coletarNaoAtribuida({
             loja: 'Shopee', id: idComprado, dia: data, tipo: 'indireta',
+            // Quem clicou entrou por ESTE disparo e levou outra coisa: o par
+            // ref -> produto divulgado e o que responde "de qual link veio".
+            refOrigem: attr.ref, origemId: attr.asin || null, origemNome: attr.nome || '',
             nome: item.itemName || '', categoria: item.globalCategoryLv1Name || '',
             vendedor: item.shopName || '',
             link: 'https://shopee.com.br/product/0/' + idComprado,
@@ -1083,13 +1155,29 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     const g = naoAtribuidas.get(chave) || {
       loja: v.loja || '', id: v.id || null, tipo: v.tipo, nome: v.nome,
       categoria: v.categoria, vendedor: v.vendedor, link: v.link,
-      unidades: 0, vendas: 0, comissao: 0, ocorrencias: 0, dias: [],
+      unidades: 0, vendas: 0, comissao: 0, ocorrencias: 0, dias: [], origens: [],
     };
     g.unidades += v.unidades;
     g.vendas = num(g.vendas + v.vendas);
     g.comissao = num(g.comissao + v.comissao);
     g.ocorrencias += 1;
     if (v.dia && !g.dias.includes(v.dia)) g.dias.push(v.dia);
+    // Origem = o disparo NOSSO que levou o clique que virou esta venda. So a
+    // Shopee entrega isso hoje (o relatorio vem por sub_id). Guardar por venda
+    // e nao por produto porque o mesmo item pode ter vindo de dois links.
+    if (v.refOrigem) {
+      const o = g.origens.find((x) => x.ref === v.refOrigem);
+      if (o) {
+        o.unidades += v.unidades;
+        o.comissao = num(o.comissao + v.comissao);
+        o.ocorrencias += 1;
+      } else {
+        g.origens.push({
+          ref: v.refOrigem, id: v.origemId || null, nome: v.origemNome || '',
+          unidades: v.unidades, comissao: num(v.comissao), ocorrencias: 1,
+        });
+      }
+    }
     // O grupo nasce com os campos da primeira ocorrencia; se ela veio incompleta
     // (categoria vazia, por exemplo), a proxima preenche em vez de descartar.
     if (!g.nome && v.nome) g.nome = v.nome;
