@@ -85,6 +85,34 @@ try {
   .main-tab.active{color:var(--accent);background:rgba(255,165,0,.12);border-color:rgba(255,165,0,.45);border-left:3px solid var(--accent);padding-left:9px}
   .tab-badge{background:var(--accent);color:#0f0f0f;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:800;line-height:1.5}
 
+  /* ══ SUB-ABAS DE CONFIGURACAO ══ */
+  /* Negocio x Tecnica: sao dois publicos diferentes na mesma tela. A distincao
+     e visual, nao estrutural — os dois blocos vivem no mesmo panel-config e
+     salvam pelo mesmo botao. */
+  .cfg-subtabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:0}
+  .cfg-subtab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;padding:9px 16px;cursor:pointer;transition:color .15s,border-color .15s;margin-bottom:-1px}
+  .cfg-subtab:hover:not(.active){color:var(--text)}
+  .cfg-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .cfg-sec{display:none}
+  .cfg-sec.active{display:block}
+
+  /* ══ EDITOR DE CATEGORIAS ══ */
+  .cat-item{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--card-deep)}
+  .cat-head{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;user-select:none}
+  .cat-head:hover{background:rgba(255,255,255,.03)}
+  [data-theme="light"] .cat-head:hover{background:rgba(0,0,0,.03)}
+  .cat-nome{font-size:13px;font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat-cont{font-size:10.5px;font-weight:700;color:var(--muted2);white-space:nowrap}
+  .cat-seta{color:var(--muted2);font-size:11px;transition:transform .15s}
+  .cat-item.aberta .cat-seta{transform:rotate(90deg)}
+  .cat-corpo{display:none;padding:4px 13px 14px;border-top:1px solid var(--border)}
+  .cat-item.aberta .cat-corpo{display:block}
+  .cat-corpo textarea{min-height:74px;font-size:12px;line-height:1.6}
+  .cat-espelho{display:flex;flex-wrap:wrap;gap:6px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--card-deep);min-height:40px;align-items:center}
+  .cat-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s;background:transparent}
+  .cat-chip:hover{color:var(--text);border-color:var(--muted)}
+  .cat-chip.on{color:var(--accent);border-color:rgba(255,165,0,.5);background:rgba(255,165,0,.12)}
+
   /* ══ LAYOUT ══ */
   .wrap{max-width:960px;margin:0 auto;padding:20px 24px 70px}
   #shell-main .wrap{margin:0 auto}
@@ -1789,11 +1817,17 @@ body.travado > *:not(#login-screen){display:none !important}
 
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
-  <div class="aviso">
-    Identidade da <b>sua operação</b>: links de afiliado, rodapés das mensagens e bloqueios do Telegram.
-    Os papéis dos grupos ficam todos na aba <b>Grupos</b>.
-    Tudo que você salvar aqui vale na hora para o auto-envio, a fila e os geradores — sem reiniciar nada.
+  <div class="cfg-subtabs">
+    <button class="cfg-subtab active" id="cfgsub-negocio" onclick="cfgSub('negocio')">💼 Neg&#243;cio</button>
+    <button class="cfg-subtab" id="cfgsub-tecnica" onclick="cfgSub('tecnica')">🛠️ T&#233;cnica</button>
   </div>
+
+  <div class="cfg-sec active" id="cfgsec-negocio">
+    <div class="aviso">
+      Como a <b>sua opera&#231;&#227;o</b> se apresenta e o que ela decide: marca, links de afiliado, rodap&#233;s das
+      mensagens e as categorias que separam as ofertas por nicho. Tudo aqui vale na hora para o auto-envio,
+      a fila e os geradores &#8212; sem reiniciar nada.
+    </div>
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">🏷️ Marca</p>
@@ -1831,6 +1865,46 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
       <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
   </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🏷️ Categorias e palavras-chave <span class="tag" style="text-transform:none">decide o grupo de nicho de cada oferta</span></p>
+    <div class="aviso" style="margin-bottom:12px">
+      Toda oferta capturada e classificada antes de escolher destino. A decis&#227;o segue esta ordem:
+      <b>trilha da Amazon</b> (quando o ASIN j&#225; &#233; conhecido) &#8594; <b>palavra-chave no t&#237;tulo</b> &#8594; indefinida.
+      <b>Bloqueio vence palavra-chave</b>: &#8220;Ta&#231;a de Vinho&#8221; tem <i>vinho</i> e n&#227;o &#233; bebida &#8212; nesses casos a
+      categoria fica indefinida de prop&#243;sito e a oferta vai para a fila de aprova&#231;&#227;o em vez de ser chutada.
+      Um termo por linha; acento e caixa n&#227;o importam.
+    </div>
+
+    <div class="g2" style="margin-bottom:14px">
+      <div class="field"><label>Confian&#231;a m&#237;nima para rotear <span class="tag">abaixo disso vai s&#243; ao grupo geral</span></label>
+        <select id="cat-limiar">
+          <option value="0.5">50% &#8212; permissivo</option>
+          <option value="0.7">70% &#8212; recomendado</option>
+          <option value="0.85">85% &#8212; s&#243; palavra-chave limpa</option>
+          <option value="0.95">95% &#8212; s&#243; trilha da Amazon</option>
+        </select></div>
+      <div class="field"><label>Espelhar no grupo do operador <span class="tag">modo observa&#231;&#227;o</span></label>
+        <div id="cat-espelho" class="cat-espelho"></div></div>
+    </div>
+
+    <div id="cat-lista"></div>
+
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-copy btn-sm" onclick="catNova()">+ Nova categoria</button>
+      <button class="btn btn-copy btn-sm" onclick="catRecarregar()">&#8635; Descartar altera&#231;&#245;es</button>
+    </div>
+    <p class="send-ok" id="cat-status"></p>
+  </div>
+
+  </div>
+
+  <div class="cfg-sec" id="cfgsec-tecnica">
+    <div class="aviso">
+      Encanamento: credenciais dos servi&#231;os, bloqueios de captura, cotas da rede de afiliados e sess&#227;o.
+      Mexer aqui muda <b>como</b> o sistema funciona, n&#227;o <b>o que</b> ele publica.
+      Os pap&#233;is dos grupos ficam todos na aba <b>Grupos</b>.
+    </div>
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">📵 Telegram — canais ignorados</p>
@@ -1929,31 +2003,14 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
   <div class="card">
-    <p class="card-title" style="margin-bottom:12px">🔁 Radar — repetição e piso de desconto</p>
-    <div class="aviso" style="margin-bottom:12px">
-      Vale para <b>todas as lojas</b> do radar (Amazon, Mercado Livre, Shopee, Magalu e Awin).
-      A não repetição é por <b>produto</b>, não por grupo: se três grupos-fonte postarem o mesmo item,
-      ele é publicado uma vez só dentro da janela. <b>Exceção:</b> se o preço cair mais de 5% em relação
-      à última publicação, o produto sai de novo. O piso de desconto só é aplicado quando a loja
-      expõe um preço "De" confiável.
-    </div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Não repetir produto por <span class="tag">horas</span></label>
-        <input type="number" id="rd-dedup" min="1" max="720" step="1" value="24"/></div>
-      <div class="field"><label>Desconto mínimo <span class="tag">%</span></label>
-        <input type="number" id="rd-mindesc" min="0" max="99" step="1" value="5"/></div>
-    </div>
-    <button class="btn" id="rd-btn" onclick="rdSalvar()">Salvar regras do radar</button>
-    <p class="send-ok" id="rd-status"></p>
-  </div>
-
-  <div class="card">
     <p class="card-title" style="margin-bottom:8px">🔒 Sessão</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
       Conectado como <b id="cfg-email-logado">—</b>. O acesso vale por 24h neste dispositivo.
     </p>
     <button class="btn btn-rej btn-sm" onclick="sairDaConta()">Sair da conta</button>
   </div>
+
+</div>
 
   <button class="btn" id="cfg-btn" onclick="cfgSalvar()">Salvar configurações</button>
   <p class="send-ok" id="cfg-status"></p>
@@ -4930,52 +4987,211 @@ function cfgAbrir() {
   // Nao depende mais da lista de grupos: os papeis sairam desta aba.
   cfgCarregarServidor().then(cfgPreencher);
   awinCarregar();
-  rdCarregar();
+  catCarregar();
 }
 
-/* ══════ RADAR — DEDUP E PISO DE DESCONTO ══════ */
-// Vivem no radar_config.json do servidor (/mkt/config), junto do espacamento
-// entre grupos. Nada de copia local: sao regras de operacao e precisam valer
-// igual em qualquer device.
-function rdCarregar() {
-  fetch(SERVER + '/mkt/config', { signal: AbortSignal.timeout(8000) })
+// ── SUB-ABAS: NEGOCIO x TECNICA ──────────────────────────────────────────────
+// Duas naturezas diferentes na mesma tela. Negocio e o que a operacao decide
+// (marca, comissao, categorias); Tecnica e o encanamento (credenciais, cotas,
+// bloqueios). Sem a separacao, quem so queria trocar um rodape passava por
+// tokens de API.
+function cfgSub(qual) {
+  ['negocio','tecnica'].forEach(function(n) {
+    var b = document.getElementById('cfgsub-'+n);
+    var s = document.getElementById('cfgsec-'+n);
+    if (b) b.classList.toggle('active', n===qual);
+    if (s) s.classList.toggle('active', n===qual);
+  });
+  window.scrollTo({ top: 0 });
+}
+
+// ══ CATEGORIAS E PALAVRAS-CHAVE ══════════════════════════════════════════════
+// Espelho local da taxonomia. Editar em memoria e salvar de uma vez evita um
+// POST por tecla e deixa o botao "Descartar alteracoes" fazer sentido.
+var CAT_ESTADO = { categorias: {}, limiarConfianca: 0.7, espelhoOperador: [] };
+var CAT_ABERTAS = {};
+
+function catCarregar() {
+  var st = document.getElementById('cat-status');
+  if (st) { st.style.color = ''; st.textContent = 'Carregando categorias…'; }
+  return fetch(SERVER + '/tsp/categorias?t=' + Date.now(), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (!d || !d.ok) return;
-      var dd = document.getElementById('rd-dedup');
-      var md = document.getElementById('rd-mindesc');
-      if (dd) dd.value = (d.dedupHoras != null ? d.dedupHoras : 24);
-      if (md) md.value = (d.descontoMinimo != null ? d.descontoMinimo : 5);
+      if (!d.ok) throw new Error(d.erro || 'resposta invalida');
+      CAT_ESTADO = {
+        categorias:      d.categorias || {},
+        limiarConfianca: d.limiarConfianca != null ? d.limiarConfianca : 0.7,
+        espelhoOperador: d.espelhoOperador || []
+      };
+      catRender();
+      if (st) st.textContent = '';
     })
-    .catch(function(){});
+    .catch(function(e){
+      var l = document.getElementById('cat-lista');
+      if (l) l.innerHTML = '<div class="aviso">Nao foi possivel carregar as categorias: ' + esc(e.message) + '</div>';
+      if (st) st.textContent = '';
+    });
 }
 
-function rdSalvar() {
-  var btn = document.getElementById('rd-btn');
-  var st  = document.getElementById('rd-status');
-  var horas = Number(document.getElementById('rd-dedup').value);
-  var minD  = Number(document.getElementById('rd-mindesc').value);
-  if (!isFinite(horas) || horas < 1) {
-    st.className = 'send-ok send-err'; st.textContent = 'A janela precisa ser de pelo menos 1 hora.';
+function catRecarregar() {
+  if (!confirm('Descartar as alteracoes nao salvas e recarregar do servidor?')) return;
+  catCarregar();
+}
+
+// Lista -> textarea (uma por linha) e volta. O operador pensa em termos, nao
+// em JSON.
+function catLinhas(v) { return (v || []).join('\n'); }
+function catDeLinhas(txt) {
+  var vistos = {}, saida = [];
+  String(txt || '').split('\n').forEach(function(l) {
+    var t = l.trim();
+    if (!t) return;
+    var k = t.toLowerCase();
+    if (vistos[k]) return;
+    vistos[k] = 1; saida.push(t);
+  });
+  return saida;
+}
+
+function catRender() {
+  var lim = document.getElementById('cat-limiar');
+  if (lim) {
+    var alvo = String(CAT_ESTADO.limiarConfianca);
+    var achou = Array.prototype.some.call(lim.options, function(o){ return o.value === alvo; });
+    lim.value = achou ? alvo : '0.7';
+  }
+
+  var ids = Object.keys(CAT_ESTADO.categorias).sort(function(a, b) {
+    return (CAT_ESTADO.categorias[a].nome || a).localeCompare(CAT_ESTADO.categorias[b].nome || b, 'pt-BR');
+  });
+
+  var esp = document.getElementById('cat-espelho');
+  if (esp) {
+    esp.innerHTML = ids.length
+      ? ids.map(function(id) {
+          var d = CAT_ESTADO.categorias[id];
+          var on = CAT_ESTADO.espelhoOperador.indexOf(id) >= 0;
+          return '<button type="button" class="cat-chip' + (on ? ' on' : '') + '" onclick="catEspelho(\'' + id + '\')">'
+               + (d.emoji ? esc(d.emoji) + ' ' : '') + esc(d.nome || id) + '</button>';
+        }).join('')
+      : '<span style="font-size:11.5px;color:var(--muted2)">Nenhuma categoria cadastrada.</span>';
+  }
+
+  var lista = document.getElementById('cat-lista');
+  if (!lista) return;
+  if (!ids.length) {
+    lista.innerHTML = '<div class="aviso">Nenhuma categoria ainda. Crie a primeira em <b>+ Nova categoria</b>.</div>';
     return;
   }
-  if (!isFinite(minD) || minD < 0) {
-    st.className = 'send-ok send-err'; st.textContent = 'O desconto mínimo não pode ser negativo.';
-    return;
+  lista.innerHTML = ids.map(function(id) {
+    var d = CAT_ESTADO.categorias[id];
+    var aberta = CAT_ABERTAS[id] ? ' aberta' : '';
+    return ''
+      + '<div class="cat-item' + aberta + '" id="cat-item-' + id + '">'
+      +   '<div class="cat-head" onclick="catToggle(\'' + id + '\')">'
+      +     '<span class="cat-seta">&#9654;</span>'
+      +     '<span class="cat-nome">' + (d.emoji ? esc(d.emoji) + ' ' : '') + esc(d.nome || id)
+      +       ' <span style="font-weight:500;color:var(--muted2)">(' + esc(id) + ')</span></span>'
+      +     '<span class="cat-cont">' + (d.keywords || []).length + ' termos &#183; '
+      +       (d.bloqueio || []).length + ' bloqueios</span>'
+      +   '</div>'
+      +   '<div class="cat-corpo">'
+      +     '<div class="g2" style="margin:10px 0 12px">'
+      +       '<div class="field"><label>Nome</label>'
+      +         '<input type="text" value="' + esc(d.nome || '') + '" oninput="catCampo(\'' + id + '\',\'nome\',this.value)"/></div>'
+      +       '<div class="field"><label>&#205;cone <span class="tag">opcional</span></label>'
+      +         '<input type="text" maxlength="4" value="' + esc(d.emoji || '') + '" oninput="catCampo(\'' + id + '\',\'emoji\',this.value)"/></div>'
+      +     '</div>'
+      +     '<div class="field" style="margin-bottom:12px"><label>Palavras-chave <span class="tag">um termo por linha &#8212; casa palavra inteira</span></label>'
+      +       '<textarea spellcheck="false" oninput="catCampo(\'' + id + '\',\'keywords\',this.value,1)">' + esc(catLinhas(d.keywords)) + '</textarea></div>'
+      +     '<div class="field" style="margin-bottom:12px"><label>Bloqueios <span class="tag">acess&#243;rio do produto, n&#227;o o produto &#8212; vence a palavra-chave</span></label>'
+      +       '<textarea spellcheck="false" oninput="catCampo(\'' + id + '\',\'bloqueio\',this.value,1)">' + esc(catLinhas(d.bloqueio)) + '</textarea></div>'
+      +     '<div class="g2" style="margin-bottom:10px">'
+      +       '<div class="field"><label>Trilha Amazon &#8212; aceita <span class="tag">n&#237;vel do breadcrumb</span></label>'
+      +         '<textarea spellcheck="false" oninput="catCampo(\'' + id + '\',\'segmentosAmazon\',this.value,1)">' + esc(catLinhas(d.segmentosAmazon)) + '</textarea></div>'
+      +       '<div class="field"><label>Trilha Amazon &#8212; recusa <span class="tag">ex: Cozinha, Utens&#237;lios</span></label>'
+      +         '<textarea spellcheck="false" oninput="catCampo(\'' + id + '\',\'segmentosBloqueio\',this.value,1)">' + esc(catLinhas(d.segmentosBloqueio)) + '</textarea></div>'
+      +     '</div>'
+      +     '<button class="btn btn-rej btn-sm" onclick="catRemover(\'' + id + '\')">Remover categoria</button>'
+      +   '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function catToggle(id) {
+  CAT_ABERTAS[id] = !CAT_ABERTAS[id];
+  var el = document.getElementById('cat-item-'+id);
+  if (el) el.classList.toggle('aberta', !!CAT_ABERTAS[id]);
+}
+
+// Edicao em memoria. Campos de lista nao redesenham a tela a cada tecla — isso
+// mataria o cursor no meio da digitacao; so o contador do cabecalho atualiza.
+function catCampo(id, campo, valor, ehLista) {
+  var d = CAT_ESTADO.categorias[id];
+  if (!d) return;
+  d[campo] = ehLista ? catDeLinhas(valor) : valor;
+  if (ehLista) {
+    var head = document.querySelector('#cat-item-'+id+' .cat-cont');
+    if (head) head.innerHTML = (d.keywords || []).length + ' termos &#183; ' + (d.bloqueio || []).length + ' bloqueios';
   }
-  btn.disabled = true; st.className = 'send-ok'; st.textContent = 'Salvando...';
-  fetch(SERVER + '/mkt/config', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dedupHoras: horas, descontoMinimo: minD })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    if (!d.ok) throw new Error(d.erro || 'falhou');
-    st.textContent = '✓ Mesmo produto não repete por ' + horas + 'h · desconto mínimo de ' + minD + '%.';
-    rdCarregar();
-  })
-  .catch(function(e){ st.className = 'send-ok send-err'; st.textContent = 'Não salvou: ' + e.message; })
-  .finally(function(){ btn.disabled = false; });
+}
+
+function catEspelho(id) {
+  var i = CAT_ESTADO.espelhoOperador.indexOf(id);
+  if (i >= 0) CAT_ESTADO.espelhoOperador.splice(i, 1);
+  else CAT_ESTADO.espelhoOperador.push(id);
+  catRender();
+}
+
+function catNova() {
+  var nome = (prompt('Nome da categoria (ex: Bebidas, Pet Shop):') || '').trim();
+  if (!nome) return;
+  // Identificador derivado do nome: o operador nomeia, o sistema cuida da
+  // chave. Sem acento, sem espaco — e o que o classificador e a rota usam.
+  var id = nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,31);
+  if (!/^[a-z]/.test(id)) id = 'c_' + id;
+  if (!id || id.length < 2) { alert('Nome invalido — use ao menos duas letras.'); return; }
+  if (CAT_ESTADO.categorias[id]) { alert('Ja existe uma categoria com esse nome.'); return; }
+  CAT_ESTADO.categorias[id] = { nome: nome, emoji: '', keywords: [], bloqueio: [], segmentosAmazon: [], segmentosBloqueio: [] };
+  CAT_ABERTAS[id] = true;
+  catRender();
+  var st = document.getElementById('cat-status');
+  if (st) { st.style.color = ''; st.textContent = 'Categoria criada — preencha as palavras-chave e salve.'; }
+}
+
+function catRemover(id) {
+  var d = CAT_ESTADO.categorias[id];
+  if (!d) return;
+  if (!confirm('Remover a categoria "' + (d.nome || id) + '"? As ofertas ja classificadas nela nao mudam.')) return;
+  delete CAT_ESTADO.categorias[id];
+  delete CAT_ABERTAS[id];
+  CAT_ESTADO.espelhoOperador = CAT_ESTADO.espelhoOperador.filter(function(x){ return x !== id; });
+  catRender();
+}
+
+// Salvo junto com o resto da configuracao (botao unico), mas com endpoint
+// proprio: a taxonomia mora em categorias.json, nao em config_tsp.json.
+function catSalvar() {
+  var lim = document.getElementById('cat-limiar');
+  var corpo = {
+    categorias:      CAT_ESTADO.categorias,
+    limiarConfianca: lim ? Number(lim.value) : CAT_ESTADO.limiarConfianca,
+    espelhoOperador: CAT_ESTADO.espelhoOperador
+  };
+  return fetch(SERVER + '/tsp/categorias', {
+    method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(corpo)
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        CAT_ESTADO.categorias = d.categorias || CAT_ESTADO.categorias;
+        CAT_ESTADO.limiarConfianca = d.limiarConfianca;
+        CAT_ESTADO.espelhoOperador = d.espelhoOperador || [];
+        catRender();
+      }
+      return d;
+    })
+    .catch(function(e){ return { ok:false, erro:e.message }; });
 }
 
 // ── AWIN ─────────────────────────────────────────────────────────────────────
@@ -5213,6 +5429,11 @@ function cfgSalvar() {
     awinSalvar().then(function(a){
       if (!a.ok) { st.style.color = 'var(--red)'; st.textContent = 'Config salva, mas a Awin falhou: ' + (a.erro || ''); }
       else awinPrever();
+    }).catch(function(){});
+    // Categorias tem endpoint proprio (categorias.json), mas o operador salva
+    // tudo num botao so — dois botoes na mesma tela viram meia config salva.
+    catSalvar().then(function(k){
+      if (!k.ok) { st.style.color = 'var(--red)'; st.textContent = 'Config salva, mas as categorias falharam: ' + (k.erro || ''); }
     }).catch(function(){});
   }).catch(function(e){
     btn.disabled = false;
