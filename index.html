@@ -3578,9 +3578,16 @@ function renderDescobertas(){
     + '<div class="desc-kpi"><span>Faturamento</span><b>' + descMoeda(tot.vendas) + '</b></div>'
     + '<div class="desc-kpi"><span>Comissão</span><b>' + descMoeda(tot.comissao) + '</b></div>';
   if (DESC_META && DESC_META.janela) {
+    // Loja que nao respondeu na coleta entra com a foto anterior. Dizer isso no
+    // cabecalho evita a leitura errada de que ela vendeu menos.
+    var atrasadas = [];
+    Object.keys(DESC_META.porLoja || {}).forEach(function(l){
+      if (DESC_META.porLoja[l] && DESC_META.porLoja[l].defasado) atrasadas.push(l);
+    });
     document.getElementById('desc-janela').textContent =
       'Janela ' + DESC_META.janela.de + ' a ' + DESC_META.janela.ate
-      + (DESC_META.atualizadoEm ? ' · atualizado em ' + new Date(DESC_META.atualizadoEm).toLocaleString('pt-BR') : '');
+      + (DESC_META.atualizadoEm ? ' · atualizado em ' + new Date(DESC_META.atualizadoEm).toLocaleString('pt-BR') : '')
+      + (atrasadas.length ? ' · ' + atrasadas.join(', ') + ' nao respondeu na ultima coleta (numeros da rodada anterior)' : '');
   }
 
   // ── categorias ──
@@ -3619,6 +3626,9 @@ function renderDescobertas(){
             + '<div class="desc-item-meta">'
               + '<span class="tag" style="margin-left:0">' + esc(x.loja||'') + '</span>'
               + '<span class="tag" style="margin-left:0">' + (DESC_ROTULO_TIPO[x.tipo] || x.tipo || '') + '</span>'
+              + (x.defasado ? '<span class="tag" style="margin-left:0;background:#5a3d0e;color:#ffd08a" title="'
+                  + 'A loja nao respondeu na ultima coleta; este numero e da rodada anterior">'
+                  + 'dado anterior</span>' : '')
               + (x.categoria ? '<span>' + esc(x.categoria) + '</span>' : '')
               + (x.vendedor ? '<span>· ' + esc(x.vendedor) + '</span>' : '')
               + (x.ocorrencias ? '<span>· ' + x.ocorrencias + ' pedido(s)</span>' : '')
