@@ -607,6 +607,35 @@ try {
 .res-scope .page{ padding: 14px 16px; }
 .res-scope header{ padding: 12px 16px; }
 }
+/* ══ DIVULGACOES (aba propria, independente do escopo .res-scope) ══ */
+  .dv-seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .dv-seg-btn{background:var(--card);border:1px solid var(--border-ctrl);color:var(--muted);font-family:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:7px 14px;border-radius:9px;cursor:pointer;transition:all .15s}
+  .dv-seg-btn:hover{border-color:var(--accent);color:var(--text)}
+  .dv-seg-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
+  .dv-mes{background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;border-radius:8px;padding:5px 8px}
+  .dv-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .dv-title:first-of-type{margin-top:0}
+  .dv-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+  .dv-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
+  .dv-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--cor,var(--accent))}
+  .dv-card-nome{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px}
+  .dv-card-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:4px;color:var(--accent)}
+  .dv-card-sub{font-size:11px;color:var(--muted);font-weight:500}
+  .dv-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;width:100%;box-sizing:border-box}
+  .dv-chart-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:14px}
+  .dv-chart-wrap{position:relative;height:250px;width:100%;overflow:hidden}
+  .dv-chart-wrap canvas{max-width:100%}
+  .dv-hint{font-size:11px;color:var(--muted2);margin-top:10px;font-weight:500}
+  .dv-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  .dv-grid2 > *{min-width:0}
+  .dv-tab{width:100%;border-collapse:collapse;font-size:12px}
+  .dv-tab td{padding:7px 0;border-top:1px solid var(--border)}
+  .dv-tab tr:first-child td{border-top:none}
+  .dv-tab .dv-td-n{text-align:right;font-weight:700}
+  .dv-tab .dv-td-pct{text-align:right;color:var(--muted);width:52px}
+  .dv-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
+  .dv-vazio{font-size:12px;color:var(--muted);font-weight:500;padding:10px 0}
+  @media (max-width:760px){ .dv-grid2{grid-template-columns:1fr} }
 /* ── LOGIN ── */
 .res-scope #login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
 /* Gate de acesso: cobre a pagina inteira antes de qualquer aba abrir. Fora do
@@ -715,6 +744,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab active" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-divulg" onclick="switchTab('divulg')">📊 Divulgações</button>
   <div class="side-group">Criar mensagem</div>
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
@@ -770,6 +800,43 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
   </div>
   <div id="agend-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- ════════ DIVULGACOES — quantos itens sairam por plataforma em cada dia ════════ -->
+<div class="panel" id="panel-divulg">
+  <div class="fila-bar">
+    <span id="dv-status">Carregando...</span>
+    <div class="fila-acoes">
+      <input type="month" id="dv-mes" class="dv-mes" onchange="carregarDivulgacoes(true)"/>
+      <button class="btn btn-copy btn-sm" onclick="carregarDivulgacoes(true)">↻ Atualizar</button>
+    </div>
+  </div>
+
+  <div class="dv-seg" id="dv-seg">
+    <button class="dv-seg-btn active" data-tipo="produtos" onclick="dvSetTipo('produtos')">🛍️ Produtos</button>
+    <button class="dv-seg-btn" data-tipo="cupons" onclick="dvSetTipo('cupons')">🏷️ Cupons</button>
+    <button class="dv-seg-btn" data-tipo="tudo" onclick="dvSetTipo('tudo')">Σ Tudo</button>
+  </div>
+
+  <div class="dv-title" id="dv-title-dia">Divulgações do dia</div>
+  <div class="dv-cards" id="dv-cards"></div>
+
+  <div class="dv-title">Por dia no mês — empilhado por plataforma</div>
+  <div class="dv-chart-card">
+    <div class="dv-chart-wrap"><canvas id="dv-chart-dia"></canvas></div>
+    <div class="dv-hint">Clique numa barra para ver a distribuição daquele dia nos cartões acima.</div>
+  </div>
+
+  <div class="dv-grid2">
+    <div class="dv-chart-card">
+      <div class="dv-chart-label" id="dv-pizza-label">Distribuição do dia</div>
+      <div class="dv-chart-wrap" style="height:230px"><canvas id="dv-chart-pizza"></canvas></div>
+    </div>
+    <div class="dv-chart-card">
+      <div class="dv-chart-label">Total do mês por loja</div>
+      <div id="dv-tabela"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ════════ CUPOM ════════ -->
@@ -2210,7 +2277,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['filaenvio','agend','aprov','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','config'];
+var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2223,6 +2290,7 @@ function switchTab(name) {
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
+  if (name === 'divulg') carregarDivulgacoes();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
   if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); carregarCensoHist(); }
@@ -2258,6 +2326,275 @@ function toggleSidebar(forcar) {
   nav.classList.toggle('open', abrir);
   if (bd) bd.classList.toggle('open', abrir);
   document.body.style.overflow = abrir ? 'hidden' : '';
+}
+
+/* ══════ DIVULGACOES ══════
+   Quantos produtos/cupons de cada plataforma sairam em cada dia. A fonte e o
+   historico duravel de envios do baileys (/operacao/historico-envios, um shard
+   por mes) — o unico registro que sobrevive a limpeza da fila operacional. */
+var DV_CACHE    = {};          // 'YYYY-MM' -> registros ja buscados
+var DV_REGS     = [];
+var DV_MES      = '';
+var DV_TIPO     = 'produtos';  // produtos | cupons | tudo
+var DV_DIA      = '';          // dia em foco nos cartoes/pizza (YYYY-MM-DD)
+var DV_CH_DIA   = null;
+var DV_CH_PIZZA = null;
+var DV_PLATS = [
+  { nome:'Amazon',         cor:'#ff9900' },
+  { nome:'Mercado Livre',  cor:'#f5c518' },
+  { nome:'Shopee',         cor:'#f4654a' },
+  { nome:'Magazine Luiza', cor:'#0086ff' },
+  { nome:'Outras',         cor:'#8b8b8b' }
+];
+var DV_MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho',
+                   'agosto','setembro','outubro','novembro','dezembro'];
+
+function dvHojeSP(){
+  return new Intl.DateTimeFormat('en-CA', { timeZone:'America/Sao_Paulo',
+    year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+}
+function dvDiaDe(iso){
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone:'America/Sao_Paulo',
+      year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(iso));
+  } catch(e){ return String(iso || '').slice(0,10); }
+}
+function dvDataBR(d){ return d ? d.slice(8,10) + '/' + d.slice(5,7) + '/' + d.slice(0,4) : '—'; }
+function dvNomeMes(m){
+  if (!m) return '—';
+  return DV_MESES_PT[Number(m.slice(5,7)) - 1] + '/' + m.slice(0,4);
+}
+
+// Plataforma: o tipoConteudo manda (e o que o radar capturou); cupom nao tem
+// tipo por loja, entao cai no campo loja, normalizado.
+function dvPlataforma(r){
+  var t = String(r.tipoConteudo || '');
+  if (t === 'oferta_amazon') return 'Amazon';
+  if (t === 'oferta_ml')     return 'Mercado Livre';
+  if (t === 'oferta_shopee') return 'Shopee';
+  if (t === 'oferta_magalu') return 'Magazine Luiza';
+  var l = dvLoja(r).toLowerCase();
+  if (l.indexOf('amazon') >= 0) return 'Amazon';
+  if (l.indexOf('mercado livre') >= 0 || l.indexOf('meli') >= 0 || l === 'ml') return 'Mercado Livre';
+  if (l.indexOf('shopee') >= 0) return 'Shopee';
+  if (l.indexOf('magalu') >= 0 || l.indexOf('magazine') >= 0) return 'Magazine Luiza';
+  return 'Outras';
+}
+function dvLoja(r){
+  return String(r.loja || '').replace(/^Outro:\s*/i, '').trim() || 'Sem loja';
+}
+function dvEhProduto(r){ return String(r.tipoConteudo || '').indexOf('oferta') === 0; }
+
+function dvFiltrados(){
+  if (DV_TIPO === 'tudo') return DV_REGS;
+  var querProduto = (DV_TIPO === 'produtos');
+  return DV_REGS.filter(function(r){ return dvEhProduto(r) === querProduto; });
+}
+function dvSetTipo(t){
+  DV_TIPO = t;
+  var bs = document.querySelectorAll('#dv-seg .dv-seg-btn');
+  for (var i = 0; i < bs.length; i++) {
+    bs[i].classList.toggle('active', bs[i].getAttribute('data-tipo') === t);
+  }
+  dvRender();
+}
+
+// Dias do eixo: mes inteiro, mas sem projetar futuro no mes corrente.
+function dvDiasDoMes(mes){
+  var y = Number(mes.slice(0,4)), m = Number(mes.slice(5,7));
+  var ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  var hoje = dvHojeSP();
+  if (hoje.slice(0,7) === mes) ultimo = Math.min(ultimo, Number(hoje.slice(8,10)));
+  var out = [];
+  for (var d = 1; d <= ultimo; d++) out.push(mes + '-' + (d < 10 ? '0' : '') + d);
+  return out;
+}
+
+async function carregarDivulgacoes(forcar){
+  var elMes = document.getElementById('dv-mes');
+  if (!elMes) return;
+  if (!elMes.value) elMes.value = dvHojeSP().slice(0,7);
+  var mes = elMes.value;
+  var st  = document.getElementById('dv-status');
+  if (!forcar && DV_CACHE[mes]) { DV_MES = mes; DV_REGS = DV_CACHE[mes]; dvRender(); return; }
+  st.textContent = 'Carregando histórico...';
+  try {
+    var r = await fetch(SERVER + '/operacao/historico-envios?mes=' + encodeURIComponent(mes) +
+                        '&t=' + Date.now(), { cache:'no-cache' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+    DV_REGS = Array.isArray(d.registros) ? d.registros : [];
+    DV_MES  = mes;
+    DV_CACHE[mes] = DV_REGS;
+    DV_DIA  = '';
+    dvRender();
+  } catch(e){
+    st.textContent = 'Erro ao carregar o histórico: ' + e.message;
+  }
+}
+
+function dvRender(){
+  if (!DV_MES) return;
+  var regs = dvFiltrados();
+  var rotulo = DV_TIPO === 'produtos' ? 'produto(s)'
+             : DV_TIPO === 'cupons'   ? 'cupom(ns)' : 'item(ns)';
+  document.getElementById('dv-status').textContent =
+    regs.length + ' ' + rotulo + ' divulgado(s) em ' + dvNomeMes(DV_MES);
+
+  var dias = dvDiasDoMes(DV_MES);
+  var porDia = {};
+  dias.forEach(function(d){ porDia[d] = {}; });
+  regs.forEach(function(r){
+    var d = dvDiaDe(r.enviadoEm);
+    if (!porDia[d]) porDia[d] = {};
+    var p = dvPlataforma(r);
+    porDia[d][p] = (porDia[d][p] || 0) + 1;
+  });
+
+  // Dia em foco: o escolhido no clique, senao hoje, senao o ultimo do eixo.
+  if (!DV_DIA || !porDia[DV_DIA]) {
+    var hoje = dvHojeSP();
+    DV_DIA = porDia[hoje] ? hoje : (dias[dias.length - 1] || hoje);
+  }
+
+  dvCards(porDia[DV_DIA] || {});
+  dvGraficoDias(dias, porDia);
+  dvGraficoPizza(porDia[DV_DIA] || {});
+  dvTabelaLojas(regs);
+}
+
+function dvCards(mapaDia){
+  var total = 0;
+  for (var k in mapaDia) total += mapaDia[k];
+  var ehHoje = (DV_DIA === dvHojeSP());
+  document.getElementById('dv-title-dia').textContent =
+    'Divulgações em ' + dvDataBR(DV_DIA) + (ehHoje ? ' (hoje)' : '');
+
+  var html = '<div class="dv-card"><div class="dv-card-nome">Total no dia</div>' +
+             '<div class="dv-card-val">' + total + '</div>' +
+             '<div class="dv-card-sub">' + (DV_TIPO === 'cupons' ? 'cupons' :
+               DV_TIPO === 'produtos' ? 'produtos' : 'itens') + ' enviados</div></div>';
+
+  var lista = DV_PLATS.map(function(p){
+    return { nome:p.nome, cor:p.cor, n: mapaDia[p.nome] || 0 };
+  }).filter(function(p){ return p.n > 0; })
+    .sort(function(a,b){ return b.n - a.n; });
+
+  lista.forEach(function(p){
+    var pct = total ? Math.round(p.n * 100 / total) : 0;
+    html += '<div class="dv-card" style="--cor:' + p.cor + '">' +
+              '<div class="dv-card-nome">' + esc(p.nome) + '</div>' +
+              '<div class="dv-card-val" style="color:' + p.cor + '">' + p.n + '</div>' +
+              '<div class="dv-card-sub">' + pct + '% do dia</div></div>';
+  });
+  if (!lista.length) html += '<div class="dv-vazio">Nada registrado neste dia para o filtro atual.</div>';
+  document.getElementById('dv-cards').innerHTML = html;
+}
+
+function dvCoresTema(){
+  var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
+  return { grade: escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)',
+           texto: escuro ? '#9aa0aa' : '#6b7280' };
+}
+
+function dvGraficoDias(dias, porDia){
+  var ctx = document.getElementById('dv-chart-dia');
+  if (!ctx || typeof Chart === 'undefined') return;
+  var t = dvCoresTema();
+  var labels = dias.map(function(d){ return d.slice(8,10) + '/' + d.slice(5,7); });
+  var ds = DV_PLATS.map(function(p){
+    return { label: p.nome, backgroundColor: p.cor, borderWidth: 0, borderRadius: 3,
+             data: dias.map(function(d){ return (porDia[d] && porDia[d][p.nome]) || 0; }) };
+  }).filter(function(s){ return s.data.some(function(v){ return v > 0; }); });
+
+  if (DV_CH_DIA) DV_CH_DIA.destroy();
+  DV_CH_DIA = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: ds.length ? ds : [{ label:'Sem dados', data: dias.map(function(){ return 0; }), backgroundColor:'#8b8b8b' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      onClick: function(ev, els){
+        if (els && els.length) { DV_DIA = dias[els[0].index]; dvRender(); }
+      },
+      plugins: {
+        legend: { labels: { color: t.texto, boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: {
+          footer: function(items){
+            var soma = items.reduce(function(s, i){ return s + (i.parsed.y || 0); }, 0);
+            return 'Total do dia: ' + soma;
+          }
+        } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false },
+             ticks: { color: t.texto, font: { size: 10 }, maxTicksLimit: 16 } },
+        y: { stacked: true, beginAtZero: true, grid: { color: t.grade },
+             ticks: { color: t.texto, font: { size: 10 }, precision: 0 } }
+      }
+    }
+  });
+}
+
+function dvGraficoPizza(mapaDia){
+  var ctx = document.getElementById('dv-chart-pizza');
+  if (!ctx || typeof Chart === 'undefined') return;
+  var t = dvCoresTema();
+  document.getElementById('dv-pizza-label').textContent = 'Distribuição em ' + dvDataBR(DV_DIA);
+  var lista = DV_PLATS.map(function(p){ return { nome:p.nome, cor:p.cor, n: mapaDia[p.nome] || 0 }; })
+                      .filter(function(p){ return p.n > 0; });
+  if (DV_CH_PIZZA) DV_CH_PIZZA.destroy();
+  if (!lista.length) {
+    var cv = ctx.getContext('2d');
+    cv.clearRect(0, 0, ctx.width, ctx.height);
+    return;
+  }
+  DV_CH_PIZZA = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: lista.map(function(p){ return p.nome; }),
+      datasets: [{ data: lista.map(function(p){ return p.n; }),
+                   backgroundColor: lista.map(function(p){ return p.cor; }),
+                   borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '58%',
+      plugins: {
+        legend: { position: 'right', labels: { color: t.texto, boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: function(it){
+          var total = it.dataset.data.reduce(function(s, v){ return s + v; }, 0);
+          var pct = total ? Math.round(it.parsed * 100 / total) : 0;
+          return it.label + ': ' + it.parsed + ' (' + pct + '%)';
+        } } }
+      }
+    }
+  });
+}
+
+function dvTabelaLojas(regs){
+  var por = {};
+  regs.forEach(function(r){
+    var l = dvLoja(r);
+    if (!por[l]) por[l] = { n: 0, cor: null };
+    por[l].n++;
+    if (!por[l].cor) {
+      var p = dvPlataforma(r);
+      for (var i = 0; i < DV_PLATS.length; i++) if (DV_PLATS[i].nome === p) por[l].cor = DV_PLATS[i].cor;
+    }
+  });
+  var lista = Object.keys(por).map(function(l){ return { loja: l, n: por[l].n, cor: por[l].cor || '#8b8b8b' }; })
+                    .sort(function(a,b){ return b.n - a.n; });
+  var total = lista.reduce(function(s, i){ return s + i.n; }, 0);
+  var el = document.getElementById('dv-tabela');
+  if (!lista.length) { el.innerHTML = '<div class="dv-vazio">Nenhum registro no mês para o filtro atual.</div>'; return; }
+  var html = '<table class="dv-tab">';
+  lista.forEach(function(i){
+    var pct = total ? Math.round(i.n * 100 / total) : 0;
+    html += '<tr><td><span class="dv-dot" style="background:' + i.cor + '"></span>' + esc(i.loja) + '</td>' +
+            '<td class="dv-td-n">' + i.n + '</td><td class="dv-td-pct">' + pct + '%</td></tr>';
+  });
+  html += '</table>';
+  el.innerHTML = html;
 }
 
 /* ══════ DISTRIBUIDOR DE GRUPOS ══════ */
