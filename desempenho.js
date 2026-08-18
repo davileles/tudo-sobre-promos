@@ -690,10 +690,14 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       const salvas = await carregarCategoriasSalvas();
       // Alvos = ASIN comprado nesta janela que o cache ainda nao conhece. Em
       // regime, essa lista e quase sempre pequena: so produto inedito entra.
+      // Entrada vinda do relatorio e provisoria: usa outra taxonomia e conviveria
+      // com a da pagina no mesmo grafico, partindo o balde em dois. Por isso ela
+      // continua na fila de alvos ate a pagina responder e substituir o rotulo.
+      const resolvido = (a) => salvas[a] && salvas[a].categoria && salvas[a].fonte === 'pagina';
       const alvos = [];
       for (const it of vinculados) {
         const a = String(it.linked_product || '').toUpperCase();
-        if (a && !(salvas[a] && salvas[a].categoria) && !alvos.includes(a)) alvos.push(a);
+        if (a && !resolvido(a) && !alvos.includes(a)) alvos.push(a);
       }
 
       const porPagina = await categoriasPorPagina(alvos);
@@ -705,12 +709,14 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         catch (e) { console.warn('[desempenho] Amazon: top_seller falhou —', e.message); }
       }
 
+      // Ordem: pagina desta rodada > cache > relatorio. A pagina vem primeiro
+      // justamente para poder promover uma entrada provisoria do cache.
       const aplicadas = new Map();
       const categoriaDe = (asin) => {
-        const salvo = salvas[asin] && salvas[asin].categoria;
-        if (salvo) { aplicadas.set(asin, salvas[asin]); return salvo; }
         const pag = porPagina.get(asin);
         if (pag) { aplicadas.set(asin, { ...pag, fonte: 'pagina' }); return pag.categoria; }
+        const salvo = salvas[asin] && salvas[asin].categoria;
+        if (salvo) { aplicadas.set(asin, salvas[asin]); return salvo; }
         const api = porApi.get(asin);
         if (api) { aplicadas.set(asin, { categoria: api, fonte: 'relatorio' }); return api; }
         return '';
