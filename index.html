@@ -1108,6 +1108,17 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="grp-resumo" id="grp-resumo"></div>
   <div id="grupos-lista" style="display:none"></div>
 
+  <div class="sec-label" style="margin-top:20px">🎯 Grupos de nicho</div>
+  <div class="aviso">
+    Destino <b>sem categoria</b> é <b>geral</b>: recebe tudo. Destino <b>com categoria</b> recebe
+    só as ofertas daquela prateleira — e o geral continua recebendo essas mesmas ofertas.
+    Oferta cuja categoria o classificador não confirmou vai <b>só para os gerais</b>.
+    Na fonte, a categoria é <b>fixa</b>: tudo que vier daquele grupo já nasce classificado,
+    sem depender de palavra-chave no título. <b>Cupom e mensagem manual nunca entram em grupo de nicho.</b>
+  </div>
+  <div id="cat-grupos"><div class="fila-loading"><div class="spinner"></div></div></div>
+  <p class="send-ok" id="cat-grupos-status" style="min-height:16px"></p>
+
   <div class="sec-label" style="margin-top:20px">⏱️ Espaçamento entre grupos</div>
   <div class="aviso">
     Pausa aplicada entre <b>um grupo e o próximo</b> quando a mesma mensagem é replicada
@@ -6787,6 +6798,9 @@ async function atualizarBadge() {
 var GRUPOS_CACHE = [];
 var PAPEIS = {};      // jid -> 'fonte' | 'destino'  (vive em radar_config.json)
 var PERSIST_SERVER = false;
+var CATS_DESTINO = {};   // jid destino -> ['bebidas']  (vazio/ausente = geral)
+var CAT_FONTE    = {};   // jid fonte   -> 'bebidas'    (vazio = classifica pelo produto)
+var CAT_TAXO     = [];   // [{id, nome}] da taxonomia, em ordem alfabetica
 
 // Os quatro papeis moram em DOIS lugares no servidor: fonte/destino em
 // radar_config.json (/mkt/config) e cupons/operador na config TSP
@@ -6822,7 +6836,13 @@ async function carregarPapeis() {
     if (r.ok) {
       var d = await r.json();
       if (d) aplicarEspacGrupos(d.espacamentoGrupos);
-      if (d && d.papeis) { PAPEIS = d.papeis; PERSIST_SERVER = true; return; }
+      if (d && d.papeis) {
+        PAPEIS = d.papeis;
+        CATS_DESTINO = d.categoriasDestino || {};
+        CAT_FONTE    = d.categoriaFonte    || {};
+        PERSIST_SERVER = true;
+        return;
+      }
     }
   } catch(e) {}
   // Sem cópia local: marcação de grupo é dado de operação e precisa valer em
@@ -6831,10 +6851,116 @@ async function carregarPapeis() {
   // pior que a ausência de papel.
   PERSIST_SERVER = false;
   PAPEIS = {};
+  CATS_DESTINO = {}; CAT_FONTE = {};
   var el = document.getElementById('grupos-persist');
   el.style.display = 'block';
   el.innerHTML = '<b>Servidor indisponível.</b> As marcações de fonte/destino vivem no servidor e não puderam ser lidas. '
     + 'Não altere nada agora — recarregue quando a conexão voltar.';
+}
+
+/* ══════ GRUPOS DE NICHO (categoria por grupo) ══════ */
+// A taxonomia vem do servidor (tsp/categorias.json). Sem ela nao ha o que
+// oferecer no select — e melhor dizer isso do que mostrar uma lista vazia.
+async function catTaxoCarregar() {
+  if (CAT_TAXO.length) return CAT_TAXO;
+  try {
+    var r = await fetch(SERVER + '/tsp/categorias?t=' + Date.now(), { cache:'no-cache', signal: AbortSignal.timeout(6000) });
+    var d = await r.json();
+    var cats = (d && d.categorias) || {};
+    CAT_TAXO = Object.keys(cats)
+      .map(function(id){ return { id: id, nome: (cats[id] && cats[id].nome) || id }; })
+      .sort(function(a, b){ return a.nome.localeCompare(b.nome, 'pt-BR'); });
+  } catch(e) { CAT_TAXO = []; }
+  return CAT_TAXO;
+}
+
+function catNomeDe(id) {
+  var c = CAT_TAXO.find(function(x){ return x.id === id; });
+  return c ? c.nome : id;
+}
+
+// Uma categoria por grupo na tela. O servidor guarda array no destino (deixa a
+// porta aberta para um grupo de duas prateleiras), mas oferecer multipla
+// escolha aqui so criaria configuracao ambigua sem pedido nenhum.
+function renderCatGrupos() {
+  var box = document.getElementById('cat-grupos');
+  if (!box) return;
+  var fontes   = Object.keys(PAPEIS).filter(function(j){ return papelDe(j) === 'fonte'; });
+  var destinos = Object.keys(PAPEIS).filter(function(j){ return papelDe(j) === 'destino'; });
+
+  if (!fontes.length && !destinos.length) {
+    box.innerHTML = '<div class="grp-box-vazio">Marque grupos como fonte ou destino acima para definir categorias.</div>';
+    return;
+  }
+  if (!CAT_TAXO.length) {
+    box.innerHTML = '<div class="grp-box-vazio">Nenhuma categoria cadastrada — crie a taxonomia na aba Configurações → Negócio.</div>';
+    return;
+  }
+
+  function nomeDe(jid) {
+    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+    return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
+  }
+  function linha(jid, valor, ehFonte) {
+    var opts = '<option value="">' + (ehFonte ? 'Classificar pelo produto' : 'Geral — recebe tudo') + '</option>'
+      + CAT_TAXO.map(function(c){
+          return '<option value="' + esc(c.id) + '"' + (c.id === valor ? ' selected' : '') + '>' + esc(c.nome) + '</option>';
+        }).join('');
+    return '<div class="field" style="margin-bottom:10px">'
+      + '<label title="' + esc(jid) + '">' + esc(nomeDe(jid)) + '</label>'
+      + '<select onchange="catGrupoMudou(\'' + jid + '\', this.value, ' + (ehFonte ? 'true' : 'false') + ')">'
+      + opts + '</select></div>';
+  }
+
+  var html = '';
+  if (fontes.length) {
+    html += '<div class="card" style="margin-bottom:12px"><p class="card-title" style="margin-bottom:12px">📥 Fontes '
+         +  '<span class="tag" style="text-transform:none">categoria fixa do que vier daqui</span></p>'
+         +  fontes.map(function(j){ return linha(j, CAT_FONTE[j] || '', true); }).join('') + '</div>';
+  }
+  if (destinos.length) {
+    html += '<div class="card"><p class="card-title" style="margin-bottom:12px">📤 Destinos '
+         +  '<span class="tag" style="text-transform:none">sem categoria = geral</span></p>'
+         +  destinos.map(function(j){
+              var lista = CATS_DESTINO[j];
+              var v = Array.isArray(lista) ? (lista[0] || '') : (lista || '');
+              return linha(j, v, false);
+            }).join('') + '</div>';
+  }
+  box.innerHTML = html;
+}
+
+async function catGrupoMudou(jid, valor, ehFonte) {
+  var s = document.getElementById('cat-grupos-status');
+  if (ehFonte) {
+    if (valor) CAT_FONTE[jid] = valor; else delete CAT_FONTE[jid];
+  } else {
+    if (valor) CATS_DESTINO[jid] = [valor]; else delete CATS_DESTINO[jid];
+  }
+  renderResumoGrupos();
+  if (s) { s.className = 'send-ok'; s.textContent = 'Salvando…'; }
+  try {
+    await salvarCatGrupos();
+    if (s) s.textContent = valor
+      ? '✓ ' + (ehFonte ? 'Tudo desta fonte entra como ' : 'Este grupo passa a receber só ') + catNomeDe(valor) + '.'
+      : '✓ ' + (ehFonte ? 'Voltou a classificar pelo produto.' : 'Voltou a ser grupo geral — recebe tudo.');
+  } catch(e) {
+    if (s) { s.className = 'send-ok send-err'; s.textContent = 'Não salvou: ' + e.message; }
+    await carregarGrupos();
+  }
+  setTimeout(function(){ if (s) s.textContent = ''; }, 6000);
+}
+
+async function salvarCatGrupos() {
+  if (!PERSIST_SERVER) throw new Error('servidor indisponível');
+  var r = await fetch(SERVER + '/mkt/config', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ categoriasDestino: CATS_DESTINO, categoriaFonte: CAT_FONTE })
+  });
+  var d = await r.json();
+  if (!d.ok) throw new Error(d.erro || 'falhou');
+  CATS_DESTINO = d.categoriasDestino || {};
+  CAT_FONTE    = d.categoriaFonte    || {};
 }
 
 /* ══════ ESPACAMENTO ENTRE GRUPOS ══════ */
@@ -6978,7 +7104,11 @@ function renderResumoGrupos() {
              : Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === papel && papelDe(j) === papel; });
     var corpo = jids.length
       ? jids.map(function(j){
-          return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDe(j)) + '</span>'
+          var cat = papel === 'fonte'   ? (CAT_FONTE[j] || '')
+                  : papel === 'destino' ? (Array.isArray(CATS_DESTINO[j]) ? (CATS_DESTINO[j][0] || '') : (CATS_DESTINO[j] || ''))
+                  : '';
+          var marca = cat ? '<span class="ja">' + esc(catNomeDe(cat)) + '</span>' : '';
+          return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDe(j)) + '</span>' + marca
                + '<button onclick="definirPapel(\'' + j + '\',\'off\')" title="Remover deste papel">✕</button></div>';
         }).join('')
       : '<div class="grp-box-vazio">' + vazio + '</div>';
@@ -7007,6 +7137,7 @@ function renderGrupos() {
     + g.cupons.length + ' só-cupons · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
   renderResumoGrupos();
   renderMonitor();
+  catTaxoCarregar().then(renderCatGrupos);
 }
 
 // Autocomplete: filtra em memoria, limita a 12 para a lista nao virar a mesma
@@ -7088,6 +7219,12 @@ async function definirPapel(jid, papel) {
 
   delete PAPEIS[jid];
   var mexeuPapeis = (anterior === 'fonte' || anterior === 'destino');
+  // Categoria e propriedade do PAPEL, nao do grupo: sair de destino (ou de
+  // fonte) apaga a regra junto. Deixar para tras criaria um nicho fantasma que
+  // volta a valer no dia em que o grupo for remarcado.
+  var mexeuCat = false;
+  if (anterior === 'destino' && CATS_DESTINO[jid]) { delete CATS_DESTINO[jid]; mexeuCat = true; }
+  if (anterior === 'fonte'   && CAT_FONTE[jid])    { delete CAT_FONTE[jid];    mexeuCat = true; }
 
   if (papel === 'fonte' || papel === 'destino') { PAPEIS[jid] = papel; mexeuPapeis = true; }
   else if (papel === 'cupons')   { cupons.push(jid); mexeuCfg = true; }
@@ -7100,6 +7237,7 @@ async function definirPapel(jid, papel) {
 
   try {
     if (mexeuPapeis) await salvarPapeis();
+    if (mexeuCat)    await salvarCatGrupos();
     if (mexeuCfg)    await salvarGruposCfg(cupons, operador);
   } catch(e) {
     alert('Não foi possível salvar a marcação no servidor: ' + e.message);
