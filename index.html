@@ -1062,31 +1062,34 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ GRUPOS ════════ -->
 <div class="panel" id="panel-grupos">
   <div class="aviso">
-    Cada grupo tem <b>um papel só</b>. <b>Fonte</b> é de onde as ofertas são lidas.
-    <b>Ofertas + cupons</b> recebe tudo o que é publicado. <b>Somente cupons</b> recebe cupom mas nunca
-    oferta de produto. <b>Operador</b> recebe avisos internos (falhas, resumos) — nunca use um grupo de clientes.
-    Busque pelo nome nos campos abaixo — a lista vem da sessão do WhatsApp, sem precisar copiar ID de grupo.
+    A configuração é por <b>trilha</b>. Cada trilha tem as <b>próprias fontes</b> e os
+    <b>próprios destinos</b>, e a regra é uma só: <b>o que a fonte da trilha captura vai para os
+    destinos da mesma trilha.</b> Trilha <b>sem categoria</b> entrega tudo o que capturou.
+    Trilha <b>com categoria</b> entrega só o que o classificador confirmar ser daquela prateleira.
+    O mesmo grupo pode ser fonte de <b>várias trilhas</b> — marque o grupo geral também na trilha de
+    bebidas e ele alimenta as duas, cada uma pela sua regra. Destino repetido recebe uma vez só.
   </div>
   <div id="grupos-persist" class="aviso" style="display:none;background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3)"></div>
+
   <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-    <span>🎯 Seleção de grupos</span>
-    <button class="btn btn-copy btn-sm" id="btn-grupos-refresh" onclick="atualizarListaGrupos()"
-            title="Busca a lista atual no WhatsApp — use depois de criar um grupo novo">🔄 Atualizar lista</button>
+    <span>🛤️ Trilhas</span>
+    <span style="display:flex;gap:8px">
+      <button class="btn btn-copy btn-sm" id="btn-grupos-refresh" onclick="atualizarListaGrupos()"
+              title="Busca a lista atual no WhatsApp — use depois de criar um grupo novo">🔄 Atualizar lista</button>
+      <button class="btn btn-copy btn-sm" onclick="trilhaNova()">+ Nova trilha</button>
+    </span>
   </div>
   <div id="grupos-refresh-fb" style="font-size:11px;font-weight:700;min-height:14px;margin:-4px 0 8px;color:var(--muted)"></div>
+  <div id="trilhas-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+  <p class="send-ok" id="trilhas-status" style="min-height:16px"></p>
+
+  <div class="sec-label" style="margin-top:20px">🏷️ Grupos fora das trilhas</div>
+  <div class="aviso">
+    <b>Somente cupons</b> recebe cupom mas nunca oferta de produto. <b>Operador</b> recebe avisos
+    internos (falhas, resumos) — nunca use um grupo de clientes. Nenhum dos dois entra em trilha:
+    cupom é de loja, não tem categoria de produto para casar com nicho.
+  </div>
   <div class="sel-grupos-4 sel-grupos">
-    <div class="field sel-box">
-      <label>Adicionar grupo FONTE <span class="tag">de onde as ofertas vêm</span></label>
-      <input type="text" id="add-fonte" autocomplete="off" placeholder="Digite parte do nome do grupo…"
-             oninput="sugerirGrupos('fonte')" onfocus="sugerirGrupos('fonte')"/>
-      <div class="sug" id="sug-fonte"></div>
-    </div>
-    <div class="field sel-box">
-      <label>Adicionar grupo OFERTAS + CUPONS <span class="tag">recebe tudo</span></label>
-      <input type="text" id="add-destino" autocomplete="off" placeholder="Digite parte do nome do grupo…"
-             oninput="sugerirGrupos('destino')" onfocus="sugerirGrupos('destino')"/>
-      <div class="sug" id="sug-destino"></div>
-    </div>
     <div class="field sel-box">
       <label>Adicionar grupo SOMENTE CUPONS <span class="tag">nunca recebe oferta</span></label>
       <input type="text" id="add-cupons" autocomplete="off" placeholder="Digite parte do nome do grupo…"
@@ -1107,17 +1110,6 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
   <div class="grp-resumo" id="grp-resumo"></div>
   <div id="grupos-lista" style="display:none"></div>
-
-  <div class="sec-label" style="margin-top:20px">🎯 Grupos de nicho</div>
-  <div class="aviso">
-    Destino <b>sem categoria</b> é <b>geral</b>: recebe tudo. Destino <b>com categoria</b> recebe
-    só as ofertas daquela prateleira — e o geral continua recebendo essas mesmas ofertas.
-    Oferta cuja categoria o classificador não confirmou vai <b>só para os gerais</b>.
-    Na fonte, a categoria é <b>fixa</b>: tudo que vier daquele grupo já nasce classificado,
-    sem depender de palavra-chave no título. <b>Cupom e mensagem manual nunca entram em grupo de nicho.</b>
-  </div>
-  <div id="cat-grupos"><div class="fila-loading"><div class="spinner"></div></div></div>
-  <p class="send-ok" id="cat-grupos-status" style="min-height:16px"></p>
 
   <div class="sec-label" style="margin-top:20px">⏱️ Espaçamento entre grupos</div>
   <div class="aviso">
@@ -6794,20 +6786,19 @@ async function atualizarBadge() {
   } catch(e) {}
 }
 
-/* ══════ GRUPOS ══════ */
+/* ══════ GRUPOS (TRILHAS) ══════ */
+// A unidade de configuracao e a TRILHA: fontes proprias, destinos proprios.
+// PAPEIS deixa de ser editado aqui e vira retrato derivado das trilhas — o
+// monitoramento por grupo e a previsao de espacamento continuam lendo dele.
 var GRUPOS_CACHE = [];
-var PAPEIS = {};      // jid -> 'fonte' | 'destino'  (vive em radar_config.json)
+var TRILHAS = [];
+var PAPEIS = {};      // jid -> 'fonte' | 'destino'  (DERIVADO de TRILHAS)
 var PERSIST_SERVER = false;
-var CATS_DESTINO = {};   // jid destino -> ['bebidas']  (vazio/ausente = geral)
-var CAT_FONTE    = {};   // jid fonte   -> 'bebidas'    (vazio = classifica pelo produto)
-var CAT_TAXO     = [];   // [{id, nome}] da taxonomia, em ordem alfabetica
+var CAT_TAXO = [];    // [{id,nome}] da taxonomia, em ordem alfabetica
 
-// Os quatro papeis moram em DOIS lugares no servidor: fonte/destino em
-// radar_config.json (/mkt/config) e cupons/operador na config TSP
-// (/config-tsp). A tela unifica; a gravacao e que se divide.
 var PAPEIS_LABEL = {
   fonte:    'fonte',
-  destino:  'ofertas + cupons',
+  destino:  'destino',
   cupons:   'somente cupons',
   operador: 'operador',
 };
@@ -6820,9 +6811,16 @@ function cfgGrupos() {
   };
 }
 
-// Papel unico e efetivo de um grupo. A ordem importa: um grupo que por engano
-// aparecesse nos dois lugares e mostrado com o papel mais restritivo, que e o
-// que o servidor de fato aplica (enviarOfertaParaDestinos pula os so-cupons).
+function recalcPapeis() {
+  PAPEIS = {};
+  TRILHAS.forEach(function(t){
+    (t.fontes   || []).forEach(function(j){ PAPEIS[j] = 'fonte'; });
+    (t.destinos || []).forEach(function(j){ PAPEIS[j] = 'destino'; });
+  });
+}
+
+// Papel unico e efetivo de um grupo. A ordem importa: cupons e operador vencem,
+// porque e o que o servidor de fato aplica.
 function papelDe(jid) {
   var g = cfgGrupos();
   if (jid && jid === g.operador) return 'operador';
@@ -6830,37 +6828,18 @@ function papelDe(jid) {
   return PAPEIS[jid] || '';
 }
 
-async function carregarPapeis() {
-  try {
-    var r = await fetch(SERVER+'/mkt/config', { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      var d = await r.json();
-      if (d) aplicarEspacGrupos(d.espacamentoGrupos);
-      if (d && d.papeis) {
-        PAPEIS = d.papeis;
-        CATS_DESTINO = d.categoriasDestino || {};
-        CAT_FONTE    = d.categoriaFonte    || {};
-        PERSIST_SERVER = true;
-        return;
-      }
-    }
-  } catch(e) {}
-  // Sem cópia local: marcação de grupo é dado de operação e precisa valer em
-  // qualquer device. Se o servidor não responder, não inventamos um estado —
-  // avisamos e deixamos vazio, porque um papel errado em cache silencioso é
-  // pior que a ausência de papel.
-  PERSIST_SERVER = false;
-  PAPEIS = {};
-  CATS_DESTINO = {}; CAT_FONTE = {};
-  var el = document.getElementById('grupos-persist');
-  el.style.display = 'block';
-  el.innerHTML = '<b>Servidor indisponível.</b> As marcações de fonte/destino vivem no servidor e não puderam ser lidas. '
-    + 'Não altere nada agora — recarregue quando a conexão voltar.';
+function nomeDoGrupo(jid) {
+  var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
+  return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
 }
 
-/* ══════ GRUPOS DE NICHO (categoria por grupo) ══════ */
-// A taxonomia vem do servidor (tsp/categorias.json). Sem ela nao ha o que
-// oferecer no select — e melhor dizer isso do que mostrar uma lista vazia.
+function catNomeDe(id) {
+  var c = CAT_TAXO.find(function(x){ return x.id === id; });
+  return c ? c.nome : id;
+}
+
+// A taxonomia vem do servidor (tsp/categorias.json). Sem ela so da para criar
+// trilha geral — melhor dizer isso do que oferecer um select vazio.
 async function catTaxoCarregar() {
   if (CAT_TAXO.length) return CAT_TAXO;
   try {
@@ -6874,76 +6853,197 @@ async function catTaxoCarregar() {
   return CAT_TAXO;
 }
 
-function catNomeDe(id) {
-  var c = CAT_TAXO.find(function(x){ return x.id === id; });
-  return c ? c.nome : id;
+async function carregarPapeis() {
+  try {
+    var r = await fetch(SERVER+'/mkt/config?t=' + Date.now(), { cache:'no-cache', signal: AbortSignal.timeout(4000) });
+    if (r.ok) {
+      var d = await r.json();
+      if (d) aplicarEspacGrupos(d.espacamentoGrupos);
+      if (d && d.trilhas) {
+        TRILHAS = d.trilhas;
+        recalcPapeis();
+        PERSIST_SERVER = true;
+        return;
+      }
+    }
+  } catch(e) {}
+  // Sem cópia local: marcação de grupo é dado de operação e precisa valer em
+  // qualquer device. Se o servidor não responder, não inventamos um estado —
+  // avisamos e deixamos vazio, porque um papel errado em cache silencioso é
+  // pior que a ausência de papel.
+  PERSIST_SERVER = false;
+  TRILHAS = []; PAPEIS = {};
+  var el = document.getElementById('grupos-persist');
+  el.style.display = 'block';
+  el.innerHTML = '<b>Servidor indisponível.</b> As trilhas vivem no servidor e não puderam ser lidas. '
+    + 'Não altere nada agora — recarregue quando a conexão voltar.';
 }
 
-// Uma categoria por grupo na tela. O servidor guarda array no destino (deixa a
-// porta aberta para um grupo de duas prateleiras), mas oferecer multipla
-// escolha aqui so criaria configuracao ambigua sem pedido nenhum.
-function renderCatGrupos() {
-  var box = document.getElementById('cat-grupos');
+/* ── RENDER DAS TRILHAS ─────────────────────────────────────────────────── */
+function renderTrilhas() {
+  var box = document.getElementById('trilhas-lista');
   if (!box) return;
-  var fontes   = Object.keys(PAPEIS).filter(function(j){ return papelDe(j) === 'fonte'; });
-  var destinos = Object.keys(PAPEIS).filter(function(j){ return papelDe(j) === 'destino'; });
-
-  if (!fontes.length && !destinos.length) {
-    box.innerHTML = '<div class="grp-box-vazio">Marque grupos como fonte ou destino acima para definir categorias.</div>';
+  if (!TRILHAS.length) {
+    box.innerHTML = '<div class="grp-box-vazio">Nenhuma trilha ainda. Crie a primeira em "+ Nova trilha" — '
+      + 'sem trilha o radar não captura nem entrega nada.</div>';
     return;
   }
-  if (!CAT_TAXO.length) {
-    box.innerHTML = '<div class="grp-box-vazio">Nenhuma categoria cadastrada — crie a taxonomia na aba Configurações → Negócio.</div>';
-    return;
-  }
-
-  function nomeDe(jid) {
-    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
-    return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
-  }
-  function linha(jid, valor, ehFonte) {
-    var opts = '<option value="">' + (ehFonte ? 'Classificar pelo produto' : 'Geral — recebe tudo') + '</option>'
-      + CAT_TAXO.map(function(c){
-          return '<option value="' + esc(c.id) + '"' + (c.id === valor ? ' selected' : '') + '>' + esc(c.nome) + '</option>';
+  box.innerHTML = TRILHAS.map(function(t, i){
+    var opts = '<option value="">Geral — entrega tudo o que capturou</option>'
+      + CAT_TAXO.map(function(k){
+          return '<option value="' + esc(k.id) + '"' + (k.id === t.categoria ? ' selected' : '') + '>'
+               + esc(k.nome) + '</option>';
         }).join('');
-    return '<div class="field" style="margin-bottom:10px">'
-      + '<label title="' + esc(jid) + '">' + esc(nomeDe(jid)) + '</label>'
-      + '<select onchange="catGrupoMudou(\'' + jid + '\', this.value, ' + (ehFonte ? 'true' : 'false') + ')">'
-      + opts + '</select></div>';
-  }
 
-  var html = '';
-  if (fontes.length) {
-    html += '<div class="card" style="margin-bottom:12px"><p class="card-title" style="margin-bottom:12px">📥 Fontes '
-         +  '<span class="tag" style="text-transform:none">categoria fixa do que vier daqui</span></p>'
-         +  fontes.map(function(j){ return linha(j, CAT_FONTE[j] || '', true); }).join('') + '</div>';
-  }
-  if (destinos.length) {
-    html += '<div class="card"><p class="card-title" style="margin-bottom:12px">📤 Destinos '
-         +  '<span class="tag" style="text-transform:none">sem categoria = geral</span></p>'
-         +  destinos.map(function(j){
-              var lista = CATS_DESTINO[j];
-              var v = Array.isArray(lista) ? (lista[0] || '') : (lista || '');
-              return linha(j, v, false);
-            }).join('') + '</div>';
-  }
-  box.innerHTML = html;
+    function chips(tipo) {
+      var lista = t[tipo] || [];
+      if (!lista.length) return '<div class="grp-box-vazio">' + (tipo === 'fontes'
+        ? 'Sem fonte: esta trilha não captura nada.'
+        : 'Sem destino: o que esta trilha capturar não vai para lugar nenhum.') + '</div>';
+      return lista.map(function(j){
+        return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDoGrupo(j)) + '</span>'
+             + '<button onclick="trilhaTirarGrupo(' + i + ',&quot;' + tipo + '&quot;,&quot;' + j + '&quot;)" '
+             + 'title="Tirar desta trilha">✕</button></div>';
+      }).join('');
+    }
+    function caixa(tipo, titulo) {
+      return '<div class="grp-box ' + (tipo === 'fontes' ? 'fonte' : 'destino') + '">'
+        + '<div class="grp-box-tit">' + titulo + '<span class="grp-box-n">' + (t[tipo] || []).length + '</span></div>'
+        + '<div class="field sel-box" style="margin-bottom:8px">'
+          + '<input type="text" id="add-t' + i + '-' + tipo + '" autocomplete="off" placeholder="Digite parte do nome do grupo…" '
+          + 'oninput="sugerirTrilha(' + i + ',&quot;' + tipo + '&quot;)" onfocus="sugerirTrilha(' + i + ',&quot;' + tipo + '&quot;)"/>'
+          + '<div class="sug" id="sug-t' + i + '-' + tipo + '"></div>'
+        + '</div>'
+        + chips(tipo) + '</div>';
+    }
+
+    return '<div class="card" style="margin-bottom:14px">'
+      + '<div class="g2" style="margin-bottom:12px">'
+        + '<div class="field"><label>Nome da trilha</label>'
+          + '<input type="text" value="' + esc(t.nome) + '" onchange="trilhaCampo(' + i + ',&quot;nome&quot;,this.value)"/></div>'
+        + '<div class="field"><label>Categoria <span class="tag">o que esta trilha entrega</span></label>'
+          + '<select onchange="trilhaCampo(' + i + ',&quot;categoria&quot;,this.value)">' + opts + '</select></div>'
+      + '</div>'
+      + '<div class="grp-resumo">' + caixa('fontes', '📥 Fontes — de onde vem') + caixa('destinos', '📤 Destinos — para onde vai') + '</div>'
+      + '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="trilhaRemover(' + i + ')">🗑 Remover trilha</button>'
+      + '</div>';
+  }).join('');
 }
 
-async function catGrupoMudou(jid, valor, ehFonte) {
-  var s = document.getElementById('cat-grupos-status');
-  if (ehFonte) {
-    if (valor) CAT_FONTE[jid] = valor; else delete CAT_FONTE[jid];
-  } else {
-    if (valor) CATS_DESTINO[jid] = [valor]; else delete CATS_DESTINO[jid];
+// Autocomplete por trilha. Um grupo ja usado em outro papel aparece marcado —
+// o servidor recusa fonte e destino no mesmo grupo, entao avisar aqui evita
+// descobrir o erro so na hora de salvar.
+function sugerirTrilha(i, tipo) {
+  var input = document.getElementById('add-t' + i + '-' + tipo);
+  var caixa = document.getElementById('sug-t' + i + '-' + tipo);
+  if (!input || !caixa) return;
+  var termo = (input.value || '').trim().toLowerCase();
+  if (!GRUPOS_CACHE.length) {
+    caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
+    caixa.classList.add('open');
+    return;
   }
-  renderResumoGrupos();
+  var jaNaTrilha = TRILHAS[i][tipo] || [];
+  var lista = GRUPOS_CACHE
+    .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
+    .filter(function(g){ return jaNaTrilha.indexOf(g.id) === -1; })
+    .slice(0, 12);
+
+  caixa.innerHTML = lista.length
+    ? lista.map(function(g){
+        var pa = papelDe(g.id);
+        var conflito = (tipo === 'fontes' && pa === 'destino') || (tipo === 'destinos' && pa === 'fonte');
+        var marca = pa ? '<span class="ja">' + (conflito ? '⚠ hoje ' : '') + esc(PAPEIS_LABEL[pa] || pa) + '</span>' : '';
+        return '<div class="sug-item" data-jid="' + esc(g.id) + '" onclick="trilhaPorGrupo(' + i + ',&quot;' + tipo + '&quot;,this)" '
+             + 'title="' + esc(g.nome) + '">' + esc(g.nome) + marca + '</div>';
+      }).join('')
+    : '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
+  caixa.classList.add('open');
+}
+
+function fecharSugestoes(){
+  var abertas = document.querySelectorAll('.sug.open');
+  for (var i = 0; i < abertas.length; i++) abertas[i].classList.remove('open');
+}
+
+async function trilhaPorGrupo(i, tipo, el) {
+  var jid = el.dataset.jid;
+  var pa = papelDe(jid);
+  if (pa === 'cupons' || pa === 'operador') {
+    if (!confirm('"' + nomeDoGrupo(jid) + '" hoje é ' + PAPEIS_LABEL[pa]
+      + '. Colocar numa trilha tira esse papel. Continuar?')) return;
+    var g = cfgGrupos();
+    var cupons   = g.cupons.filter(function(j){ return j !== jid; });
+    var operador = g.operador === jid ? '' : g.operador;
+    CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador };
+    try { await salvarGruposCfg(cupons, operador); }
+    catch(e) { alert('Não deu para tirar o papel anterior: ' + e.message); await carregarGrupos(); return; }
+  }
+  // Fonte e destino no mesmo grupo realimentaria o radar: o que ele recebe
+  // voltaria como captura na rodada seguinte. O servidor recusa; aqui a gente
+  // resolve tirando do papel anterior, com confirmacao.
+  var papelNovo = tipo === 'fontes' ? 'fonte' : 'destino';
+  var outro = tipo === 'fontes' ? 'destinos' : 'fontes';
+  if (PAPEIS[jid] && PAPEIS[jid] !== papelNovo) {
+    if (!confirm('"' + nomeDoGrupo(jid) + '" já é ' + PAPEIS_LABEL[PAPEIS[jid]]
+      + ' em alguma trilha. Um grupo não pode ser fonte e destino ao mesmo tempo — '
+      + 'ele sai do papel anterior. Continuar?')) return;
+    TRILHAS.forEach(function(t){
+      t[outro] = (t[outro] || []).filter(function(j){ return j !== jid; });
+    });
+  }
+  TRILHAS[i][tipo] = (TRILHAS[i][tipo] || []).concat([jid]);
+  var inp = document.getElementById('add-t' + i + '-' + tipo);
+  if (inp) inp.value = '';
+  fecharSugestoes();
+  await trilhasGravar();
+}
+
+async function trilhaTirarGrupo(i, tipo, jid) {
+  TRILHAS[i][tipo] = (TRILHAS[i][tipo] || []).filter(function(j){ return j !== jid; });
+  await trilhasGravar();
+}
+
+function trilhaCampo(i, campo, valor) {
+  TRILHAS[i][campo] = String(valor || '').trim();
+  trilhasGravar();
+}
+
+function trilhaNova() {
+  TRILHAS.push({ id: '', nome: 'Nova trilha', categoria: '', fontes: [], destinos: [] });
+  renderGrupos();
+  trilhasGravar();
+}
+
+async function trilhaRemover(i) {
+  var t = TRILHAS[i];
+  if (!confirm('Remover a trilha "' + t.nome + '"? Os ' + (t.fontes || []).length + ' grupo(s) fonte param de capturar '
+    + 'e os ' + (t.destinos || []).length + ' destino(s) param de receber por ela.')) return;
+  TRILHAS.splice(i, 1);
+  await trilhasGravar();
+}
+
+// Gravacao unica das trilhas. O servidor valida (JID, categoria existente,
+// fonte x destino) e devolve a lista normalizada — que substitui a local, para
+// a tela nunca mostrar algo que o disco recusou.
+async function trilhasGravar() {
+  var s = document.getElementById('trilhas-status');
+  if (!PERSIST_SERVER) {
+    if (s) { s.className = 'send-ok send-err'; s.textContent = 'Servidor indisponível — nada foi salvo.'; }
+    return;
+  }
   if (s) { s.className = 'send-ok'; s.textContent = 'Salvando…'; }
   try {
-    await salvarCatGrupos();
-    if (s) s.textContent = valor
-      ? '✓ ' + (ehFonte ? 'Tudo desta fonte entra como ' : 'Este grupo passa a receber só ') + catNomeDe(valor) + '.'
-      : '✓ ' + (ehFonte ? 'Voltou a classificar pelo produto.' : 'Voltou a ser grupo geral — recebe tudo.');
+    var r = await fetch(SERVER + '/mkt/config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ trilhas: TRILHAS })
+    });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    TRILHAS = d.trilhas || [];
+    recalcPapeis();
+    renderGrupos();
+    if (s) s.textContent = '✓ Salvo — ' + TRILHAS.length + ' trilha(s) valendo agora.';
   } catch(e) {
     if (s) { s.className = 'send-ok send-err'; s.textContent = 'Não salvou: ' + e.message; }
     await carregarGrupos();
@@ -6951,16 +7051,185 @@ async function catGrupoMudou(jid, valor, ehFonte) {
   setTimeout(function(){ if (s) s.textContent = ''; }, 6000);
 }
 
-async function salvarCatGrupos() {
-  if (!PERSIST_SERVER) throw new Error('servidor indisponível');
-  var r = await fetch(SERVER + '/mkt/config', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ categoriasDestino: CATS_DESTINO, categoriaFonte: CAT_FONTE })
+/* ── RESUMO: cupons e operador (fora das trilhas) ───────────────────────── */
+function renderResumoGrupos() {
+  function caixa(papel, titulo, vazio) {
+    var g = cfgGrupos();
+    var jids = papel === 'cupons' ? g.cupons : (g.operador ? [g.operador] : []);
+    var corpo = jids.length
+      ? jids.map(function(j){
+          return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDoGrupo(j)) + '</span>'
+               + '<button onclick="definirPapel(&quot;' + j + '&quot;,&quot;off&quot;)" title="Remover deste papel">✕</button></div>';
+        }).join('')
+      : '<div class="grp-box-vazio">' + vazio + '</div>';
+    return '<div class="grp-box ' + papel + '">'
+      + '<div class="grp-box-tit">' + titulo + '<span class="grp-box-n">' + jids.length + '</span></div>'
+      + corpo + '</div>';
+  }
+  document.getElementById('grp-resumo').innerHTML =
+      caixa('cupons',   '🏷️ Somente cupons — nunca recebem oferta', 'Nenhum grupo exclusivo de cupom.')
+    + caixa('operador', '🛠️ Operador — avisos internos', 'Sem grupo de operador: falhas de envio não são avisadas.');
+}
+
+function renderGrupos() {
+  var g = cfgGrupos();
+  var nFonte = 0, nDest = 0;
+  Object.keys(PAPEIS).forEach(function(j){
+    if (PAPEIS[j] === 'fonte') nFonte++;
+    if (PAPEIS[j] === 'destino') nDest++;
+  });
+  var tot = document.getElementById('grupos-total');
+  if (tot) tot.textContent = TRILHAS.length + ' trilha(s) · ' + nFonte + ' fonte · ' + nDest + ' destino · '
+    + g.cupons.length + ' só-cupons · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
+  renderTrilhas();
+  renderResumoGrupos();
+  renderMonitor();
+}
+
+/* ── CUPONS E OPERADOR ──────────────────────────────────────────────────── */
+function sugerirGrupos(papel) {
+  var input = document.getElementById('add-' + papel);
+  var caixa = document.getElementById('sug-' + papel);
+  var termo = (input.value || '').trim().toLowerCase();
+
+  if (!GRUPOS_CACHE.length) {
+    caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
+    caixa.classList.add('open');
+    return;
+  }
+  var lista = GRUPOS_CACHE
+    .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
+    .filter(function(g){ return papelDe(g.id) !== papel; })
+    .slice(0, 12);
+
+  caixa.innerHTML = lista.length
+    ? lista.map(function(g){
+        var pa = papelDe(g.id);
+        var outro = pa && pa !== papel ? '<span class="ja">hoje ' + esc(PAPEIS_LABEL[pa] || pa) + '</span>' : '';
+        return '<div class="sug-item" data-jid="' + esc(g.id) + '" data-papel="' + esc(papel) + '" '
+          + 'onclick="escolherGrupo(this)" title="' + esc(g.nome) + '">' + esc(g.nome) + outro + '</div>';
+      }).join('')
+    : '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
+  caixa.classList.add('open');
+}
+
+function escolherGrupo(el){
+  var jid = el.dataset.jid, papel = el.dataset.papel;
+  var atual = papelDe(jid);
+  if (atual && atual !== papel) {
+    if (!confirm('"' + nomeDoGrupo(jid) + '" já é ' + (PAPEIS_LABEL[atual] || atual)
+      + '. Mudar para ' + (PAPEIS_LABEL[papel] || papel) + '? Ele sai de todas as trilhas.')) return;
+  }
+  // Operador e UM grupo só: escolher outro tira o anterior, e isso precisa
+  // ficar explícito — quem perde o papel para de receber os avisos de falha.
+  if (papel === 'operador') {
+    var antigo = cfgGrupos().operador;
+    if (antigo && antigo !== jid
+      && !confirm('O grupo de operador hoje é "' + nomeDoGrupo(antigo)
+        + '". Ele deixa de receber os avisos internos. Continuar?')) return;
+  }
+  definirPapel(jid, papel);
+  document.getElementById('add-' + papel).value = '';
+  fecharSugestoes();
+}
+
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.sel-box')) fecharSugestoes();
+});
+
+// Papel exclusivo: o grupo sai das trilhas e do outro papel antes de entrar no
+// novo, sem depender de qual dos dois arquivos guardava o papel anterior.
+async function definirPapel(jid, papel) {
+  var anterior = papelDe(jid);
+  if (anterior === papel) return;
+
+  var g = cfgGrupos();
+  var cupons   = g.cupons.filter(function(j){ return j !== jid; });
+  var operador = g.operador === jid ? '' : g.operador;
+  var mexeuCfg = (cupons.length !== g.cupons.length) || (operador !== g.operador);
+
+  var mexeuTrilhas = false;
+  if (PAPEIS[jid]) {
+    TRILHAS.forEach(function(t){
+      var f = (t.fontes || []).filter(function(j){ return j !== jid; });
+      var d = (t.destinos || []).filter(function(j){ return j !== jid; });
+      if (f.length !== (t.fontes || []).length || d.length !== (t.destinos || []).length) mexeuTrilhas = true;
+      t.fontes = f; t.destinos = d;
+    });
+  }
+
+  if (papel === 'cupons')        { cupons.push(jid); mexeuCfg = true; }
+  else if (papel === 'operador') { operador = jid;   mexeuCfg = true; }
+
+  // Render otimista: a tela responde na hora e volta ao estado real do
+  // servidor se alguma das gravacoes falhar.
+  if (mexeuCfg) { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
+  recalcPapeis();
+  renderGrupos();
+
+  try {
+    if (mexeuTrilhas) await trilhasGravar();
+    if (mexeuCfg)     await salvarGruposCfg(cupons, operador);
+  } catch(e) {
+    alert('Não foi possível salvar a marcação no servidor: ' + e.message);
+    await carregarGrupos();
+  }
+}
+
+// Grava a metade da config que vive em /config-tsp. Merge parcial no servidor:
+// mandar so 'grupos' preserva afiliados, rodapes e credenciais.
+async function salvarGruposCfg(cupons, operador) {
+  var r = await fetch(SERVER + '/config-tsp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grupos: { cupons: cupons, operador: operador } })
   });
   var d = await r.json();
   if (!d.ok) throw new Error(d.erro || 'falhou');
-  CATS_DESTINO = d.categoriasDestino || {};
-  CAT_FONTE    = d.categoriaFonte    || {};
+  if (d.config) cfgAplicar(d.config);
+  else { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
+}
+
+// Botao "Atualizar lista": o GET /grupos responde do cache NOMES_GRUPOS, que so
+// era preenchido na conexao do WhatsApp. Grupo criado depois nao aparecia ate
+// reconectar. ?refresh=1 (via carregarGrupos(true)) refaz o fetch no WhatsApp.
+async function atualizarListaGrupos() {
+  var btn = document.getElementById('btn-grupos-refresh');
+  var fb  = document.getElementById('grupos-refresh-fb');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Buscando…'; }
+  if (fb)  { fb.style.color = 'var(--muted)'; fb.textContent = 'Consultando o WhatsApp… pode levar alguns segundos.'; }
+  try {
+    var ok = await carregarGrupos(true);
+    if (fb) {
+      if (ok) { fb.style.color = 'var(--green)'; fb.textContent = '✓ Lista atualizada — ' + GRUPOS_CACHE.length + ' grupo(s).'; }
+      else    { fb.style.color = 'var(--red)';   fb.textContent = 'Não deu para atualizar — veja o aviso acima.'; }
+    }
+  } catch(e) {
+    if (fb) { fb.style.color = 'var(--red)'; fb.textContent = 'Falhou: ' + e.message; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Atualizar lista'; }
+    setTimeout(function(){ if (fb) fb.textContent = ''; }, 6000);
+  }
+}
+
+async function carregarGrupos(forcar) {
+  await carregarPapeis();
+  await catTaxoCarregar();
+  // Sem a config TSP a tela nao sabe quem e so-cupons nem quem e operador, e
+  // esses grupos apareceriam como "sem papel" — convite a remarcar errado.
+  if (!CFG_TSP) { try { await cfgCarregarServidor(); } catch(e) {} }
+  try {
+    var r = await fetch(SERVER+'/grupos' + (forcar ? '?refresh=1' : ''), { signal: AbortSignal.timeout(30000) });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    GRUPOS_CACHE = d.grupos || [];
+    renderGrupos();
+    return true;
+  } catch(e) {
+    var av = document.getElementById('grupos-persist');
+    av.style.display = 'block';
+    av.innerHTML = '<b>Não deu para listar os grupos.</b> Verifique se o WhatsApp está conectado e recarregue.';
+    return false;
+  }
 }
 
 /* ══════ ESPACAMENTO ENTRE GRUPOS ══════ */
@@ -7023,226 +7292,6 @@ function salvarEspacGrupos() {
   })
   .catch(function(e){ s.className = 'send-ok send-err'; s.textContent = 'Não salvou: ' + e.message; })
   .finally(function(){ btn.disabled = false; });
-}
-
-async function salvarPapeis() {
-  if (!PERSIST_SERVER) throw new Error('servidor indisponível');
-  var r = await fetch(SERVER+'/mkt/config', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ papeis: PAPEIS })
-  });
-  var d = await r.json();
-  if (!d.ok) throw new Error(d.erro || 'falhou');
-}
-
-// Grava a metade da config que vive em /config-tsp. Merge parcial no servidor:
-// mandar so 'grupos' preserva afiliados, rodapes e credenciais.
-async function salvarGruposCfg(cupons, operador) {
-  var r = await fetch(SERVER + '/config-tsp', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ grupos: { cupons: cupons, operador: operador } })
-  });
-  var d = await r.json();
-  if (!d.ok) throw new Error(d.erro || 'falhou');
-  if (d.config) cfgAplicar(d.config);
-  else { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
-}
-
-// Botao "Atualizar lista": o GET /grupos responde do cache NOMES_GRUPOS, que so
-// era preenchido na conexao do WhatsApp. Grupo criado depois nao aparecia ate
-// reconectar. ?refresh=1 (via carregarGrupos(true)) refaz o fetch no WhatsApp.
-async function atualizarListaGrupos() {
-  var btn = document.getElementById('btn-grupos-refresh');
-  var fb  = document.getElementById('grupos-refresh-fb');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Buscando…'; }
-  if (fb)  { fb.style.color = 'var(--muted)'; fb.textContent = 'Consultando o WhatsApp… pode levar alguns segundos.'; }
-  try {
-    var ok = await carregarGrupos(true);
-    if (fb) {
-      if (ok) { fb.style.color = 'var(--green)'; fb.textContent = '✓ Lista atualizada — ' + GRUPOS_CACHE.length + ' grupo(s).'; }
-      else    { fb.style.color = 'var(--red)';   fb.textContent = 'Não deu para atualizar — veja o aviso acima.'; }
-    }
-  } catch(e) {
-    if (fb) { fb.style.color = 'var(--red)'; fb.textContent = 'Falhou: ' + e.message; }
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Atualizar lista'; }
-    setTimeout(function(){ if (fb) fb.textContent = ''; }, 6000);
-  }
-}
-
-async function carregarGrupos(forcar) {
-  await carregarPapeis();
-  // Sem a config TSP a tela nao sabe quem e so-cupons nem quem e operador, e
-  // esses grupos apareceriam como "sem papel" — convite a remarcar errado.
-  if (!CFG_TSP) { try { await cfgCarregarServidor(); } catch(e) {} }
-  try {
-    var r = await fetch(SERVER+'/grupos' + (forcar ? '?refresh=1' : ''), { signal: AbortSignal.timeout(30000) });
-    var d = await r.json();
-    if (!d.ok) throw new Error(d.erro || 'falha');
-    GRUPOS_CACHE = d.grupos || [];
-    renderGrupos();
-    return true;
-  } catch(e) {
-    var av = document.getElementById('grupos-persist');
-    av.style.display = 'block';
-    av.innerHTML = '<b>Não deu para listar os grupos.</b> Verifique se o WhatsApp está conectado e recarregue.';
-    return false;
-  }
-}
-
-// Resumo fixo no topo: quem e fonte e quem e destino, sem depender da busca.
-// Le PAPEIS (nao a lista filtrada) para nunca esconder um grupo configurado.
-function renderResumoGrupos() {
-  function nomeDe(jid) {
-    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
-    return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
-  }
-  function caixa(papel, titulo, vazio) {
-    var g = cfgGrupos();
-    var jids = papel === 'cupons'   ? g.cupons
-             : papel === 'operador' ? (g.operador ? [g.operador] : [])
-             : Object.keys(PAPEIS).filter(function(j){ return PAPEIS[j] === papel && papelDe(j) === papel; });
-    var corpo = jids.length
-      ? jids.map(function(j){
-          var cat = papel === 'fonte'   ? (CAT_FONTE[j] || '')
-                  : papel === 'destino' ? (Array.isArray(CATS_DESTINO[j]) ? (CATS_DESTINO[j][0] || '') : (CATS_DESTINO[j] || ''))
-                  : '';
-          var marca = cat ? '<span class="ja">' + esc(catNomeDe(cat)) + '</span>' : '';
-          return '<div class="grp-chip"><span title="' + esc(j) + '">' + esc(nomeDe(j)) + '</span>' + marca
-               + '<button onclick="definirPapel(\'' + j + '\',\'off\')" title="Remover deste papel">✕</button></div>';
-        }).join('')
-      : '<div class="grp-box-vazio">' + vazio + '</div>';
-    return '<div class="grp-box ' + papel + '">'
-      + '<div class="grp-box-tit">' + titulo + '<span class="grp-box-n">' + jids.length + '</span></div>'
-      + corpo + '</div>';
-  }
-  document.getElementById('grp-resumo').innerHTML =
-      caixa('fonte',    '📥 Fontes — de onde as ofertas vêm', 'Nenhum grupo marcado: o radar não vai capturar nada.')
-    + caixa('destino',  '📤 Ofertas + cupons — recebem tudo', 'Sem nenhum grupo aqui, o envio de oferta falha.')
-    + caixa('cupons',   '🏷️ Somente cupons — nunca recebem oferta', 'Nenhum grupo exclusivo de cupom.')
-    + caixa('operador', '🛠️ Operador — avisos internos', 'Sem grupo de operador: falhas de envio não são avisadas.');
-}
-
-// A lista completa de ~400 grupos nao e mais renderizada: era o que travava a
-// aba. A selecao passa a ser por busca, e so os grupos escolhidos aparecem.
-function renderGrupos() {
-  var g = cfgGrupos();
-  var nFonte = 0, nDest = 0;
-  Object.keys(PAPEIS).forEach(function(j){
-    if (papelDe(j) === 'fonte') nFonte++;
-    if (papelDe(j) === 'destino') nDest++;
-  });
-  var tot = document.getElementById('grupos-total');
-  if (tot) tot.textContent = nFonte + ' fonte · ' + nDest + ' ofertas+cupons · '
-    + g.cupons.length + ' só-cupons · ' + GRUPOS_CACHE.length + ' grupos disponíveis';
-  renderResumoGrupos();
-  renderMonitor();
-  catTaxoCarregar().then(renderCatGrupos);
-}
-
-// Autocomplete: filtra em memoria, limita a 12 para a lista nao virar a mesma
-// parede de antes, e marca o que ja tem papel.
-function sugerirGrupos(papel) {
-  var input = document.getElementById('add-' + papel);
-  var caixa = document.getElementById('sug-' + papel);
-  var termo = (input.value || '').trim().toLowerCase();
-
-  if (!GRUPOS_CACHE.length) {
-    caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
-    caixa.classList.add('open');
-    return;
-  }
-  var lista = GRUPOS_CACHE
-    .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
-    .filter(function(g){ return papelDe(g.id) !== papel; })
-    .slice(0, 12);
-
-  if (!lista.length) {
-    caixa.innerHTML = '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
-  } else {
-    caixa.innerHTML = lista.map(function(g){
-      var pa = papelDe(g.id);
-      var outro = pa && pa !== papel
-        ? '<span class="ja">hoje ' + esc(PAPEIS_LABEL[pa] || pa) + '</span>' : '';
-      return '<div class="sug-item" data-jid="' + esc(g.id) + '" data-papel="' + esc(papel) + '" '
-        + 'onclick="escolherGrupo(this)" title="' + esc(g.nome) + '">' + esc(g.nome) + outro + '</div>';
-    }).join('');
-  }
-  caixa.classList.add('open');
-}
-
-function fecharSugestoes(){
-  ['fonte','destino','cupons','operador'].forEach(function(p){
-    var c = document.getElementById('sug-' + p); if (c) c.classList.remove('open');
-  });
-}
-
-function escolherGrupo(el){
-  var jid = el.dataset.jid, papel = el.dataset.papel;
-  var atual = papelDe(jid);
-  var nomeDeJid = function(j){
-    var g = GRUPOS_CACHE.find(function(x){ return x.id === j; });
-    return g ? (g.nome || j) : j;
-  };
-  if (atual && atual !== papel) {
-    if (!confirm('"' + nomeDeJid(jid) + '" já é ' + (PAPEIS_LABEL[atual] || atual)
-      + '. Mudar para ' + (PAPEIS_LABEL[papel] || papel) + '?')) return;
-  }
-  // Operador e UM grupo só: escolher outro tira o anterior, e isso precisa
-  // ficar explícito — quem perde o papel para de receber os avisos de falha.
-  if (papel === 'operador') {
-    var antigo = cfgGrupos().operador;
-    if (antigo && antigo !== jid
-      && !confirm('O grupo de operador hoje é "' + nomeDeJid(antigo)
-        + '". Ele deixa de receber os avisos internos. Continuar?')) return;
-  }
-  definirPapel(jid, papel);
-  document.getElementById('add-' + papel).value = '';
-  fecharSugestoes();
-}
-
-// Clique fora fecha as sugestoes sem interferir na escolha.
-document.addEventListener('click', function(e){
-  if (!e.target.closest('.sel-box')) fecharSugestoes();
-});
-
-// Papel exclusivo: o grupo sai de onde estava antes de entrar no novo, sem
-// depender de qual dos dois arquivos guardava o papel anterior.
-async function definirPapel(jid, papel) {
-  var anterior = papelDe(jid);
-  if (anterior === papel) return;
-
-  var g = cfgGrupos();
-  var cupons   = g.cupons.filter(function(j){ return j !== jid; });
-  var operador = g.operador === jid ? '' : g.operador;
-  var mexeuCfg = (cupons.length !== g.cupons.length) || (operador !== g.operador);
-
-  delete PAPEIS[jid];
-  var mexeuPapeis = (anterior === 'fonte' || anterior === 'destino');
-  // Categoria e propriedade do PAPEL, nao do grupo: sair de destino (ou de
-  // fonte) apaga a regra junto. Deixar para tras criaria um nicho fantasma que
-  // volta a valer no dia em que o grupo for remarcado.
-  var mexeuCat = false;
-  if (anterior === 'destino' && CATS_DESTINO[jid]) { delete CATS_DESTINO[jid]; mexeuCat = true; }
-  if (anterior === 'fonte'   && CAT_FONTE[jid])    { delete CAT_FONTE[jid];    mexeuCat = true; }
-
-  if (papel === 'fonte' || papel === 'destino') { PAPEIS[jid] = papel; mexeuPapeis = true; }
-  else if (papel === 'cupons')   { cupons.push(jid); mexeuCfg = true; }
-  else if (papel === 'operador') { operador = jid;   mexeuCfg = true; }
-
-  // Render otimista: a tela responde na hora e volta ao estado real do
-  // servidor se alguma das duas gravacoes falhar.
-  if (mexeuCfg) { CFG_TSP = CFG_TSP || {}; CFG_TSP.grupos = { cupons: cupons, operador: operador }; }
-  renderGrupos();
-
-  try {
-    if (mexeuPapeis) await salvarPapeis();
-    if (mexeuCat)    await salvarCatGrupos();
-    if (mexeuCfg)    await salvarGruposCfg(cupons, operador);
-  } catch(e) {
-    alert('Não foi possível salvar a marcação no servidor: ' + e.message);
-    await carregarGrupos();
-  }
 }
 
 /* ══════ INIT ══════ */
