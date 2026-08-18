@@ -1867,6 +1867,32 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
   <div class="card">
+    <p class="card-title" style="margin-bottom:12px">⚡ Auto-envio <span class="tag" style="text-transform:none">quem dispara sozinho e quem espera aprova&#231;&#227;o</span></p>
+    <div class="aviso" style="margin-bottom:12px">
+      Vale na hora, sem reiniciar o servidor. Independente do modo, uma oferta com
+      <b>pre&#231;o n&#227;o verificado</b> ou <b>cupom fora da base</b> nunca &#233; auto-enviada &#8212; sempre vai para a fila.
+    </div>
+
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field"><label>Cupons <span class="tag" id="ae-cupom-origem">&#8212;</span></label>
+        <select id="cfg-ae-cupom">
+          <option value="off">Desligado &#8212; tudo vai para a fila</option>
+          <option value="sombra">Sombra &#8212; avalia e registra, mas n&#227;o envia</option>
+          <option value="on">Autom&#225;tico &#8212; dispara direto</option>
+        </select></div>
+      <div class="field"><label>Ofertas de produto <span class="tag" id="ae-oferta-origem">&#8212;</span></label>
+        <select id="cfg-ae-oferta">
+          <option value="off">Desligado &#8212; tudo vai para a fila</option>
+          <option value="on">Autom&#225;tico &#8212; dispara direto</option>
+        </select></div>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);line-height:1.5">
+      <b>Sombra</b> existe s&#243; para cupom: serve para conferir o que <i>seria</i> enviado antes de confiar no gate.
+      Ofertas n&#227;o t&#234;m esse meio-termo &#8212; ou vai, ou espera voc&#234;.
+    </p>
+  </div>
+
+  <div class="card">
     <p class="card-title" style="margin-bottom:12px">🏷️ Categorias e palavras-chave <span class="tag" style="text-transform:none">decide o grupo de nicho de cada oferta</span></p>
     <div class="aviso" style="margin-bottom:12px">
       Toda oferta capturada e classificada antes de escolher destino. A decis&#227;o segue esta ordem:
@@ -4968,6 +4994,9 @@ function cfgCarregarServidor() {
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (d.ok && d.config) cfgAplicar(d.config);
+      // Modo EFETIVO (config ou env) — nao o campo cru da config, que fica
+      // vazio enquanto a env manda.
+      if (d.autoEnvio) aeAplicar(d.autoEnvio);
       // Só o ESTADO das credenciais vem do servidor — o valor nunca volta.
       if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
       if (d.tenant) aplicarVisaoOperador(d.tenant);
@@ -4988,6 +5017,24 @@ function cfgAbrir() {
   cfgCarregarServidor().then(cfgPreencher);
   awinCarregar();
   catCarregar();
+}
+
+// ── AUTO-ENVIO ───────────────────────────────────────────────────────────────
+// A etiqueta de origem e o ponto todo desta tela: enquanto a config estiver
+// vazia quem manda e a env do Railway, e o operador precisa saber disso antes
+// de concluir que "mudar aqui nao fez nada".
+function aeAplicar(ae) {
+  var sc = document.getElementById('cfg-ae-cupom');
+  var so = document.getElementById('cfg-ae-oferta');
+  if (sc) sc.value = ae.cupom  || 'sombra';
+  if (so) so.value = ae.oferta || 'off';
+  var origem = ae.origem || {};
+  [['ae-cupom-origem', origem.cupom], ['ae-oferta-origem', origem.oferta]].forEach(function(par) {
+    var el = document.getElementById(par[0]);
+    if (!el) return;
+    if (par[1] === 'painel') { el.textContent = 'definido aqui'; el.style.color = ''; }
+    else { el.textContent = 'ainda vindo do Railway'; el.style.color = 'var(--accent)'; }
+  });
 }
 
 // ── SUB-ABAS: NEGOCIO x TECNICA ──────────────────────────────────────────────
@@ -5412,6 +5459,12 @@ function cfgSalvar() {
     telegram: {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
         .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
+    },
+    // Salvar aqui grava o modo na config e ele passa a ter precedencia sobre a
+    // env do Railway a partir do proximo cupom/oferta capturado.
+    autoEnvio: {
+      cupom:  document.getElementById('cfg-ae-cupom').value,
+      oferta: document.getElementById('cfg-ae-oferta').value
     }
   };
   btn.disabled = true; st.style.color = ''; st.textContent = 'Salvando…';
@@ -5422,6 +5475,7 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
+    if (d.autoEnvio) aeAplicar(d.autoEnvio);
     if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
     // A Awin tem endpoint proprio: o botao unico salva as duas coisas para o
