@@ -329,6 +329,13 @@ try {
   .desc-num span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .desc-acoes{display:flex;flex-direction:column;gap:5px;align-items:stretch}
   @media(max-width:640px){.desc-item{flex-wrap:wrap}.desc-nums{width:100%;justify-content:flex-start}}
+  /* ── Rastreio de links ── */
+  .rt-ref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:var(--border);
+          border-radius:4px;padding:1px 5px;color:var(--muted)}
+  .rt-mudo{opacity:.55}
+  .rt-flag{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+           border-radius:4px;padding:2px 6px;background:var(--border);color:var(--muted)}
+  .rt-flag.ok{background:rgba(46,160,67,.18);color:#3fb950}
   /* Aba Fila (visualizacao): contexto da janela + cards reaproveitando .ag-* */
   .fe-ctx{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .fe-pill{font-size:11px;font-weight:700;color:var(--muted);background:var(--card-deep);border:1px solid var(--border);border-radius:8px;padding:5px 10px}
@@ -761,6 +768,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
   <div class="side-group">Sistema</div>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
+  <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio de links</button>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
 </div>
 
@@ -1893,6 +1901,54 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="desc-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
+<!-- ════════ RASTREIO DE LINKS ════════ -->
+<div class="panel" id="panel-rastreio">
+  <div class="aviso">
+    Cada link disparado sai com uma <b>ref própria</b> (tag da Amazon, subId do Mercado Livre e da
+    Shopee, clickRef da Awin). Aqui é o resultado de volta: <b>clique, pedido, venda e comissão do
+    que nós divulgamos</b>. O filtro de data vale para o dia do disparo; os números são o acumulado
+    que o coletor já conseguiu casar com aquela ref.
+  </div>
+
+  <div class="card" id="rt-resumo" style="display:none">
+    <div class="desc-cards" id="rt-cards"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px" id="rt-meta"></div>
+  </div>
+
+  <div class="sec-label" style="margin-top:22px">Por loja</div>
+  <div id="rt-lojas"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="sec-label" style="margin-top:26px">Por dia <span class="tag" style="text-transform:none">clique e comissão dos produtos filtrados</span></div>
+  <div class="dv-chart-card">
+    <div class="dv-chart-wrap" style="height:230px"><canvas id="rt-chart"></canvas></div>
+  </div>
+
+  <div class="sec-label" style="margin-top:26px">Produtos divulgados</div>
+  <div class="fila-bar">
+    <span id="rt-status">Carregando...</span>
+    <div class="fila-acoes">
+      <input type="date" id="rt-de" onchange="carregarRastreio()" style="width:auto;padding:6px 8px;font-size:12px"/>
+      <input type="date" id="rt-ate" onchange="carregarRastreio()" style="width:auto;padding:6px 8px;font-size:12px"/>
+      <input type="text" id="rt-busca" class="busca-mini" autocomplete="off" placeholder="Buscar produto, ref ou ID…" oninput="renderRastreio()"/>
+      <select id="rt-loja" onchange="renderRastreio()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <select id="rt-retorno" onchange="renderRastreio()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="">Todos</option>
+        <option value="com">Só com retorno</option>
+        <option value="sem">Só sem retorno</option>
+      </select>
+      <select id="rt-ordem" onchange="renderRastreio()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="comissao">Maior comissão</option>
+        <option value="cliques">Mais cliques</option>
+        <option value="pedidos">Mais pedidos</option>
+        <option value="vendas">Maior faturamento</option>
+        <option value="disparos">Mais disparos</option>
+      </select>
+      <button class="btn btn-copy btn-sm" onclick="carregarRastreio(true)">↻ Atualizar</button>
+    </div>
+  </div>
+  <div id="rt-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
   <div class="cfg-subtabs">
@@ -2277,7 +2333,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','config'];
+var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2287,6 +2343,7 @@ function switchTab(name) {
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'descobertas') carregarDescobertas();
+  if (name === 'rastreio') carregarRastreio();
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
@@ -3956,6 +4013,187 @@ function excluirLista(id){
     .then(function(r){ return r.json(); })
     .then(function(){ carregarListas(); })
     .catch(function(e){ alert('Falhou: ' + e.message); });
+}
+
+/* ══════ RASTREIO DE LINKS ══════ */
+// Fonte: proxy CDV /afiliados/rastreio, que cruza o ledger de atribuicoes
+// (tsp/rastreio.json, escrito pelo baileys-server no disparo) com o resultado
+// por produto (tsp/desempenho-produtos.json, escrito pelo coletor diario).
+var RT_CACHE = [], RT_META = null, RT_CHART = null;
+
+function rtMoeda(v){
+  return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function rtDataBR(d){
+  if (!d) return '—';
+  var p = String(d).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] : d;
+}
+
+function carregarRastreio(forcar){
+  var st = document.getElementById('rt-status');
+  st.textContent = 'Carregando...';
+  var qs = [];
+  var de = document.getElementById('rt-de').value;
+  var ate = document.getElementById('rt-ate').value;
+  if (de)  qs.push('de='  + de);
+  if (ate) qs.push('ate=' + ate);
+  qs.push('limite=3000');
+  qs.push('t=' + Date.now());
+  return fetch(DIST_PROXY + '/afiliados/rastreio?' + qs.join('&'), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) throw new Error(d && d.erro ? d.erro : 'resposta inválida');
+      RT_CACHE = d.itens || [];
+      RT_META  = d;
+      // O select sai da lista que o servidor manda (todas as lojas do ledger),
+      // e nao dos itens filtrados: assim nao some opcao ao escolher uma.
+      var sel = document.getElementById('rt-loja'), atual = sel.value;
+      sel.innerHTML = '<option value="">Todas as lojas</option>' + (d.lojas||[]).map(function(l){
+        return '<option value="' + esc(l) + '">' + esc(l) + '</option>';
+      }).join('');
+      if (atual) sel.value = atual;
+      renderRastreio();
+    })
+    .catch(function(e){
+      document.getElementById('rt-status').textContent = 'Falha: ' + e.message;
+      document.getElementById('rt-lista').innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
+      document.getElementById('rt-lojas').innerHTML = '';
+    });
+}
+
+function renderRastreio(){
+  var termo   = (document.getElementById('rt-busca').value || '').toLowerCase().trim();
+  var loja    = document.getElementById('rt-loja').value;
+  var retorno = document.getElementById('rt-retorno').value;
+  var ordem   = document.getElementById('rt-ordem').value;
+
+  var itens = RT_CACHE.filter(function(x){
+    if (loja && x.loja !== loja) return false;
+    if (retorno === 'com' && !x.temRetorno) return false;
+    if (retorno === 'sem' && x.temRetorno) return false;
+    if (termo) {
+      var alvo = ((x.nome||'') + ' ' + (x.asin||'') + ' ' + (x.refs||[]).join(' ')).toLowerCase();
+      if (alvo.indexOf(termo) < 0) return false;
+    }
+    return true;
+  });
+  itens.sort(function(a,b){ return (Number(b[ordem])||0) - (Number(a[ordem])||0); });
+
+  var tot = itens.reduce(function(t,x){
+    t.produtos += 1; t.disparos += x.disparos||0; t.cliques += x.cliques||0;
+    t.pedidos += x.pedidos||0; t.vendas += x.vendas||0; t.comissao += x.comissao||0;
+    if (!x.temRetorno) t.sem += 1;
+    return t;
+  }, {produtos:0,disparos:0,cliques:0,pedidos:0,vendas:0,comissao:0,sem:0});
+
+  document.getElementById('rt-status').textContent =
+    itens.length + ' produto(s) · ' + tot.disparos + ' disparo(s) · ' + tot.sem + ' ainda sem retorno';
+
+  document.getElementById('rt-resumo').style.display = itens.length ? '' : 'none';
+  document.getElementById('rt-cards').innerHTML =
+      '<div class="desc-kpi"><span>Produtos</span><b>' + tot.produtos + '</b></div>'
+    + '<div class="desc-kpi"><span>Disparos</span><b>' + tot.disparos + '</b></div>'
+    + '<div class="desc-kpi"><span>Cliques</span><b>' + tot.cliques + '</b></div>'
+    + '<div class="desc-kpi"><span>Pedidos</span><b>' + tot.pedidos + '</b></div>'
+    + '<div class="desc-kpi"><span>Faturamento</span><b>' + rtMoeda(tot.vendas) + '</b></div>'
+    + '<div class="desc-kpi"><span>Comissão</span><b>' + rtMoeda(tot.comissao) + '</b></div>';
+
+  if (RT_META) {
+    // Duas datas diferentes de proposito: o ledger e escrito no disparo (minutos
+    // atras), o desempenho so na coleta. Ver as duas evita ler atraso como zero.
+    document.getElementById('rt-meta').textContent =
+      (RT_META.atribuicoesTotal || 0) + ' atribuições no ledger · pool de ' + (RT_META.poolTamanho || 0) + ' refs'
+      + (RT_META.atualizadoEm ? ' · último disparo ' + new Date(RT_META.atualizadoEm).toLocaleString('pt-BR') : '')
+      + (RT_META.desempenhoAtualizadoEm
+          ? ' · resultado coletado em ' + new Date(RT_META.desempenhoAtualizadoEm).toLocaleString('pt-BR')
+          : ' · resultado ainda não coletado');
+  }
+
+  rtTabelaLojas(itens);
+  rtGrafico();
+
+  document.getElementById('rt-lista').innerHTML = itens.length
+    ? '<div class="card" style="padding:0">' + itens.map(function(x){
+        var conv = x.conversao === null || x.conversao === undefined ? '—' : (x.conversao + '%');
+        var flag = x.temRetorno
+          ? '<span class="rt-flag ok">com retorno</span>'
+          : '<span class="rt-flag">sem retorno ainda</span>';
+        return '<div class="desc-item' + (x.temRetorno ? '' : ' rt-mudo') + '">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(x.nome || x.asin) + '</div>'
+            + '<div class="desc-item-meta">'
+              + '<b>' + esc(x.loja || 'Sem loja') + '</b>'
+              + '<span>' + x.disparos + ' disparo(s)</span>'
+              + '<span>' + rtDataBR(x.primeiroDisparo) + (x.ultimoDisparo !== x.primeiroDisparo ? ' → ' + rtDataBR(x.ultimoDisparo) : '') + '</span>'
+              + (x.preco ? '<span>' + rtMoeda(x.preco) + '</span>' : '')
+              + flag
+              + (x.refs||[]).slice(0,3).map(function(r){ return '<span class="rt-ref">' + esc(r) + '</span>'; }).join('')
+              + ((x.refs||[]).length > 3 ? '<span class="rt-ref">+' + ((x.refs||[]).length - 3) + '</span>' : '')
+            + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + (x.cliques||0) + '</b><span>cliques</span></div>'
+            + '<div class="desc-num"><b>' + (x.pedidos||0) + '</b><span>pedidos</span></div>'
+            + '<div class="desc-num"><b>' + conv + '</b><span>conversão</span></div>'
+            + '<div class="desc-num"><b>' + rtMoeda(x.vendas) + '</b><span>vendas</span></div>'
+            + '<div class="desc-num"><b>' + rtMoeda(x.comissao) + '</b><span>comissão</span></div>'
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Nenhum produto disparado no período escolhido.</div>';
+}
+
+function rtTabelaLojas(itens){
+  var por = {};
+  itens.forEach(function(x){
+    var k = x.loja || 'Sem loja';
+    por[k] = por[k] || {produtos:0,disparos:0,cliques:0,pedidos:0,vendas:0,comissao:0};
+    por[k].produtos += 1; por[k].disparos += x.disparos||0; por[k].cliques += x.cliques||0;
+    por[k].pedidos += x.pedidos||0; por[k].vendas += x.vendas||0; por[k].comissao += x.comissao||0;
+  });
+  var lista = Object.keys(por).map(function(k){ return {nome:k, d:por[k]}; })
+    .sort(function(a,b){ return b.d.comissao - a.d.comissao || b.d.disparos - a.d.disparos; });
+  document.getElementById('rt-lojas').innerHTML = lista.length
+    ? '<div class="card" style="padding:6px 0">' + lista.map(function(l){
+        return '<div class="desc-cat">'
+          + '<div class="desc-cat-nome">' + esc(l.nome) + '</div>'
+          + '<div style="flex:0 0 auto;color:var(--muted);font-size:11px">' + l.d.disparos + ' disparo(s) · ' + l.d.produtos + ' produto(s)</div>'
+          + '<div style="flex:0 0 60px;text-align:right">' + l.d.cliques + ' cliq.</div>'
+          + '<div style="flex:0 0 60px;text-align:right">' + l.d.pedidos + ' ped.</div>'
+          + '<div style="flex:0 0 100px;text-align:right;font-weight:700">' + rtMoeda(l.d.comissao) + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Sem disparos no período.</div>';
+}
+
+function rtGrafico(){
+  var serie = (RT_META && RT_META.serie) || {};
+  var dias = Object.keys(serie).sort();
+  var ctx = document.getElementById('rt-chart');
+  if (!ctx) return;
+  if (RT_CHART) { RT_CHART.destroy(); RT_CHART = null; }
+  if (!dias.length) return;
+  RT_CHART = new Chart(ctx, {
+    data: {
+      labels: dias.map(rtDataBR),
+      datasets: [
+        { type:'bar', label:'Cliques', data: dias.map(function(d){ return serie[d].cliques; }),
+          backgroundColor:'rgba(88,166,255,.55)', borderRadius:4, yAxisID:'y' },
+        { type:'line', label:'Comissão (R$)', data: dias.map(function(d){ return serie[d].comissao; }),
+          borderColor:'#3fb950', backgroundColor:'#3fb950', tension:.3, yAxisID:'y1' }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#8b949e', boxWidth:12, font:{size:11} } } },
+      scales:{
+        x:{ ticks:{ color:'#8b949e', font:{size:10} }, grid:{ display:false } },
+        y:{ position:'left', ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'rgba(139,148,158,.12)' } },
+        y1:{ position:'right', ticks:{ color:'#8b949e', font:{size:10} }, grid:{ display:false } }
+      }
+    }
+  });
 }
 
 /* ══════ DESCOBERTAS ══════ */
