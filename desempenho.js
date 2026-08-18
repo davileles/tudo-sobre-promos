@@ -583,26 +583,54 @@ async function salvarCategorias(salvas, conhecidas) {
     + `-${podados} podada(s) — ${Object.keys(salvas).length} no cache`);
 }
 
-async function amazonProdutosVinculados(ctx, de, ate) {
+// 429 aconteceu de verdade numa rodada agendada e custou a Amazon inteira no
+// painel. O relatorio nao tem pressa: esperar e tentar de novo sai muito mais
+// barato que perder o dia.
+const VINC_ESPERAS = [5000, 15000, 40000];
+
+async function amazonProdutosVinculadosPagina(ctx, de, ate, skip, token) {
   const qs = new URLSearchParams({
     'query[type]': 'overview',
     'query[start_date]': de, 'query[end_date]': ate,
     'query[group_by]': 'linked_product',
     'query[columns]': COLUNAS_VINCULADOS,
     'query[order]': 'desc', 'query[sort]': 'total_ordered_items',
-    'query[skip]': '0', 'query[limit]': '200', 'query[next_token]': '',
+    'query[skip]': String(skip), 'query[limit]': String(CAT_PAGINA),
+    'query[next_token]': token || '',
     'query[storeId]': ctx.storeId, 'query[locale]': 'BR',
     store_id: ctx.storeId,
   });
-  const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
-    { headers: ctx.headers });
-  if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
-  if (!r.ok) throw new Error(`produtos vinculados: status ${r.status}`);
-  const j = await r.json();
-  return j.records || [];
+  for (let tent = 0; ; tent++) {
+    const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
+      { headers: ctx.headers });
+    if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
+    if (r.ok) return r.json();
+    if (![429, 500, 502, 503].includes(r.status) || tent >= VINC_ESPERAS.length) {
+      throw new Error(`produtos vinculados: status ${r.status}`);
+    }
+    console.log(`[desempenho] Amazon: vinculados status ${r.status}, `
+      + `nova tentativa em ${VINC_ESPERAS[tent] / 1000}s`);
+    await new Promise((res) => setTimeout(res, VINC_ESPERAS[tent]));
+  }
 }
 
-async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida) {
+// Paginado: com limit fixo em 200, uma operacao que crescesse passaria a
+// perder produto sem avisar — a listagem simplesmente terminaria no 200o.
+async function amazonProdutosVinculados(ctx, de, ate) {
+  const linhas = [];
+  let token = '';
+  for (let pagina = 0; pagina < CAT_MAX_PAGINAS; pagina++) {
+    const j = await amazonProdutosVinculadosPagina(ctx, de, ate, pagina * CAT_PAGINA, token);
+    const registros = j.records || [];
+    linhas.push(...registros);
+    token = j.nextToken || j.next_token || '';
+    if (registros.length < CAT_PAGINA) break;
+    await new Promise((res) => setTimeout(res, 400));
+  }
+  return linhas;
+}
+
+async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
   if (!AMAZON_COOKIE) {
     console.log('[desempenho] AMAZON_COOKIE ausente — Amazon por tag ignorada');
     return 0;
@@ -649,6 +677,9 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
         .filter((a) => /amazon/i.test(String(a.loja || '')))
         .map((a) => String(a.asin || '').toUpperCase()));
       const vinculados = await amazonProdutosVinculados(ctx, dias[0], dias[dias.length - 1]);
+      // A listagem chegou inteira: o que a loja tem a dizer nesta janela ja e
+      // conhecido, ainda que dela nao saia nenhuma descoberta.
+      marcarColeta?.('Amazon');
       // Categoria vem de outro agrupamento; falha aqui nao pode custar a coleta.
       const salvas = await carregarCategoriasSalvas();
       // Alvos = ASIN comprado nesta janela que o cache ainda nao conhece. Em
@@ -736,7 +767,7 @@ const idMlDoLink = (url) => {
   return m ? 'MLB' + m[1] : null;
 };
 
-async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida) {
+async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
   if (!ML_COOKIE) {
     console.log('[desempenho] ML_COOKIE ausente — Mercado Livre ignorado');
     return 0;
@@ -772,6 +803,7 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida)
     if (lote.length < 50 || linhas.length >= (j.total_results || 0)) break;
     await new Promise((res) => setTimeout(res, 400));
   }
+  marcarColeta?.('Mercado Livre');
 
   // Agrega por (id, dia) somando apenas vendas diretas.
   const agreg = new Map();
@@ -922,7 +954,7 @@ async function shopeeItensComprados(inicio, fim) {
   return saida;
 }
 
-async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida) {
+async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
   if (!SHOPEE_COOKIE || !SHOPEE_APP_ID || !SHOPEE_SECRET) {
     console.log('[desempenho] credenciais da Shopee ausentes — Shopee ignorada');
     return 0;
@@ -966,7 +998,9 @@ async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, regi
     // indireta e vira leitura de mercado, nao desempenho daquele disparo.
     if (coletarNaoAtribuida) {
       try {
-        for (const { ref, item } of await shopeeItensComprados(inicioDoDia(data), fimDoDia(data))) {
+        const comprados = await shopeeItensComprados(inicioDoDia(data), fimDoDia(data));
+        marcarColeta?.('Shopee');
+        for (const { ref, item } of comprados) {
           const attr = porRef.get(ref);
           if (!attr) continue;
           const idComprado = String(item.itemId || '');
@@ -1024,6 +1058,13 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   // comprado: e o que o publico leva alem do que divulgamos — venda indireta
   // (entrou pelo nosso link e comprou outra coisa) ou produto ainda fora da
   // base. Vale para qualquer loja que exponha o item comprado.
+  // Loja cuja fonte respondeu nesta rodada. O arquivo de descobertas e
+  // reescrito por inteiro, entao sem esta marca um 429 transitorio na Amazon
+  // apagava a Amazon do painel ate a proxima rodada dar certo — foi o que
+  // aconteceu na rodada agendada de 18/08.
+  const lojasColetadas = new Set();
+  const marcarColeta = (loja) => { if (loja) lojasColetadas.add(loja); };
+
   const naoAtribuidas = new Map();
   const coletarNaoAtribuida = (v) => {
     const chave = (v.loja || '?') + '|' + (v.id || v.nome || 'sem-id') + '|' + v.tipo;
@@ -1049,12 +1090,12 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   // Cada loja é isolada: falha em uma não derruba a outra nem a coleta principal.
   let mudou = 0;
   try {
-    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida);
+    mudou += await desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta);
   } catch (e) {
     console.warn('[desempenho] Shopee falhou:', e.message);
   }
   try {
-    mudou += await desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida);
+    mudou += await desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta);
   } catch (e) {
     console.warn('[desempenho] Amazon falhou:', e.message);
   }
@@ -1064,7 +1105,7 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
     console.warn('[desempenho] Awin falhou:', e.message);
   }
   try {
-    mudou += await desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida);
+    mudou += await desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta);
   } catch (e) {
     console.warn('[desempenho] Mercado Livre falhou:', e.message);
   }
@@ -1073,6 +1114,26 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   // misturar no ranking distorceria comissaoPorDisparo e conversao.
   if (naoAtribuidas.size) {
     const itens = [...naoAtribuidas.values()].sort((a, b) => b.comissao - a.comissao);
+
+    // Loja que nao respondeu mantem a foto anterior, marcada como defasada: o
+    // painel prefere um numero de ontem identificado como tal a um buraco.
+    try {
+      const { dados: anterior } = await lerJson(ARQ_DESCOBERTAS, null);
+      const desdeQuando = anterior?.atualizadoEm || null;
+      const preservados = (anterior?.itens || [])
+        .filter((x) => x.loja && !lojasColetadas.has(x.loja))
+        .map((x) => ({ ...x, defasado: true, coletadoEm: x.coletadoEm || desdeQuando }));
+      if (preservados.length) {
+        const lojas = [...new Set(preservados.map((x) => x.loja))];
+        console.log(`[desempenho] descobertas: ${lojas.join(', ')} nao respondeu(ram) — `
+          + `${preservados.length} item(ns) preservado(s) da rodada anterior`);
+        itens.push(...preservados);
+        itens.sort((a, b) => b.comissao - a.comissao);
+      }
+    } catch (e) {
+      console.warn('[desempenho] descobertas: preservacao da rodada anterior falhou —', e.message);
+    }
+
     const totais = itens.reduce((t, x) => ({
       unidades: t.unidades + x.unidades,
       vendas: num(t.vendas + x.vendas),
@@ -1084,6 +1145,7 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
         const l = (porLoja[x.loja] = porLoja[x.loja] || { produtos: 0, unidades: 0, vendas: 0, comissao: 0 });
         l.produtos += 1; l.unidades += x.unidades;
         l.vendas = num(l.vendas + x.vendas); l.comissao = num(l.comissao + x.comissao);
+        if (x.defasado) { l.defasado = true; l.coletadoEm = x.coletadoEm || l.coletadoEm; }
       }
       await gravarJson(ARQ_DESCOBERTAS, {
         atualizadoEm: new Date().toISOString(),
