@@ -431,6 +431,14 @@ try {
   .sel-grupos-4{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:700px){ .sel-grupos-4{grid-template-columns:1fr} }
   .grp-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+  /* O campo de busca vive DENTRO da caixa: com overflow:hidden a lista de
+     sugestoes era cortada na borda e so dava para ler as primeiras linhas.
+     Enquanto a lista esta aberta a caixa solta o recorte e sobe no empilhamento,
+     para a lista passar por cima da caixa vizinha e dos chips de baixo. */
+  .grp-box.sug-aberta{overflow:visible;z-index:130}
+  /* O card da trilha recorta igual: sem soltar os dois, a lista bate na borda
+     do card em vez de aparecer inteira. */
+  .card.sug-aberta{overflow:visible;z-index:130}
   .grp-box::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
   .grp-box.fonte::before{background:var(--blue)}
   .grp-box.destino::before{background:var(--accent)}
@@ -6940,7 +6948,7 @@ function sugerirTrilha(i, tipo) {
   var termo = (input.value || '').trim().toLowerCase();
   if (!GRUPOS_CACHE.length) {
     caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
-    caixa.classList.add('open');
+    abrirSugestoes(caixa);
     return;
   }
   var jaNaTrilha = TRILHAS[i][tipo] || [];
@@ -6958,12 +6966,30 @@ function sugerirTrilha(i, tipo) {
              + 'title="' + esc(g.nome) + '">' + esc(g.nome) + marca + '</div>';
       }).join('')
     : '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
+  abrirSugestoes(caixa);
+}
+
+// Abrir e fechar passam pela mesma funcao dos dois lados: a classe na caixa
+// precisa sair junto com a lista, senao fica um grp-box sem recorte e com
+// z-index alto atrapalhando o resto da tela.
+function abrirSugestoes(caixa){
+  fecharSugestoes();
   caixa.classList.add('open');
+  // Sobe a arvore soltando TODO ancestral que recorta (a caixa e o card da
+  // trilha): basta um deles com overflow:hidden para a lista aparecer cortada.
+  var no = caixa.parentNode;
+  while (no && no.classList) {
+    if (no.classList.contains('grp-box') || no.classList.contains('card')) no.classList.add('sug-aberta');
+    if (no.classList.contains('panel')) break;
+    no = no.parentNode;
+  }
 }
 
 function fecharSugestoes(){
   var abertas = document.querySelectorAll('.sug.open');
   for (var i = 0; i < abertas.length; i++) abertas[i].classList.remove('open');
+  var caixas = document.querySelectorAll('.sug-aberta');
+  for (var j = 0; j < caixas.length; j++) caixas[j].classList.remove('sug-aberta');
 }
 
 async function trilhaPorGrupo(i, tipo, el) {
@@ -7094,7 +7120,7 @@ function sugerirGrupos(papel) {
 
   if (!GRUPOS_CACHE.length) {
     caixa.innerHTML = '<div class="sug-vazio">Carregando grupos…</div>';
-    caixa.classList.add('open');
+    abrirSugestoes(caixa);
     return;
   }
   var lista = GRUPOS_CACHE
@@ -7110,7 +7136,7 @@ function sugerirGrupos(papel) {
           + 'onclick="escolherGrupo(this)" title="' + esc(g.nome) + '">' + esc(g.nome) + outro + '</div>';
       }).join('')
     : '<div class="sug-vazio">' + (termo ? 'Nenhum grupo com esse nome.' : 'Nada a adicionar.') + '</div>';
-  caixa.classList.add('open');
+  abrirSugestoes(caixa);
 }
 
 function escolherGrupo(el){
