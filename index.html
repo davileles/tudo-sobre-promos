@@ -336,6 +336,9 @@ try {
   .rt-flag{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
            border-radius:4px;padding:2px 6px;background:var(--border);color:var(--muted)}
   .rt-flag.ok{background:rgba(46,160,67,.18);color:#3fb950}
+  .desc-origem{margin-top:6px;display:flex;flex-direction:column;gap:2px}
+  .desc-origem-item{font-size:11px;color:#3fb950}
+  .desc-origem-item b{font-weight:700;color:var(--text)}
   /* Aba Fila (visualizacao): contexto da janela + cards reaproveitando .ag-* */
   .fe-ctx{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .fe-pill{font-size:11px;font-weight:700;color:var(--muted);background:var(--card-deep);border:1px solid var(--border);border-radius:8px;padding:5px 10px}
@@ -1888,6 +1891,11 @@ body.travado > *:not(#login-screen){display:none !important}
         <option value="indireta">Venda indireta</option>
         <option value="direta_fora_do_ledger">Direta fora da base</option>
         <option value="nao_divulgado">Não divulgado</option>
+      </select>
+      <select id="desc-origem" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="">Com e sem origem</option>
+        <option value="com">Só com link de origem</option>
+        <option value="sem">Só sem origem</option>
       </select>
       <select id="desc-ordem" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
         <option value="comissao">Maior comissão</option>
@@ -4211,6 +4219,24 @@ function descMoeda(v){
   return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
+// De qual disparo NOSSO veio a venda indireta. Hoje so a Shopee entrega isso
+// (relatorio por sub_id); Amazon devolve dinheiro por tag sem dizer o item, e o
+// ML nao devolve origem nenhuma — nesses casos o bloco simplesmente nao aparece,
+// em vez de fingir um vinculo que a loja nao confirmou.
+function descOrigemHtml(x){
+  var o = x.origens || [];
+  if (!o.length) return '';
+  var linhas = o.slice(0, 3).map(function(g){
+    return '<span class="desc-origem-item">↩ veio do link de <b>' + esc(g.nome || g.ref) + '</b>'
+      + (g.unidades ? ' · ' + g.unidades + ' un' : '')
+      + (g.comissao ? ' · ' + descMoeda(g.comissao) : '')
+      + '</span>';
+  }).join('');
+  return '<div class="desc-origem">' + linhas
+    + (o.length > 3 ? '<span class="desc-origem-item">+' + (o.length - 3) + ' outro(s) link(s)</span>' : '')
+    + '</div>';
+}
+
 function carregarDescobertas(){
   document.getElementById('desc-status').textContent = 'Carregando...';
   return fetch(DIST_PROXY + '/afiliados/descobertas?limite=2000&t=' + Date.now(), { cache:'no-cache' })
@@ -4243,10 +4269,14 @@ function renderDescobertas(){
   var loja  = document.getElementById('desc-loja').value;
   var tipo  = document.getElementById('desc-tipo').value;
   var ordem = document.getElementById('desc-ordem').value;
+  var orig  = document.getElementById('desc-origem').value;
 
   var itens = DESC_CACHE.filter(function(x){
     if (loja && x.loja !== loja) return false;
     if (tipo && x.tipo !== tipo) return false;
+    var temOrigem = (x.origens || []).length > 0;
+    if (orig === 'com' && !temOrigem) return false;
+    if (orig === 'sem' && temOrigem) return false;
     if (termo && ((x.nome||'') + ' ' + (x.categoria||'')).toLowerCase().indexOf(termo) < 0) return false;
     return true;
   });
@@ -4321,6 +4351,7 @@ function renderDescobertas(){
               + (x.vendedor ? '<span>· ' + esc(x.vendedor) + '</span>' : '')
               + (x.ocorrencias ? '<span>· ' + x.ocorrencias + ' pedido(s)</span>' : '')
             + '</div>'
+            + descOrigemHtml(x)
           + '</div>'
           + '<div class="desc-nums">'
             + '<div class="desc-num"><b>' + (x.unidades||0) + '</b><span>un</span></div>'
