@@ -5023,11 +5023,13 @@ function cfgAbrir() {
 // A etiqueta de origem e o ponto todo desta tela: enquanto a config estiver
 // vazia quem manda e a env do Railway, e o operador precisa saber disso antes
 // de concluir que "mudar aqui nao fez nada".
+var AE_CARREGADO = false;   // so mandamos o modo de volta se soubermos o atual
 function aeAplicar(ae) {
   var sc = document.getElementById('cfg-ae-cupom');
   var so = document.getElementById('cfg-ae-oferta');
   if (sc) sc.value = ae.cupom  || 'sombra';
   if (so) so.value = ae.oferta || 'off';
+  AE_CARREGADO = true;
   var origem = ae.origem || {};
   [['ae-cupom-origem', origem.cupom], ['ae-oferta-origem', origem.oferta]].forEach(function(par) {
     var el = document.getElementById(par[0]);
@@ -5460,12 +5462,15 @@ function cfgSalvar() {
       canaisIgnorados: document.getElementById('cfg-tg-ignorados').value
         .split('\n').map(function(x){ return x.trim(); }).filter(Boolean)
     },
-    // Salvar aqui grava o modo na config e ele passa a ter precedencia sobre a
-    // env do Railway a partir do proximo cupom/oferta capturado.
-    autoEnvio: {
-      cupom:  document.getElementById('cfg-ae-cupom').value,
-      oferta: document.getElementById('cfg-ae-oferta').value
-    }
+  };
+  // Salvar aqui grava o modo na config e ele passa a ter precedencia sobre a
+  // env do Railway a partir do proximo cupom/oferta capturado. So vai no corpo
+  // se o estado atual chegou a ser lido do servidor: sem isso os selects estao
+  // na primeira opcao ('Desligado') por default do HTML, e salvar qualquer
+  // outra coisa nesta tela desligaria o auto-envio sem ninguem pedir.
+  if (AE_CARREGADO) corpo.autoEnvio = {
+    cupom:  document.getElementById('cfg-ae-cupom').value,
+    oferta: document.getElementById('cfg-ae-oferta').value
   };
   btn.disabled = true; st.style.color = ''; st.textContent = 'Salvando…';
   fetch(SERVER + '/config-tsp', {
