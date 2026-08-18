@@ -1929,6 +1929,25 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
   <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🔁 Radar — repetição e piso de desconto</p>
+    <div class="aviso" style="margin-bottom:12px">
+      Vale para <b>todas as lojas</b> do radar (Amazon, Mercado Livre, Shopee, Magalu e Awin).
+      A não repetição é por <b>produto</b>, não por grupo: se três grupos-fonte postarem o mesmo item,
+      ele é publicado uma vez só dentro da janela. <b>Exceção:</b> se o preço cair mais de 5% em relação
+      à última publicação, o produto sai de novo. O piso de desconto só é aplicado quando a loja
+      expõe um preço "De" confiável.
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Não repetir produto por <span class="tag">horas</span></label>
+        <input type="number" id="rd-dedup" min="1" max="720" step="1" value="24"/></div>
+      <div class="field"><label>Desconto mínimo <span class="tag">%</span></label>
+        <input type="number" id="rd-mindesc" min="0" max="99" step="1" value="5"/></div>
+    </div>
+    <button class="btn" id="rd-btn" onclick="rdSalvar()">Salvar regras do radar</button>
+    <p class="send-ok" id="rd-status"></p>
+  </div>
+
+  <div class="card">
     <p class="card-title" style="margin-bottom:8px">🔒 Sessão</p>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
       Conectado como <b id="cfg-email-logado">—</b>. O acesso vale por 24h neste dispositivo.
@@ -4911,6 +4930,52 @@ function cfgAbrir() {
   // Nao depende mais da lista de grupos: os papeis sairam desta aba.
   cfgCarregarServidor().then(cfgPreencher);
   awinCarregar();
+  rdCarregar();
+}
+
+/* ══════ RADAR — DEDUP E PISO DE DESCONTO ══════ */
+// Vivem no radar_config.json do servidor (/mkt/config), junto do espacamento
+// entre grupos. Nada de copia local: sao regras de operacao e precisam valer
+// igual em qualquer device.
+function rdCarregar() {
+  fetch(SERVER + '/mkt/config', { signal: AbortSignal.timeout(8000) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) return;
+      var dd = document.getElementById('rd-dedup');
+      var md = document.getElementById('rd-mindesc');
+      if (dd) dd.value = (d.dedupHoras != null ? d.dedupHoras : 24);
+      if (md) md.value = (d.descontoMinimo != null ? d.descontoMinimo : 5);
+    })
+    .catch(function(){});
+}
+
+function rdSalvar() {
+  var btn = document.getElementById('rd-btn');
+  var st  = document.getElementById('rd-status');
+  var horas = Number(document.getElementById('rd-dedup').value);
+  var minD  = Number(document.getElementById('rd-mindesc').value);
+  if (!isFinite(horas) || horas < 1) {
+    st.className = 'send-ok send-err'; st.textContent = 'A janela precisa ser de pelo menos 1 hora.';
+    return;
+  }
+  if (!isFinite(minD) || minD < 0) {
+    st.className = 'send-ok send-err'; st.textContent = 'O desconto mínimo não pode ser negativo.';
+    return;
+  }
+  btn.disabled = true; st.className = 'send-ok'; st.textContent = 'Salvando...';
+  fetch(SERVER + '/mkt/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dedupHoras: horas, descontoMinimo: minD })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    st.textContent = '✓ Mesmo produto não repete por ' + horas + 'h · desconto mínimo de ' + minD + '%.';
+    rdCarregar();
+  })
+  .catch(function(e){ st.className = 'send-ok send-err'; st.textContent = 'Não salvou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
 }
 
 // ── AWIN ─────────────────────────────────────────────────────────────────────
