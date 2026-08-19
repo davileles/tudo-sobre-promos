@@ -2405,6 +2405,102 @@ body.travado > *:not(#login-screen){display:none !important}
     <div id="mp-simulacao" style="margin-top:12px"></div>
   </div>
 
+  <!-- ─── Desempenho real (EPC) ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Desempenho real &mdash; ganho por clique</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Ordenar produto por <b>unidades vendidas</b> premia item barato de giro alto e esconde o que paga.
+      O que decide se vale gastar um post &eacute; o <b>ganho por clique (EPC)</b>.
+      Este ledger vem do relat&oacute;rio de produtos vinculados da Amazon e cobre <b>tudo</b> que o p&uacute;blico
+      comprou entrando pelos nossos links &mdash; inclusive o que <b>nunca foi divulgado</b> e entrou por venda
+      indireta. Convers&atilde;o acima de 100% &eacute; exatamente isso: demanda comprovada sem gastar um post.
+    </div>
+    <div id="mp-epc-resumo"><div class="dv-vazio">Carregando&hellip;</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Semear a vitrine automaticamente</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Cadastra na vitrine, sozinho, o ASIN que j&aacute; provou que converte. <b>Semear n&atilde;o &eacute; publicar</b>:
+      o produto entra e passa a ser vigiado como qualquer outro, sujeito &agrave; mesma regra de disparo.
+      O teto conta apenas o que este mecanismo cadastrou &mdash; produto colado &agrave; m&atilde;o n&atilde;o consome a cota.
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Semeadura autom&aacute;tica</label>
+        <select id="mp-sem-ativo">
+          <option value="0">Desligada &mdash; s&oacute; pelo bot&atilde;o</option>
+          <option value="1">Ligada &mdash; a cada varredura</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>EPC m&iacute;nimo <span class="tag">R$ por clique</span></label>
+        <input type="number" id="mp-sem-epcmin" min="0" max="1000" step="0.05"/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Cliques m&iacute;nimos <span class="tag" style="text-transform:none">amostra</span></label>
+        <input type="number" id="mp-sem-cliques" min="1" max="100000"/>
+      </div>
+      <div class="field">
+        <label>Teto de produtos semeados</label>
+        <input type="number" id="mp-sem-max" min="0" max="5000"/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>M&aacute;ximo por rodada</label>
+        <input type="number" id="mp-sem-rodada" min="1" max="500"/>
+      </div>
+      <div class="field"></div>
+    </div>
+
+    <div class="card-title" style="font-size:12px;margin:16px 0 8px">Peso do desempenho na fila</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Peso do EPC no score <span class="tag" style="text-transform:none">0 = ignora</span></label>
+        <input type="number" id="mp-sc-peso" min="0" max="100" step="0.5"/>
+      </div>
+      <div class="field">
+        <label>Vetar abaixo de <span class="tag">R$ por clique</span></label>
+        <input type="number" id="mp-sc-veto" min="0" max="1000" step="0.05"/>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="field">
+        <label>Cliques para o veto valer <span class="tag" style="text-transform:none">amostra m&iacute;nima</span></label>
+        <input type="number" id="mp-sc-vetocliques" min="0" max="100000"/>
+      </div>
+      <div class="field"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="mpSemearPrevia()">👁️ Ver o que entraria</button>
+      <button class="btn btn-sm" style="margin-top:0" onclick="mpSemear()">🌱 Semear agora</button>
+    </div>
+    <p class="send-ok" id="mp-sem-status"></p>
+    <div id="mp-sem-resultado" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Ranking por ganho por clique</div>
+    <div class="aviso" style="margin-bottom:12px">
+      <b>Fora da vitrine</b> = produto que rende e ainda n&atilde;o est&aacute; sendo vigiado.
+      <b>Vetado</b> = amostra suficiente e EPC abaixo do piso: n&atilde;o dispara nem com desconto fundo.
+      <b>Indireta</b> = convers&atilde;o acima de 100%, comprado sem ter sido divulgado.
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <select id="mp-epc-filtro" onchange="mpRenderEpc()">
+        <option value="todos">Todos</option>
+        <option value="fora">Fora da vitrine</option>
+        <option value="indireta">S&oacute; venda indireta</option>
+        <option value="vetados">S&oacute; vetados</option>
+      </select>
+    </div>
+    <div id="mp-epc-ranking"><div class="dv-vazio">Carregando&hellip;</div></div>
+  </div>
+
   <!-- ─── Fila de candidatos ─── -->
   <div class="card">
     <div class="card-title" style="margin-bottom:6px">Fila de candidatos <span class="tag" id="mp-fila-badge">0</span></div>
@@ -9854,6 +9950,7 @@ function sairDaConta(){
 
 var MP_ESTADO = null;
 var MP_PRODUTOS = [];
+var MP_EPC = [];
 
 // Campos da regra na ordem em que fazem sentido para quem calibra: primeiro o
 // que define "é oferta?", depois os limites de preço, depois o cooldown.
@@ -9942,6 +10039,13 @@ function mpCarregar() {
       // Nicho novo descoberto na lista de produtos precisa aparecer nas cotas.
       mpRenderCotas();
       mpRenderRegras();
+      return fetch(SERVER + '/monitor-precos/epc?limite=250');
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      MP_EPC = d.ranking || [];
+      mpRenderEpcResumo(d.estado || {});
+      mpRenderEpc();
     })
     .catch(function(e){ mpStatus('mp-status', 'Erro: ' + e.message, true); });
 }
@@ -10012,6 +10116,16 @@ function mpPreencherConfig() {
   var j = (c.publicacao.janelas || [])[0] || { inicio:'08:00', fim:'21:00' };
   document.getElementById('mp-janela-inicio').value = j.inicio;
   document.getElementById('mp-janela-fim').value = j.fim;
+
+  var dz = c.desempenho || { semear:{}, score:{} };
+  document.getElementById('mp-sem-ativo').value = dz.semear.ativo ? '1' : '0';
+  document.getElementById('mp-sem-epcmin').value = dz.semear.epcMin;
+  document.getElementById('mp-sem-cliques').value = dz.semear.cliquesMin;
+  document.getElementById('mp-sem-max').value = dz.semear.maximo;
+  document.getElementById('mp-sem-rodada').value = dz.semear.porRodada;
+  document.getElementById('mp-sc-peso').value = dz.score.pesoEpc;
+  document.getElementById('mp-sc-veto').value = dz.score.epcVeto;
+  document.getElementById('mp-sc-vetocliques').value = dz.score.cliquesParaVeto;
 
   var lojas = mpLojas();
   document.getElementById('mp-lojas').innerHTML = lojas.map(function(l){
@@ -10147,6 +10261,20 @@ function mpColetarConfig() {
       aplicarCupom: document.getElementById('mp-cupom').value === '1',
       cotaPorLoja: cotaLoja,
       cotaPorNicho: cotaNicho,
+    },
+    desempenho: {
+      semear: {
+        ativo: document.getElementById('mp-sem-ativo').value === '1',
+        epcMin: Number(document.getElementById('mp-sem-epcmin').value),
+        cliquesMin: Number(document.getElementById('mp-sem-cliques').value),
+        maximo: Number(document.getElementById('mp-sem-max').value),
+        porRodada: Number(document.getElementById('mp-sem-rodada').value),
+      },
+      score: {
+        pesoEpc: Number(document.getElementById('mp-sc-peso').value),
+        epcVeto: Number(document.getElementById('mp-sc-veto').value),
+        cliquesParaVeto: Number(document.getElementById('mp-sc-vetocliques').value),
+      },
     },
     regras: { padrao: padrao, porNicho: porNicho },
   };
@@ -10296,6 +10424,119 @@ function mpRenderProdutos() {
   h += '</table>';
   if (lista.length > 300) h += '<div class="dv-vazio">Mostrando 300 de ' + lista.length + '.</div>';
   document.getElementById('mp-produtos').innerHTML = h;
+}
+
+// ── DESEMPENHO REAL (EPC) ────────────────────────────────────────────────────
+function mpRenderEpcResumo(est) {
+  var el = document.getElementById('mp-epc-resumo');
+  if (!est.disponivel) {
+    el.innerHTML = '<div class="dv-vazio">O ledger ainda est&aacute; vazio. Ele &eacute; preenchido pelo coletor '
+      + '(GitHub Actions), que acumula um dia por rodada. Sem ele, o peso e o veto de EPC ficam inertes '
+      + 'e o monitor funciona normalmente pela queda de pre&ccedil;o.</div>';
+    return;
+  }
+  var t = est.totais || {};
+  var h = '<table class="dv-tab">';
+  h += '<tr><td>Produtos no ledger</td><td class="dv-td-n">' + (est.produtos || 0) + '</td></tr>';
+  h += '<tr><td>Janela</td><td class="dv-td-n">' + (est.janelaDias || '—') + ' dias</td></tr>';
+  h += '<tr><td>Cliques</td><td class="dv-td-n">' + (t.cliques || 0).toLocaleString('pt-BR') + '</td></tr>';
+  h += '<tr><td>Pedidos</td><td class="dv-td-n">' + (t.pedidos || 0).toLocaleString('pt-BR') + '</td></tr>';
+  h += '<tr><td>Comiss&atilde;o</td><td class="dv-td-n">' + mpFmtR(t.comissao) + '</td></tr>';
+  h += '<tr><td>EPC m&eacute;dio</td><td class="dv-td-n"><b>' + mpFmtR(t.epc) + '</b> por clique</td></tr>';
+  h += '<tr><td>J&aacute; semeados na vitrine</td><td class="dv-td-n">' + (MP_ESTADO.semeados || 0) + '</td></tr>';
+  h += '<tr><td>Atualizado em</td><td class="dv-td-n">' + mpFmtData(est.atualizadoEm) + '</td></tr>';
+  h += '</table>';
+  el.innerHTML = h;
+}
+
+function mpRenderEpc() {
+  var f = document.getElementById('mp-epc-filtro').value;
+  var lista = MP_EPC.filter(function(p){
+    if (f === 'fora') return !p.naVitrine;
+    if (f === 'indireta') return p.indireta;
+    if (f === 'vetados') return p.vetado;
+    return true;
+  });
+  var el = document.getElementById('mp-epc-ranking');
+  if (!lista.length) { el.innerHTML = '<div class="dv-vazio">Nenhum produto neste filtro.</div>'; return; }
+
+  var h = '<table class="dv-tab">';
+  lista.slice(0, 150).forEach(function(p){
+    var selos = [];
+    if (p.naVitrine) selos.push('<span style="color:#22c55e">na vitrine</span>');
+    else selos.push('<span style="color:#f59e0b">fora da vitrine</span>');
+    if (p.indireta) selos.push('<span style="color:#60a5fa">indireta</span>');
+    if (p.vetado) selos.push('<span style="color:#ef4444">vetado</span>');
+    h += '<tr><td style="padding-right:10px"><b>' + mpEsc((p.nome || p.asin).slice(0, 58)) + '</b><br>'
+      + '<span style="color:var(--muted);font-size:11px">' + mpEsc(p.categoria || 'sem categoria')
+      + ' &middot; ' + p.cliques + ' cliques &middot; ' + p.pedidos + ' pedidos'
+      + (p.conversao != null ? ' &middot; conv ' + p.conversao + '%' : '')
+      + ' &middot; ' + selos.join(' &middot; ') + '</span></td>'
+      + '<td class="dv-td-n" style="white-space:nowrap"><b>' + mpFmtR(p.epc) + '</b>/clique'
+      + '<br><span style="color:var(--muted);font-size:11px">' + mpFmtR(p.comissao) + ' total</span></td></tr>';
+  });
+  h += '</table>';
+  if (lista.length > 150) h += '<div class="dv-vazio">Mostrando 150 de ' + lista.length + '.</div>';
+  el.innerHTML = h;
+}
+
+// Previa e semeadura compartilham o render: a unica diferenca e se cadastrou.
+function mpRenderSemeadura(d, foiPrevia) {
+  var el = document.getElementById('mp-sem-resultado');
+  if (d.erro) { el.innerHTML = '<div class="dv-vazio">' + mpEsc(d.erro) + '</div>'; return; }
+
+  var h = '<div class="aviso" style="margin-bottom:10px">'
+    + (foiPrevia ? '<b>Pr&eacute;via</b> &mdash; nada foi cadastrado. ' : '<b>' + d.cadastrados.length
+       + ' produto(s) cadastrado(s)</b> na vitrine. ')
+    + d.candidatos + ' candidato(s) avaliado(s), ' + d.jaNaVitrine + ' j&aacute; estavam na vitrine.'
+    + (d.tetoAtingido ? ' <b>Teto atingido.</b>' : '') + '</div>';
+
+  if (d.cadastrados.length) {
+    h += '<table class="dv-tab">';
+    d.cadastrados.forEach(function(p){
+      h += '<tr><td>' + mpEsc((p.nome || p.asin).slice(0, 55)) + '<br>'
+        + '<span style="color:var(--muted);font-size:11px">' + p.cliques + ' cliques'
+        + (p.conversao != null ? ' &middot; conv ' + p.conversao + '%' : '') + '</span></td>'
+        + '<td class="dv-td-n">' + mpFmtR(p.epc) + '/clique<br>'
+        + '<span style="color:var(--muted);font-size:11px">' + mpFmtR(p.comissao) + '</span></td></tr>';
+    });
+    h += '</table>';
+  }
+  var mot = Object.keys(d.ignorados || {});
+  if (mot.length) {
+    h += '<div class="card-title" style="font-size:12px;margin:14px 0 6px">N&atilde;o entraram</div><table class="dv-tab">';
+    mot.sort(function(a,b){ return d.ignorados[b] - d.ignorados[a]; }).forEach(function(m){
+      h += '<tr><td>' + mpEsc(m) + '</td><td class="dv-td-n">' + d.ignorados[m] + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  el.innerHTML = h;
+}
+
+function mpSemearPrevia() {
+  mpStatus('mp-sem-status', 'Calculando...');
+  fetch(SERVER + '/monitor-precos/semear/previa', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      mpStatus('mp-sem-status', '');
+      mpRenderSemeadura(d, true);
+    })
+    .catch(function(e){ mpStatus('mp-sem-status', 'Erro: ' + e.message, true); });
+}
+
+function mpSemear() {
+  if (!confirm('Cadastrar os produtos elegiveis na vitrine? Eles passarao a ser monitorados (nao serao publicados).')) return;
+  mpStatus('mp-sem-status', 'Semeando...');
+  fetch(SERVER + '/monitor-precos/semear', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      mpStatus('mp-sem-status', '\u2713 ' + d.cadastrados.length + ' produto(s) cadastrado(s).');
+      mpRenderSemeadura(d, false);
+      return mpCarregar();
+    })
+    .catch(function(e){ mpStatus('mp-sem-status', 'Erro: ' + e.message, true); });
 }
 
 // ── HISTÓRICO ────────────────────────────────────────────────────────────────
