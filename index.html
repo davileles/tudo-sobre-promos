@@ -782,6 +782,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
   <div class="side-group">Cadastros</div>
   <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine e disparos</button>
+  <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
@@ -2280,6 +2281,160 @@ body.travado > *:not(#login-screen){display:none !important}
   <p class="send-ok" id="rod-status"></p>
 </div>
 
+<!-- ════════ MONITOR DE PREÇOS ════════ -->
+<div class="panel" id="panel-monprecos">
+  <div class="aviso">
+    O monitor lê o preço dos produtos da <b>Vitrine</b> (Shopee e Mercado Livre) de tempos em tempos e guarda a série.
+    O gatilho <b>não usa o desconto que a loja anuncia</b> — usa a queda contra a <b>mediana dos últimos 30 dias</b> do
+    próprio histórico, e opcionalmente exige que o preço esteja no <b>menor patamar de 90 dias</b>.
+    Enquanto a série não amadurece, o produto não dispara.<br>
+    Detecção e publicação são <b>separadas</b>: a varredura empilha candidatos, o publicador solta um por vez
+    respeitando janela, intervalo e cota — é isso que dá cadência mesmo num dia sem quedas.
+  </div>
+
+  <!-- ─── Situação ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Situação</div>
+    <div id="mp-resumo" class="mp-resumo"><div class="dv-vazio">Carregando…</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="mpCarregar()">🔄 Atualizar</button>
+      <button class="btn btn-sm" style="margin-top:0" onclick="mpVarrer()">🔍 Varrer preços agora</button>
+    </div>
+    <p class="send-ok" id="mp-status"></p>
+  </div>
+
+  <!-- ─── Liga/desliga e cadência ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Funcionamento</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Monitor</label>
+        <select id="mp-ativo">
+          <option value="0">Desligado — não lê preço nem avalia</option>
+          <option value="1">Ligado</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Modo <span class="tag" style="text-transform:none">comece em sombra</span></label>
+        <select id="mp-modo">
+          <option value="off">Off — não avalia</option>
+          <option value="sombra">Sombra — avalia e enfileira, mas NÃO envia</option>
+          <option value="on">On — envia automaticamente</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Reler preços a cada <span class="tag">minutos</span></label>
+        <input type="number" id="mp-intervalo-varredura" min="15" max="720" step="5"/>
+      </div>
+      <div class="field">
+        <label>Intervalo mínimo entre envios <span class="tag">minutos</span></label>
+        <input type="number" id="mp-intervalo-envio" min="1" max="1440" step="5"/>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Publicar das</label><input type="time" id="mp-janela-inicio"/></div>
+      <div class="field"><label>Até</label><input type="time" id="mp-janela-fim"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Lojas monitoradas</label>
+        <div id="mp-lojas" style="display:flex;gap:14px;flex-wrap:wrap;padding-top:6px"></div>
+      </div>
+      <div class="field">
+        <label>Cupom no disparo</label>
+        <select id="mp-cupom">
+          <option value="1">Buscar o melhor cupom aplicável</option>
+          <option value="0">Não aplicar cupom</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="field">
+        <label>Produtos por lote <span class="tag">antes da pausa</span></label>
+        <input type="number" id="mp-lote" min="1" max="100"/>
+      </div>
+      <div class="field">
+        <label>Pausa entre lotes <span class="tag">ms</span></label>
+        <input type="number" id="mp-pausa" min="200" max="20000" step="100"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Cotas diárias ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Cotas diárias</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Teto de envios do monitor por dia. A cota por <b>loja</b> e a cota por <b>nicho</b> valem ao mesmo tempo:
+      o candidato só sai se as duas tiverem vaga. Sem a cota por nicho, o dia inteiro vira o nicho com mais
+      produto cadastrado. Isso <b>não</b> limita os disparos manuais, listas ou radar.
+    </div>
+    <div class="card-title" style="font-size:12px;margin-bottom:8px">Por loja</div>
+    <div id="mp-cota-lojas" class="g2" style="margin-bottom:16px"></div>
+    <div class="card-title" style="font-size:12px;margin-bottom:8px">Por nicho <span class="tag" style="text-transform:none">deixe vazio para não limitar</span></div>
+    <div id="mp-cota-nichos" class="g2"></div>
+  </div>
+
+  <!-- ─── Regras de disparo ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Regra de disparo</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Vale para todos os nichos. Abaixo é possível sobrescrever campo a campo por nicho —
+      campo em branco na sobrescrita significa <b>herda o padrão</b>.
+    </div>
+    <div id="mp-regra-padrao"></div>
+
+    <div class="card-title" style="font-size:12px;margin:18px 0 8px">Sobrescrita por nicho</div>
+    <div id="mp-regras-nicho"></div>
+  </div>
+
+  <button class="btn" id="mp-btn-salvar" onclick="mpSalvar()">💾 Salvar configuração</button>
+  <p class="send-ok" id="mp-salvar-status"></p>
+
+  <!-- ─── Simulação ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Simular com a série já coletada</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Roda as regras <b>atuais da tela</b> em cima do último preço lido de cada produto, sem tocar em rede e sem
+      enviar nada. É como calibrar o limiar sem cobaia no grupo: se passar produto demais, aperte; se não passar
+      nenhum, afrouxe.
+    </div>
+    <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="mpSimular()">🧪 Simular</button>
+    <div id="mp-simulacao" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ─── Fila de candidatos ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Fila de candidatos <span class="tag" id="mp-fila-badge">0</span></div>
+    <div class="aviso" style="margin-bottom:12px">
+      Produtos que passaram na regra e aguardam a vez. Em modo <b>sombra</b> a fila é só relatório —
+      é aqui que se confere, todo dia, se o monitor está achando o que você aprovaria.
+    </div>
+    <div id="mp-fila"><div class="dv-vazio">Carregando…</div></div>
+  </div>
+
+  <!-- ─── Monitorados ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Produtos monitorados</div>
+    <div class="aviso" style="margin-bottom:12px">
+      Todo produto da Vitrine nas lojas monitoradas. <b>Dias</b> é o tamanho da série — abaixo da maturidade
+      mínima o produto ainda não pode disparar. Para incluir ou remover produtos, use a aba
+      <b>Vitrine e disparos</b>.
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <input type="text" id="mp-busca" placeholder="Filtrar por nome, loja ou nicho…" oninput="mpRenderProdutos()"/>
+    </div>
+    <div id="mp-produtos"><div class="dv-vazio">Carregando…</div></div>
+  </div>
+
+  <!-- ─── Histórico ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">Últimos disparos do monitor</div>
+    <div id="mp-historico"><div class="dv-vazio">Nenhum disparo ainda.</div></div>
+  </div>
+</div>
+
 <!-- ════════ BASE DE CUPONS ════════ -->
 <div class="panel" id="panel-cupons">
 
@@ -2396,7 +2551,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
+var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2430,6 +2585,7 @@ function switchTab(name) {
       .then(carregarListas)
       .then(carregarAwinCand);
   }
+  if (name === 'monprecos') mpCarregar();
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') cfgAbrir();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
@@ -9689,6 +9845,468 @@ function sairDaConta(){
     if (el) el.textContent = s.email || '';
   }
 })();
+
+
+// ── MONITOR DE PREÇOS ────────────────────────────────────────────────────────
+// Toda a configuração do monitor mora em tela. Nada aqui guarda regra própria:
+// a tela lê o que o servidor devolve e devolve o que o operador mexeu.
+
+var MP_ESTADO = null;
+var MP_PRODUTOS = [];
+
+// Campos da regra na ordem em que fazem sentido para quem calibra: primeiro o
+// que define "é oferta?", depois os limites de preço, depois o cooldown.
+var MP_CAMPOS_REGRA = [
+  { k:'quedaMinPct',        rot:'Queda mínima (%)',            dica:'contra a mediana de 30 dias', min:0,  max:95,  step:1 },
+  { k:'quedaMinReais',      rot:'Queda mínima (R$)',           dica:'30% de R$ 40 não move ninguém', min:0, max:100000, step:1 },
+  { k:'exigirMinimo90d',    rot:'Só no menor preço de 90 dias', tipo:'bool' },
+  { k:'toleranciaMinimoPct',rot:'Tolerância do mínimo (%)',    dica:'empatar com o mínimo conta como mínimo', min:0, max:30, step:0.5 },
+  { k:'maturidadeMinDias',  rot:'Maturidade mínima (dias)',    dica:'tamanho mínimo da série', min:0, max:365, step:1 },
+  { k:'precoMin',           rot:'Preço mínimo (R$)',           min:0, max:1000000, step:1 },
+  { k:'precoMax',           rot:'Preço máximo (R$)',           min:0, max:1000000, step:1 },
+  { k:'reenvioMinDias',     rot:'Não repetir por (dias)',      dica:'cooldown do mesmo produto', min:0, max:365, step:1 },
+  { k:'exigirDisponivel',   rot:'Só se estiver disponível',    tipo:'bool' },
+];
+
+// 'geral' não é categoria da taxonomia: é a ausência de categoria confiável,
+// mesmo critério que o roteamento por trilha já usa.
+var MP_NICHOS_BASE = ['geral', 'bebidas', 'infantil'];
+
+function mpFmtR(v) {
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  return 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+}
+function mpFmtData(iso) {
+  if (!iso) return '—';
+  try {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Sao_Paulo', day:'2-digit', month:'2-digit',
+      hour:'2-digit', minute:'2-digit', hour12:false }).format(new Date(iso));
+  } catch (e) { return '—'; }
+}
+function mpEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+  });
+}
+function mpStatus(id, txt, erro) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'send-ok' + (erro ? ' send-err' : '');
+  el.textContent = txt;
+  if (txt) setTimeout(function(){ if (el.textContent === txt) el.textContent = ''; }, 6000);
+}
+
+// Nichos oferecidos na tela: os da taxonomia carregada + os que já têm cota ou
+// regra gravada. Assim uma categoria nova criada na aba Categorias aparece aqui
+// sem precisar de deploy.
+function mpNichos() {
+  var s = {};
+  MP_NICHOS_BASE.forEach(function(n){ s[n] = 1; });
+  if (MP_ESTADO) {
+    Object.keys(MP_ESTADO.config.publicacao.cotaPorNicho || {}).forEach(function(n){ s[n] = 1; });
+    Object.keys(MP_ESTADO.config.regras.porNicho || {}).forEach(function(n){ s[n] = 1; });
+  }
+  (MP_PRODUTOS || []).forEach(function(p){ if (p.nicho) s[p.nicho] = 1; });
+  return Object.keys(s).sort();
+}
+
+// ── CARGA ────────────────────────────────────────────────────────────────────
+function mpCarregar() {
+  return fetch(SERVER + '/monitor-precos')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      MP_ESTADO = d;
+      mpRenderResumo();
+      mpPreencherConfig();
+      mpRenderFila();
+      mpRenderHistorico();
+      return fetch(SERVER + '/monitor-precos/produtos');
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      MP_PRODUTOS = d.produtos || [];
+      mpRenderProdutos();
+      // Nicho novo descoberto na lista de produtos precisa aparecer nas cotas.
+      mpRenderCotas();
+      mpRenderRegras();
+    })
+    .catch(function(e){ mpStatus('mp-status', 'Erro: ' + e.message, true); });
+}
+
+function mpRenderResumo() {
+  var d = MP_ESTADO, c = d.config;
+  var estado = !c.ativo ? '<span style="color:var(--muted)">Desligado</span>'
+    : c.modo === 'on' ? '<b style="color:#22c55e">Enviando</b>'
+    : c.modo === 'sombra' ? '<b style="color:#f59e0b">Sombra (não envia)</b>'
+    : '<span style="color:var(--muted)">Off</span>';
+
+  var uv = d.ultimaVarredura;
+  var cotasTxt = Object.keys(d.limites.porLoja || {}).map(function(l){
+    return mpEsc(l) + ' ' + ((d.cotas.porLoja || {})[l] || 0) + '/' + d.limites.porLoja[l];
+  }).join(' · ') || '—';
+  var cotasN = Object.keys(d.limites.porNicho || {}).map(function(n){
+    return mpEsc(n) + ' ' + ((d.cotas.porNicho || {})[n] || 0) + '/' + d.limites.porNicho[n];
+  }).join(' · ') || '—';
+
+  var h = '<table class="dv-tab">';
+  h += '<tr><td>Estado</td><td class="dv-td-n">' + estado + '</td></tr>';
+  h += '<tr><td>Produtos monitorados</td><td class="dv-td-n">' + d.monitorados + '</td></tr>';
+  h += '<tr><td>Com série de preço</td><td class="dv-td-n">' + d.comSerie + '</td></tr>';
+  h += '<tr><td>Série já madura</td><td class="dv-td-n">' + d.maduros + '</td></tr>';
+  h += '<tr><td>Candidatos na fila</td><td class="dv-td-n">' + (d.fila || []).length + '</td></tr>';
+  h += '<tr><td>Cota usada hoje — lojas</td><td class="dv-td-n">' + cotasTxt + '</td></tr>';
+  h += '<tr><td>Cota usada hoje — nichos</td><td class="dv-td-n">' + cotasN + '</td></tr>';
+  h += '<tr><td>Dentro da janela agora</td><td class="dv-td-n">' + (d.dentroDaJanela ? 'sim' : 'não') + '</td></tr>';
+  h += '<tr><td>Último envio</td><td class="dv-td-n">' + (d.ultimoEnvioEm ? mpFmtData(new Date(d.ultimoEnvioEm).toISOString()) : '—') + '</td></tr>';
+  if (uv) {
+    h += '<tr><td>Última varredura</td><td class="dv-td-n">' + mpFmtData(uv.em) + ' · ' + uv.lidos
+       + ' lido(s), ' + uv.candidatos + ' candidato(s), ' + uv.falhas + ' falha(s) em ' + uv.duracaoSeg + 's</td></tr>';
+  }
+  h += '</table>';
+
+  // Motivos de reprovação da última varredura: é o diagnóstico mais útil da
+  // tela — diz por que a fila está vazia sem precisar abrir log.
+  if (uv && uv.porMotivo && Object.keys(uv.porMotivo).length) {
+    h += '<div class="card-title" style="font-size:12px;margin:14px 0 6px">Por que os demais não passaram</div>';
+    h += '<table class="dv-tab">';
+    Object.keys(uv.porMotivo).sort(function(a,b){ return uv.porMotivo[b] - uv.porMotivo[a]; })
+      .forEach(function(m){
+        h += '<tr><td>' + mpEsc(m) + '</td><td class="dv-td-n">' + uv.porMotivo[m] + '</td></tr>';
+      });
+    h += '</table>';
+  }
+  if (uv && uv.erros && uv.erros.length) {
+    h += '<div class="card-title" style="font-size:12px;margin:14px 0 6px">Falhas de leitura</div><table class="dv-tab">';
+    uv.erros.forEach(function(e){
+      h += '<tr><td>' + mpEsc((e.nome || e.asin || '').slice(0, 60)) + '</td><td class="dv-td-n" style="font-weight:500;color:var(--muted)">'
+         + mpEsc(e.erro) + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  document.getElementById('mp-resumo').innerHTML = h;
+}
+
+// ── CONFIG NA TELA ───────────────────────────────────────────────────────────
+function mpPreencherConfig() {
+  var c = MP_ESTADO.config;
+  document.getElementById('mp-ativo').value = c.ativo ? '1' : '0';
+  document.getElementById('mp-modo').value = c.modo;
+  document.getElementById('mp-intervalo-varredura').value = c.varredura.intervaloMin;
+  document.getElementById('mp-intervalo-envio').value = c.publicacao.intervaloMin;
+  document.getElementById('mp-lote').value = c.varredura.lote;
+  document.getElementById('mp-pausa').value = c.varredura.pausaMs;
+  document.getElementById('mp-cupom').value = c.publicacao.aplicarCupom ? '1' : '0';
+  var j = (c.publicacao.janelas || [])[0] || { inicio:'08:00', fim:'21:00' };
+  document.getElementById('mp-janela-inicio').value = j.inicio;
+  document.getElementById('mp-janela-fim').value = j.fim;
+
+  var lojas = MP_ESTADO.lojasDisponiveis || [];
+  document.getElementById('mp-lojas').innerHTML = lojas.map(function(l){
+    var on = (c.varredura.lojas || []).indexOf(l) >= 0;
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">'
+      + '<input type="checkbox" class="mp-loja-chk" value="' + mpEsc(l) + '"' + (on ? ' checked' : '') + '/>'
+      + mpEsc(l) + '</label>';
+  }).join('');
+}
+
+function mpRenderCotas() {
+  var c = MP_ESTADO.config;
+  var lojas = MP_ESTADO.lojasDisponiveis || [];
+  document.getElementById('mp-cota-lojas').innerHTML = lojas.map(function(l){
+    var v = (c.publicacao.cotaPorLoja || {})[l];
+    return '<div class="field"><label>' + mpEsc(l) + ' <span class="tag">por dia</span></label>'
+      + '<input type="number" min="0" max="500" class="mp-cota-loja" data-loja="' + mpEsc(l) + '" value="'
+      + (v === undefined ? '' : v) + '"/></div>';
+  }).join('');
+
+  document.getElementById('mp-cota-nichos').innerHTML = mpNichos().map(function(n){
+    var v = (c.publicacao.cotaPorNicho || {})[n];
+    return '<div class="field"><label>' + mpEsc(n) + ' <span class="tag">por dia</span></label>'
+      + '<input type="number" min="0" max="500" class="mp-cota-nicho" data-nicho="' + mpEsc(n) + '" value="'
+      + (v === undefined ? '' : v) + '"/></div>';
+  }).join('');
+}
+
+function mpCampoRegra(campo, valor, prefixo, herdado) {
+  var id = prefixo + '-' + campo.k;
+  if (campo.tipo === 'bool') {
+    // Na sobrescrita por nicho o booleano precisa de um terceiro estado
+    // ("herda"), senão marcar/desmarcar viraria sobrescrita silenciosa.
+    var opts = herdado
+      ? '<option value="">Herda o padrão</option><option value="1">Sim</option><option value="0">Não</option>'
+      : '<option value="1">Sim</option><option value="0">Não</option>';
+    var v = (valor === undefined || valor === null) ? '' : (valor ? '1' : '0');
+    return '<div class="field"><label>' + campo.rot + '</label><select id="' + id + '" class="' + prefixo + '-campo" data-campo="'
+      + campo.k + '">' + opts + '</select></div>';
+  }
+  return '<div class="field"><label>' + campo.rot
+    + (campo.dica ? ' <span class="tag" style="text-transform:none">' + campo.dica + '</span>' : '')
+    + '</label><input type="number" id="' + id + '" class="' + prefixo + '-campo" data-campo="' + campo.k
+    + '" min="' + campo.min + '" max="' + campo.max + '" step="' + (campo.step || 1) + '" value="'
+    + (valor === undefined || valor === null ? '' : valor) + '"'
+    + (herdado ? ' placeholder="herda"' : '') + '/></div>';
+}
+
+function mpRenderRegras() {
+  var c = MP_ESTADO.config;
+  var p = c.regras.padrao;
+
+  var h = '<div class="g2">';
+  MP_CAMPOS_REGRA.forEach(function(campo){ h += mpCampoRegra(campo, p[campo.k], 'mpr', false); });
+  h += '</div>';
+  document.getElementById('mp-regra-padrao').innerHTML = h;
+  // Select não aceita value pelo atributo montado acima quando o valor é '0'.
+  MP_CAMPOS_REGRA.forEach(function(campo){
+    if (campo.tipo !== 'bool') return;
+    document.getElementById('mpr-' + campo.k).value = p[campo.k] ? '1' : '0';
+  });
+
+  var nichos = mpNichos();
+  var hn = '';
+  nichos.forEach(function(n){
+    var r = (c.regras.porNicho || {})[n] || {};
+    hn += '<div class="card" style="margin-bottom:10px"><div class="card-title" style="font-size:12px;margin-bottom:10px">'
+        + mpEsc(n) + '</div><div class="g2" data-nicho-bloco="' + mpEsc(n) + '">';
+    MP_CAMPOS_REGRA.forEach(function(campo){
+      hn += mpCampoRegra(campo, r[campo.k], 'mpn-' + n, true);
+    });
+    hn += '</div></div>';
+  });
+  document.getElementById('mp-regras-nicho').innerHTML = hn;
+  nichos.forEach(function(n){
+    var r = (c.regras.porNicho || {})[n] || {};
+    MP_CAMPOS_REGRA.forEach(function(campo){
+      if (campo.tipo !== 'bool') return;
+      var el = document.getElementById('mpn-' + n + '-' + campo.k);
+      if (el) el.value = (r[campo.k] === undefined || r[campo.k] === null) ? '' : (r[campo.k] ? '1' : '0');
+    });
+  });
+}
+
+// Lê a tela e monta o payload. Campo vazio numa sobrescrita de nicho não entra
+// no objeto — é assim que o backend distingue "herda" de "vale zero".
+function mpColetarConfig() {
+  var lojas = [];
+  document.querySelectorAll('.mp-loja-chk').forEach(function(el){ if (el.checked) lojas.push(el.value); });
+
+  var cotaLoja = {};
+  document.querySelectorAll('.mp-cota-loja').forEach(function(el){
+    if (el.value !== '') cotaLoja[el.dataset.loja] = Number(el.value);
+  });
+  var cotaNicho = {};
+  document.querySelectorAll('.mp-cota-nicho').forEach(function(el){
+    if (el.value !== '') cotaNicho[el.dataset.nicho] = Number(el.value);
+  });
+
+  var padrao = {};
+  MP_CAMPOS_REGRA.forEach(function(campo){
+    var el = document.getElementById('mpr-' + campo.k);
+    if (!el) return;
+    if (campo.tipo === 'bool') padrao[campo.k] = el.value === '1';
+    else if (el.value !== '') padrao[campo.k] = Number(el.value);
+  });
+
+  var porNicho = {};
+  mpNichos().forEach(function(n){
+    var parcial = {};
+    MP_CAMPOS_REGRA.forEach(function(campo){
+      var el = document.getElementById('mpn-' + n + '-' + campo.k);
+      if (!el || el.value === '') return;
+      if (campo.tipo === 'bool') parcial[campo.k] = el.value === '1';
+      else parcial[campo.k] = Number(el.value);
+    });
+    if (Object.keys(parcial).length) porNicho[n] = parcial;
+  });
+
+  return {
+    ativo: document.getElementById('mp-ativo').value === '1',
+    modo: document.getElementById('mp-modo').value,
+    varredura: {
+      intervaloMin: Number(document.getElementById('mp-intervalo-varredura').value),
+      lote: Number(document.getElementById('mp-lote').value),
+      pausaMs: Number(document.getElementById('mp-pausa').value),
+      lojas: lojas,
+    },
+    publicacao: {
+      janelas: [{ inicio: document.getElementById('mp-janela-inicio').value,
+                  fim: document.getElementById('mp-janela-fim').value }],
+      intervaloMin: Number(document.getElementById('mp-intervalo-envio').value),
+      aplicarCupom: document.getElementById('mp-cupom').value === '1',
+      cotaPorLoja: cotaLoja,
+      cotaPorNicho: cotaNicho,
+    },
+    regras: { padrao: padrao, porNicho: porNicho },
+  };
+}
+
+function mpSalvar() {
+  var btn = document.getElementById('mp-btn-salvar');
+  btn.disabled = true;
+  var cfg = mpColetarConfig();
+  if (cfg.modo === 'on' && cfg.ativo && !confirm('O monitor passará a ENVIAR ofertas automaticamente nos grupos. Confirma?')) {
+    btn.disabled = false; return;
+  }
+  fetch(SERVER + '/monitor-precos/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      MP_ESTADO.config = d.config;
+      mpStatus('mp-salvar-status', '✓ Configuração salva.');
+      return mpCarregar();
+    })
+    .catch(function(e){ mpStatus('mp-salvar-status', 'Erro: ' + e.message, true); })
+    .then(function(){ btn.disabled = false; });
+}
+
+// ── VARREDURA / SIMULAÇÃO ────────────────────────────────────────────────────
+function mpVarrer() {
+  mpStatus('mp-status', 'Lendo preços… isso pode levar alguns minutos.');
+  fetch(SERVER + '/monitor-precos/varrer', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      mpStatus('mp-status', '✓ ' + d.lidos + ' preço(s) lido(s), ' + d.candidatos + ' candidato(s), '
+        + d.falhas + ' falha(s).');
+      return mpCarregar();
+    })
+    .catch(function(e){ mpStatus('mp-status', 'Erro: ' + e.message, true); });
+}
+
+function mpSimular() {
+  var cfg = mpColetarConfig();
+  fetch(SERVER + '/monitor-precos/simular', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ regras: cfg.regras }),
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      var h = '<div class="aviso" style="margin-bottom:10px">Com estas regras, <b>' + d.passaram.length
+        + '</b> de <b>' + d.total + '</b> produto(s) com série passariam agora.</div>';
+      if (d.passaram.length) {
+        h += '<table class="dv-tab">';
+        d.passaram.slice(0, 40).forEach(function(p){
+          h += '<tr><td>' + mpEsc((p.nome || p.asin).slice(0, 55)) + '<br><span style="color:var(--muted);font-size:11px">'
+            + mpEsc(p.loja) + ' · ' + mpEsc(p.nicho) + (p.recorde ? ' · menor de 90d' : '') + '</span></td>'
+            + '<td class="dv-td-n">' + mpFmtR(p.preco) + '<br><span style="color:#22c55e;font-size:11px">-'
+            + p.quedaPct + '%</span></td></tr>';
+        });
+        h += '</table>';
+      }
+      var motivos = Object.keys(d.reprovados || {});
+      if (motivos.length) {
+        h += '<div class="card-title" style="font-size:12px;margin:14px 0 6px">Reprovados</div><table class="dv-tab">';
+        motivos.sort(function(a,b){ return d.reprovados[b] - d.reprovados[a]; }).forEach(function(m){
+          h += '<tr><td>' + mpEsc(m) + '</td><td class="dv-td-n">' + d.reprovados[m] + '</td></tr>';
+        });
+        h += '</table>';
+      }
+      document.getElementById('mp-simulacao').innerHTML = h;
+    })
+    .catch(function(e){
+      document.getElementById('mp-simulacao').innerHTML = '<div class="dv-vazio">Erro: ' + mpEsc(e.message) + '</div>';
+    });
+}
+
+// ── FILA ─────────────────────────────────────────────────────────────────────
+function mpRenderFila() {
+  var fila = MP_ESTADO.fila || [];
+  document.getElementById('mp-fila-badge').textContent = fila.length;
+  if (!fila.length) {
+    document.getElementById('mp-fila').innerHTML = '<div class="dv-vazio">Nenhum candidato no momento.</div>';
+    return;
+  }
+  var h = '<table class="dv-tab">';
+  fila.forEach(function(f){
+    h += '<tr><td style="padding-right:10px">'
+      + '<b>' + mpEsc((f.nome || f.asin).slice(0, 60)) + '</b><br>'
+      + '<span style="color:var(--muted);font-size:11px">' + mpEsc(f.loja) + ' · ' + mpEsc(f.nicho)
+      + ' · mediana 30d ' + mpFmtR(f.mediana30) + ' · mín 90d ' + mpFmtR(f.min90)
+      + (f.recorde ? ' · <span style="color:#22c55e">menor de 90d</span>' : '')
+      + (f.cupom ? ' · cupom ' + mpEsc(f.cupom) : '') + '</span></td>'
+      + '<td class="dv-td-n" style="white-space:nowrap">' + mpFmtR(f.preco)
+      + '<br><span style="color:#22c55e;font-size:11px">-' + f.quedaPct + '% · score ' + f.score + '</span></td>'
+      + '<td class="dv-td-n" style="white-space:nowrap;padding-left:10px">'
+      + '<button class="btn btn-sm" style="margin:0;padding:4px 8px;font-size:11px" onclick="mpPublicar(\''
+      + mpEsc(f.asin) + '\')">Publicar</button> '
+      + '<button class="btn btn-copy btn-sm" style="margin:0;padding:4px 8px;font-size:11px" onclick="mpDescartar(\''
+      + mpEsc(f.asin) + '\')">Descartar</button></td></tr>';
+  });
+  h += '</table>';
+  document.getElementById('mp-fila').innerHTML = h;
+}
+
+function mpDescartar(asin) {
+  fetch(SERVER + '/monitor-precos/fila/' + encodeURIComponent(asin), { method: 'DELETE' })
+    .then(function(){ return mpCarregar(); });
+}
+
+function mpPublicar(asin) {
+  if (!confirm('Publicar esta oferta agora nos grupos?')) return;
+  mpStatus('mp-status', 'Publicando…');
+  fetch(SERVER + '/monitor-precos/fila/' + encodeURIComponent(asin) + '/publicar', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.motivo || d.erro || 'falha');
+      mpStatus('mp-status', '✓ Enviado em ' + d.grupos + ' grupo(s).');
+      return mpCarregar();
+    })
+    .catch(function(e){ mpStatus('mp-status', 'Erro: ' + e.message, true); });
+}
+
+// ── PRODUTOS ─────────────────────────────────────────────────────────────────
+function mpRenderProdutos() {
+  var q = (document.getElementById('mp-busca').value || '').toLowerCase().trim();
+  var lista = MP_PRODUTOS.filter(function(p){
+    if (!q) return true;
+    return ((p.nome || '') + ' ' + (p.loja || '') + ' ' + (p.nicho || '')).toLowerCase().indexOf(q) >= 0;
+  });
+  if (!lista.length) {
+    document.getElementById('mp-produtos').innerHTML = '<div class="dv-vazio">Nenhum produto.</div>';
+    return;
+  }
+  var minDias = (MP_ESTADO && MP_ESTADO.config.regras.padrao.maturidadeMinDias) || 0;
+  var h = '<table class="dv-tab">';
+  lista.slice(0, 300).forEach(function(p){
+    var cor = p.quedaPct == null ? 'var(--muted)' : (p.quedaPct > 0 ? '#22c55e' : 'var(--muted)');
+    var imaturo = p.dias < minDias;
+    h += '<tr><td style="padding-right:10px"><b>' + mpEsc((p.nome || p.asin).slice(0, 58)) + '</b><br>'
+      + '<span style="color:var(--muted);font-size:11px">' + mpEsc(p.loja) + ' · ' + mpEsc(p.nicho)
+      + ' · ' + p.dias + ' dia(s) de série' + (imaturo ? ' <span style="color:#f59e0b">(imaturo)</span>' : '')
+      + ' · lido ' + mpFmtData(p.lidoEm) + '</span></td>'
+      + '<td class="dv-td-n" style="white-space:nowrap">' + mpFmtR(p.precoAtual)
+      + '<br><span style="color:' + cor + ';font-size:11px">'
+      + (p.quedaPct == null ? '—' : (p.quedaPct > 0 ? '-' + p.quedaPct + '%' : '+' + Math.abs(p.quedaPct) + '%')) + '</span></td>'
+      + '<td class="dv-td-pct" style="white-space:nowrap;width:auto;padding-left:10px">mín ' + mpFmtR(p.min90)
+      + '<br>med ' + mpFmtR(p.mediana30) + '</td></tr>';
+  });
+  h += '</table>';
+  if (lista.length > 300) h += '<div class="dv-vazio">Mostrando 300 de ' + lista.length + '.</div>';
+  document.getElementById('mp-produtos').innerHTML = h;
+}
+
+// ── HISTÓRICO ────────────────────────────────────────────────────────────────
+function mpRenderHistorico() {
+  var hist = MP_ESTADO.historicoDisparos || [];
+  if (!hist.length) {
+    document.getElementById('mp-historico').innerHTML = '<div class="dv-vazio">Nenhum disparo ainda.</div>';
+    return;
+  }
+  var h = '<table class="dv-tab">';
+  hist.forEach(function(d){
+    h += '<tr><td><b>' + mpEsc((d.nome || d.asin || '').slice(0, 55)) + '</b><br>'
+      + '<span style="color:var(--muted);font-size:11px">' + mpFmtData(d.em) + ' · ' + mpEsc(d.loja || '')
+      + ' · ' + mpEsc(d.nicho || '') + (d.manual ? ' · manual' : '') + '</span></td>'
+      + '<td class="dv-td-n" style="white-space:nowrap">'
+      + (d.ok ? mpFmtR(d.precoEnviado) + '<br><span style="color:#22c55e;font-size:11px">' + (d.grupos || 0)
+                + ' grupo(s)</span>'
+              : '<span style="color:var(--muted);font-size:11px;font-weight:500">' + mpEsc(d.motivo || 'falhou') + '</span>')
+      + '</td></tr>';
+  });
+  h += '</table>';
+  document.getElementById('mp-historico').innerHTML = h;
+}
 
 </script>
 </body>
