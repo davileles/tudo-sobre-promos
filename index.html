@@ -118,6 +118,12 @@ try {
   .rod-item.rod-off{opacity:.55}
   .rod-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .rod-head input[type="text"]{flex:1;min-width:0}
+  .rod-ord{font-size:11px;font-weight:800;color:var(--muted2);min-width:22px}
+  .rod-mv{background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:10px;line-height:1;padding:5px 7px;cursor:pointer}
+  .rod-mv:hover:not(:disabled){color:var(--accent);border-color:rgba(255,165,0,.5)}
+  .rod-mv:disabled{opacity:.3;cursor:default}
+  .rod-info{margin-top:8px;padding:9px 11px;border:1px dashed var(--border);border-radius:8px;font-size:11.5px;line-height:1.55;color:var(--muted)}
+  .rod-info code{display:block;margin-top:6px;font-size:11.5px;white-space:pre-wrap;word-break:break-all;color:var(--text)}
   .rod-chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;min-height:36px;align-items:center}
 
   /* ══ LAYOUT ══ */
@@ -5663,6 +5669,69 @@ function anexarRodape(msg, rodape) {
   return rodape ? msg + '\n\n' + rodape : msg;
 }
 
+/* ══ RODAPÉ DOS GERADORES MANUAIS ══
+   O rodapé deixou de ser colado no corpo da mensagem: quem resolve é o mesmo
+   motor de regras do radar (Config → 🎯 Rodapés por nicho), por GRUPO, na hora
+   do envio. O corpo ia junto no texto enviado e o servidor anexava a regra por
+   cima — o convite saía duas vezes. Aqui só EXIBIMOS o que o grupo geral vai
+   receber, para o operador conferir e para o botão Copiar (colagem à mão). */
+var ROD_PREVIEW = { manual: null, cupom: null };
+var _rodPrevProm = null;
+
+function rodapeManualCarregar(force) {
+  if (_rodPrevProm && !force) return _rodPrevProm;
+  _rodPrevProm = Promise.all(['manual','cupom'].map(function(t){
+    return fetch(SERVER + '/config-tsp/rodape-preview?tipo=' + t + '&t=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(d){ ROD_PREVIEW[t] = rodMaisComum((d && d.destinos) || []); })
+      .catch(function(){ ROD_PREVIEW[t] = null; });
+  }));
+  return _rodPrevProm;
+}
+
+// Mensagem manual vai só para os grupos gerais, então o rodapé é o mesmo em
+// todos. A moda cobre o caso de algum destino divergir sem quebrar a exibição.
+function rodMaisComum(destinos) {
+  var cont = {}, melhor = '', max = 0;
+  destinos.forEach(function(d){
+    var v = d.rodape || '';
+    cont[v] = (cont[v] || 0) + 1;
+    if (cont[v] > max) { max = cont[v]; melhor = v; }
+  });
+  return melhor;
+}
+
+function rodTipoDoGerador(msgId) { return msgId === 'c-msg' ? 'cupom' : 'manual'; }
+
+function rodapeDoGerador(msgId) {
+  var v = ROD_PREVIEW[rodTipoDoGerador(msgId)];
+  return typeof v === 'string' ? v : '';
+}
+
+function pintarRodapeAplicado(msgId) {
+  var el = document.getElementById(msgId);
+  if (!el) return;
+  var box = document.getElementById(msgId + '-rodinfo');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = msgId + '-rodinfo';
+    box.className = 'rod-info';
+    el.parentNode.insertBefore(box, el.nextSibling);
+  }
+  box.innerHTML = 'Consultando o rodapé…';
+  rodapeManualCarregar().then(function(){
+    var v = ROD_PREVIEW[rodTipoDoGerador(msgId)];
+    if (v === null || v === undefined) {
+      box.innerHTML = 'Não deu para consultar o rodapé no servidor. A mensagem sai com o rodapé que as regras definirem no envio.';
+    } else if (!v) {
+      box.innerHTML = '<b>Sem rodapé</b> — nenhuma regra ativa casa com este tipo de mensagem. Cadastre em <b>Config → 🎯 Rodapés por nicho</b>.';
+    } else {
+      box.innerHTML = '<b>➕ Rodapé aplicado no envio</b> — resolvido grupo a grupo pelas regras (Config → 🎯 Rodapés por nicho). '
+        + 'Não faz parte do texto acima; o botão <b>Copiar</b> já o inclui.<code>' + esc(v) + '</code>';
+    }
+  });
+}
+
 function cfgAbrir() {
   // Nao depende mais da lista de grupos: os papeis sairam desta aba.
   cfgCarregarServidor().then(cfgPreencher);
@@ -6130,6 +6199,7 @@ function rodSalvar() {
     // Repinta com o que o servidor normalizou: regra sem texto e descartada la,
     // e a tela precisa mostrar isso em vez de fingir que ela existe.
     rodPreencherCampos();
+    rodapeManualCarregar(true);
     if (st) { st.style.color='var(--green)'; st.textContent = '✓ Salvo — já valendo para o próximo envio.'; }
   }).catch(function(e){
     if (btn) btn.disabled = false;
@@ -6183,6 +6253,9 @@ function rodRender() {
     return ''
       + '<div class="rod-item'+(r.ativo===false?' rod-off':'')+'">'
       +   '<div class="rod-head">'
+      +     '<span class="rod-ord">#'+(i+1)+'</span>'
+      +     '<button class="rod-mv" title="Subir"'+(i===0?' disabled':'')+' onclick="rodMover('+i+',-1)">&#9650;</button>'
+      +     '<button class="rod-mv" title="Descer"'+(i===ROD_REGRAS.length-1?' disabled':'')+' onclick="rodMover('+i+',1)">&#9660;</button>'
       +     '<input type="text" value="'+esc(r.nome||'')+'" placeholder="Nome da regra (ex: Convite grupo de bebidas)" oninput="rodCampo('+i+',\'nome\',this.value)"/>'
       +     '<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap">'
       +       '<input type="checkbox"'+(r.ativo===false?'':' checked')+' style="width:auto;accent-color:var(--accent)" onchange="rodCampo('+i+',\'ativo\',this.checked)"/> ativa</label>'
@@ -6230,6 +6303,15 @@ function rodCat(i, id) {
 
 function rodAdd() {
   ROD_REGRAS.push({ id:'', nome:'', ativo:true, tipos:['oferta'], categorias:[], escopo:'fora-da-trilha', texto:'' });
+  rodRender();
+}
+
+// Ordem importa: vale a PRIMEIRA regra que casa. Regra geral (sem categoria,
+// escopo 'todos') precisa ficar embaixo das de nicho, senao ela engole todas.
+function rodMover(i, d) {
+  var j = i + d;
+  if (j < 0 || j >= ROD_REGRAS.length) return;
+  var t = ROD_REGRAS[i]; ROD_REGRAS[i] = ROD_REGRAS[j]; ROD_REGRAS[j] = t;
   rodRender();
 }
 
@@ -6363,7 +6445,6 @@ function gerarCupom() {
     msgC += 'Acesse o link abaixo para resgatar os cupons disponíveis.\n\n';
     if (cImportante) msgC += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
     msgC += '🔗 *RESGATE O CUPOM AQUI* '+linksMap['Shopee_sem'];
-    msgC = anexarRodape(msgC, RODAPE_CUPOM);
     mostrar('c-msg','c-result','c-ok', msgC);
     return;
   }
@@ -6462,7 +6543,6 @@ async function montarCombo(loja) {
   msg += '\n\n🛒 *LOJA* ' + loja.toUpperCase() + '\n\n';
   if (cImportante) msg += '⚠️ *IMPORTANTE* ' + cImportante + '\n\n';
   if (url) msg += '🔗 *RESGATE OS CUPONS AQUI* ' + url + '\n\n';
-  msg = anexarRodape(msg, RODAPE_CUPOM);
 
   mostrar('c-msg','c-result','c-ok', msg);
 }
@@ -6672,7 +6752,6 @@ function gerarOferta() {
   var oImportante = document.getElementById('o-importante').value.trim();
   if (oImportante) msg += '⚠️ *IMPORTANTE* '+oImportante+'\n\n';
   msg += '🛒 *LOJA* '+loja.toUpperCase()+'\n\n🔗 *LINK* '+link+'\n\n';
-  msg = anexarRodape(msg, RODAPE_OFERTA);
   mostrar('o-msg','o-result','o-ok', msg);
 }
 
@@ -6692,12 +6771,12 @@ function gerarLivre() {
   var lImportante = document.getElementById('l-importante').value.trim();
   if (lImportante) msg += '⚠️ *IMPORTANTE* '+lImportante+'\n\n';
   if (link) msg += '🔗 *LINK* '+link+'\n\n';
-  msg = anexarRodape(msg, RODAPE_OFERTA);
   mostrar('l-msg','l-result','l-ok', msg);
 }
 
 function mostrar(msgId, cardId, okId, msg) {
   document.getElementById(msgId).value = msg;
+  pintarRodapeAplicado(msgId);
   document.getElementById(cardId).style.display = 'block';
   document.getElementById(okId).textContent = '';
   document.getElementById(cardId).scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -6706,6 +6785,9 @@ function mostrar(msgId, cardId, okId, msg) {
 function copiar(msgId, okId) {
   var el = document.getElementById(msgId);
   var texto = el.tagName==='TEXTAREA' ? el.value : el.textContent;
+  // Copiar e colar a mao nao passa pelo servidor, entao aqui o rodape entra no
+  // texto. No envio pelo botao ele NAO entra: quem anexa e o motor de regras.
+  texto = anexarRodape(texto, rodapeDoGerador(msgId));
   if (navigator.clipboard) { navigator.clipboard.writeText(texto).then(function(){ okMsg(okId); }); }
   else {
     var ta = document.createElement('textarea'); ta.value = texto;
