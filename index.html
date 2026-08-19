@@ -113,6 +113,13 @@ try {
   .cat-chip:hover{color:var(--text);border-color:var(--muted)}
   .cat-chip.on{color:var(--accent);border-color:rgba(255,165,0,.5);background:rgba(255,165,0,.12)}
 
+  /* ══ RODAPÉS POR NICHO ══ */
+  .rod-item{border:1px solid var(--border);border-radius:10px;background:var(--card-deep);padding:12px 13px;margin-bottom:10px}
+  .rod-item.rod-off{opacity:.55}
+  .rod-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .rod-head input[type="text"]{flex:1;min-width:0}
+  .rod-chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;min-height:36px;align-items:center}
+
   /* ══ LAYOUT ══ */
   .wrap{max-width:960px;margin:0 auto;padding:20px 24px 70px}
   #shell-main .wrap{margin:0 auto}
@@ -2006,6 +2013,19 @@ body.travado > *:not(#login-screen){display:none !important}
       <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
     <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
       <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🎯 Rodapés por nicho <span class="tag" style="text-transform:none">convite cruzado</span></p>
+    <div class="aviso" style="margin-bottom:12px">
+      Bloco <b>extra</b> anexado ao final da mensagem e escolhido <b>grupo a grupo</b> na hora do envio — o rodapé
+      padrão acima continua valendo. É o que faz uma oferta de bebida sair no grupo geral convidando para o grupo
+      exclusivo de bebidas, e sair <b>sem</b> esse convite dentro do próprio grupo de bebidas.<br>
+      Vale a <b>primeira regra que casar</b>. Sem nenhuma regra aplicável, a mensagem sai exatamente como hoje.
+      Regra por categoria só entra quando o classificador <b>confirma</b> a categoria do produto.
+    </div>
+    <div id="rod-lista"></div>
+    <button class="btn btn-copy btn-sm" onclick="rodAdd()">+ Nova regra de rodapé</button>
   </div>
 
   <div class="card">
@@ -5782,6 +5802,9 @@ function catRender() {
       +   '</div>'
       + '</div>';
   }).join('');
+  // Os chips de categoria das regras de rodape leem a mesma taxonomia: sem
+  // isto, quem abre a aba antes de a taxonomia carregar ve "sem categoria".
+  if (typeof rodRender === 'function') rodRender();
 }
 
 function catToggle(id) {
@@ -6039,6 +6062,136 @@ function credCorpo() {
   return out;
 }
 
+/* ══ RODAPÉS POR NICHO ══
+   Regras editadas em memória e gravadas junto com o resto da config
+   (rodapes.regras). Campo de texto NÃO redesenha a lista a cada tecla — isso
+   mataria o cursor no meio da digitação; só clique em chip redesenha. */
+var ROD_REGRAS  = [];
+var ROD_TIPOS   = [['oferta','Oferta'],['cupom','Cupom'],['manual','Mensagem manual']];
+var ROD_ESCOPOS = [
+  ['fora-da-trilha','Só nos grupos que NÃO são do nicho'],
+  ['todos',         'Em todos os grupos de destino'],
+  ['so-trilha',     'Só dentro do grupo do nicho']
+];
+
+function rodPreencher() {
+  var r = (CFG_TSP && CFG_TSP.rodapes) || {};
+  ROD_REGRAS = (Array.isArray(r.regras) ? r.regras : []).map(function(x){
+    return {
+      id:         x.id   || '',
+      nome:       x.nome || '',
+      ativo:      x.ativo !== false,
+      tipos:      Array.isArray(x.tipos)      ? x.tipos.slice()      : ['oferta'],
+      categorias: Array.isArray(x.categorias) ? x.categorias.slice() : [],
+      escopo:     x.escopo || 'fora-da-trilha',
+      texto:      x.texto  || ''
+    };
+  });
+  rodRender();
+}
+
+function rodRender() {
+  var box = document.getElementById('rod-lista');
+  if (!box) return;
+  if (!ROD_REGRAS.length) {
+    box.innerHTML = '<div class="aviso" style="margin-bottom:10px">Nenhuma regra — as mensagens saem só com o rodapé padrão acima.</div>';
+    return;
+  }
+  var mapa = (typeof CAT_ESTADO !== 'undefined' && CAT_ESTADO.categorias) || {};
+  var cats = Object.keys(mapa).sort(function(a,b){
+    return (mapa[a].nome||a).localeCompare(mapa[b].nome||b,'pt-BR');
+  });
+  box.innerHTML = ROD_REGRAS.map(function(r, i) {
+    var chipsTipo = ROD_TIPOS.map(function(t){
+      var on = (r.tipos||[]).indexOf(t[0]) >= 0;
+      return '<button type="button" class="cat-chip'+(on?' on':'')+'" onclick="rodTipo('+i+',\''+t[0]+'\')">'+t[1]+'</button>';
+    }).join('');
+    var chipsCat = cats.length
+      ? cats.map(function(id){
+          var on = (r.categorias||[]).indexOf(id) >= 0;
+          var d  = mapa[id] || {};
+          return '<button type="button" class="cat-chip'+(on?' on':'')+'" onclick="rodCat('+i+',\''+id+'\')">'
+               + (d.emoji ? esc(d.emoji)+' ' : '') + esc(d.nome||id) + '</button>';
+        }).join('')
+      : '<span style="font-size:11.5px;color:var(--muted2)">Nenhuma categoria cadastrada — a regra vale para qualquer produto.</span>';
+    var opts = ROD_ESCOPOS.map(function(e){
+      return '<option value="'+e[0]+'"'+(r.escopo===e[0]?' selected':'')+'>'+e[1]+'</option>';
+    }).join('');
+    return ''
+      + '<div class="rod-item'+(r.ativo===false?' rod-off':'')+'">'
+      +   '<div class="rod-head">'
+      +     '<input type="text" value="'+esc(r.nome||'')+'" placeholder="Nome da regra (ex: Convite grupo de bebidas)" oninput="rodCampo('+i+',\'nome\',this.value)"/>'
+      +     '<label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap">'
+      +       '<input type="checkbox"'+(r.ativo===false?'':' checked')+' style="width:auto;accent-color:var(--accent)" onchange="rodCampo('+i+',\'ativo\',this.checked)"/> ativa</label>'
+      +     '<button class="btn btn-rej btn-sm" onclick="rodRemover('+i+')">Remover</button>'
+      +   '</div>'
+      +   '<div class="field" style="margin-bottom:10px"><label>Vale para</label>'
+      +     '<div class="rod-chips">'+chipsTipo+'</div></div>'
+      +   '<div class="field" style="margin-bottom:10px"><label>Categorias <span class="tag">nenhuma marcada = qualquer produto</span></label>'
+      +     '<div class="rod-chips">'+chipsCat+'</div></div>'
+      +   '<div class="field" style="margin-bottom:10px"><label>Onde anexar</label>'
+      +     '<select onchange="rodCampo('+i+',\'escopo\',this.value)">'+opts+'</select></div>'
+      +   '<div class="field"><label>Texto do rodapé <span class="tag">crase = monoespaçado do WhatsApp · vazio descarta a regra</span></label>'
+      +     '<textarea rows="2" spellcheck="false" oninput="rodCampo('+i+',\'texto\',this.value)">'+esc(r.texto||'')+'</textarea></div>'
+      + '</div>';
+  }).join('');
+}
+
+function rodCampo(i, campo, valor) {
+  var r = ROD_REGRAS[i];
+  if (!r) return;
+  r[campo] = valor;
+  if (campo === 'ativo') {
+    var el = document.querySelectorAll('#rod-lista .rod-item')[i];
+    if (el) el.classList.toggle('rod-off', !valor);
+  }
+}
+
+function rodTipo(i, t) {
+  var r = ROD_REGRAS[i];
+  if (!r) return;
+  r.tipos = r.tipos || [];
+  var k = r.tipos.indexOf(t);
+  if (k >= 0) r.tipos.splice(k, 1); else r.tipos.push(t);
+  rodRender();
+}
+
+function rodCat(i, id) {
+  var r = ROD_REGRAS[i];
+  if (!r) return;
+  r.categorias = r.categorias || [];
+  var k = r.categorias.indexOf(id);
+  if (k >= 0) r.categorias.splice(k, 1); else r.categorias.push(id);
+  rodRender();
+}
+
+function rodAdd() {
+  ROD_REGRAS.push({ id:'', nome:'', ativo:true, tipos:['oferta'], categorias:[], escopo:'fora-da-trilha', texto:'' });
+  rodRender();
+}
+
+function rodRemover(i) {
+  if (!confirm('Remover esta regra de rodapé?')) return;
+  ROD_REGRAS.splice(i, 1);
+  rodRender();
+}
+
+// Regra sem texto não vai para o servidor: o backend descartaria do mesmo jeito,
+// e mandar meia regra deixaria o painel e o disco discordando.
+function rodColetar() {
+  return ROD_REGRAS.map(function(r){
+    return {
+      id:         (r.id   || '').trim(),
+      nome:       (r.nome || '').trim(),
+      ativo:      r.ativo !== false,
+      tipos:      (r.tipos      || []).slice(),
+      categorias: (r.categorias || []).slice(),
+      escopo:     r.escopo || 'fora-da-trilha',
+      texto:      (r.texto || '')
+    };
+  }).filter(function(r){ return r.texto.trim(); });
+}
+
 function cfgPreencher() {
   var c = CFG_TSP || {};
   var a = c.afiliados || {}, r = c.rodapes || {}, t = c.telegram || {};
@@ -6052,6 +6205,7 @@ function cfgPreencher() {
   document.getElementById('cfg-rod-cupom').value     = r.cupom || '';
   document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
+  rodPreencher();
 }
 
 function cfgSalvar() {
@@ -6069,7 +6223,8 @@ function cfgSalvar() {
     },
     rodapes: {
       cupom:  document.getElementById('cfg-rod-cupom').value,
-      oferta: document.getElementById('cfg-rod-oferta').value
+      oferta: document.getElementById('cfg-rod-oferta').value,
+      regras: rodColetar()
     },
     // 'grupos' NAO vai aqui de proposito: os papeis sao gravados pela aba
     // Grupos. Mandar deste formulario sobrescreveria a marcacao com o estado
@@ -6097,6 +6252,7 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
+    rodPreencher();
     if (d.autoEnvio) aeAplicar(d.autoEnvio);
     if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
