@@ -20,6 +20,12 @@ const ARQ_DESEMPENHO = process.env.ARQUIVO_DESEMPENHO || 'tsp/desempenho-produto
 const ARQ_RASTREIO = process.env.ARQUIVO_RASTREIO || 'tsp/rastreio.json';
 const ARQ_DESCOBERTAS = process.env.ARQUIVO_DESCOBERTAS || 'tsp/vendas-descobertas.json';
 const ARQ_CATEGORIAS = process.env.ARQUIVO_CATEGORIAS || 'tsp/categorias-amazon.json';
+// Ledger de EPC (ganho por clique) por ASIN. Diferente de desempenho-produtos,
+// que so enxerga o que NOS divulgamos via tag, este cobre TODO produto comprado
+// por quem entrou pelos nossos links — inclusive o que nunca foi divulgado e
+// entrou por venda indireta. E a base de curadoria: prova demanda sem gastar um
+// post para descobrir.
+const ARQ_EPC = process.env.ARQUIVO_EPC || 'tsp/epc-produtos.json';
 const GH_TOKEN = process.env.GH_TOKEN_DADOS;
 
 const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
@@ -636,6 +642,138 @@ async function amazonProdutosVinculados(ctx, de, ate) {
   return linhas;
 }
 
+// ── LEDGER DE EPC POR ASIN ────────────────────────────────────────────────
+//
+// Por que existe: ordenar produto por "quantas unidades vendeu" premia item
+// barato de giro alto e esconde o que realmente paga. O que decide se vale
+// gastar um post e o GANHO POR CLIQUE — o iPad Air puxou 242 cliques e rendeu
+// R$ 0,28 por clique; o vinho DV Catena puxou 153 e rendeu R$ 4,55. Os dois
+// aparecem lado a lado num ranking por unidades.
+//
+// Acumulacao DIA A DIA, nunca por janela: o relatorio e agregado, entao somar
+// janelas que se sobrepoem contaria a mesma venda varias vezes. Cada dia e
+// coletado uma unica vez e fica gravado; o total e sempre recalculado a partir
+// dos dias, para uma rodada repetida nao dobrar numero nenhum.
+const EPC_RETENCAO_DIAS = 180;
+// Teto de dias novos por rodada. A primeira rodada tem uma janela inteira em
+// aberto e o Actions tem tempo limitado; o resto entra nas rodadas seguintes.
+const EPC_MAX_DIAS_RODADA = 8;
+// Horizonte do EPC publicado. Comportamento de compra de 6 meses atras nao
+// descreve o publico de hoje.
+const EPC_JANELA_DIAS = 90;
+
+function epcVazio() {
+  return { atualizadoEm: null, dias: {}, produtos: {} };
+}
+
+/**
+ * Coleta os dias que faltam e reescreve o ledger. Devolve o numero de dias
+ * novos coletados (0 = nada a fazer).
+ */
+async function acumularEpcAmazon(ctx, janela, categoriaDe) {
+  const { dados } = await lerJson(ARQ_EPC, null);
+  const led = (dados && typeof dados === 'object' && dados.dias) ? dados : epcVazio();
+
+  // Dia de hoje nunca entra: o relatorio ainda esta sendo escrito e o numero
+  // parcial ficaria congelado como se fosse o fechamento.
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const faltando = [...janela].sort()
+    .filter((d) => d < hoje && !led.dias[d])
+    .slice(-EPC_MAX_DIAS_RODADA);
+
+  if (!faltando.length) {
+    console.log('[desempenho] EPC: nenhum dia novo a coletar');
+    return 0;
+  }
+
+  let novos = 0;
+  for (const dia of faltando) {
+    let linhas;
+    try { linhas = await amazonProdutosVinculados(ctx, dia, dia); }
+    catch (e) { console.warn(`[desempenho] EPC ${dia}: ${e.message}`); continue; }
+
+    const doDia = {};
+    for (const it of linhas) {
+      const asin = String(it.linked_product || '').toUpperCase();
+      if (!/^B[A-Z0-9]{9}$/.test(asin)) continue;
+      const reg = {
+        c: Math.round(numApi(it.clicks)),
+        p: Math.round(numApi(it.total_ordered_items)),
+        r: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue)),
+        g: num(numApi(it.total_earnings)),
+      };
+      if (!reg.c && !reg.p && !reg.g) continue;
+      doDia[asin] = reg;
+
+      const nome = it.linked_product_title || '';
+      const p = led.produtos[asin] || (led.produtos[asin] = { asin, nome: '', categoria: '' });
+      if (nome && !p.nome) p.nome = nome;
+      const cat = categoriaDe ? categoriaDe(asin) : '';
+      if (cat && !p.categoria) p.categoria = cat;
+    }
+    // Dia gravado mesmo vazio: sem isso ele seria recoletado para sempre.
+    led.dias[dia] = doDia;
+    novos++;
+    await new Promise((res) => setTimeout(res, 500));
+  }
+
+  // Poda e recalculo. Totais SEMPRE derivados dos dias — nunca incrementados.
+  const corte = new Date(Date.now() - EPC_RETENCAO_DIAS * 86400000).toISOString().slice(0, 10);
+  for (const d of Object.keys(led.dias)) if (d < corte) delete led.dias[d];
+
+  const corteJanela = new Date(Date.now() - EPC_JANELA_DIAS * 86400000).toISOString().slice(0, 10);
+  const acc = {};
+  for (const [dia, itens] of Object.entries(led.dias)) {
+    if (dia < corteJanela) continue;
+    for (const [asin, r] of Object.entries(itens)) {
+      const a = acc[asin] || (acc[asin] = { cliques: 0, pedidos: 0, receita: 0, comissao: 0, dias: 0,
+                                            primeiroDia: dia, ultimoDia: dia });
+      a.cliques += r.c; a.pedidos += r.p;
+      a.receita = num(a.receita + r.r); a.comissao = num(a.comissao + r.g);
+      a.dias += 1;
+      if (dia < a.primeiroDia) a.primeiroDia = dia;
+      if (dia > a.ultimoDia) a.ultimoDia = dia;
+    }
+  }
+
+  for (const asin of Object.keys(led.produtos)) {
+    const a = acc[asin];
+    const p = led.produtos[asin];
+    if (!a) {
+      // Fora da janela de 90 dias: o produto some do ranking, mas o cadastro
+      // (nome, categoria) fica — e barato e evita reaprender tudo se voltar.
+      Object.assign(p, { cliques: 0, pedidos: 0, receita: 0, comissao: 0, dias: 0,
+                         epc: 0, conversao: 0, ticket: 0 });
+      continue;
+    }
+    Object.assign(p, a, {
+      epc: a.cliques ? Math.round((a.comissao / a.cliques) * 100) / 100 : 0,
+      // Acima de 100% e venda indireta: a pessoa clicou aqui e comprou isto
+      // sem que este produto tivesse sido divulgado. Nao e erro — e o sinal
+      // mais valioso do relatorio.
+      conversao: a.cliques ? Math.round((a.pedidos / a.cliques) * 1000) / 10 : null,
+      ticket: a.pedidos ? Math.round((a.receita / a.pedidos) * 100) / 100 : 0,
+    });
+  }
+
+  led.atualizadoEm = new Date().toISOString();
+  led.janelaDias = EPC_JANELA_DIAS;
+
+  const ranking = Object.values(led.produtos).filter((p) => p.cliques > 0)
+    .sort((a, b) => b.comissao - a.comissao);
+  led.totais = ranking.reduce((t, p) => ({
+    produtos: t.produtos + 1, cliques: t.cliques + p.cliques, pedidos: t.pedidos + p.pedidos,
+    receita: num(t.receita + p.receita), comissao: num(t.comissao + p.comissao),
+  }), { produtos: 0, cliques: 0, pedidos: 0, receita: 0, comissao: 0 });
+  led.totais.epc = led.totais.cliques
+    ? Math.round((led.totais.comissao / led.totais.cliques) * 100) / 100 : 0;
+
+  await gravarJson(ARQ_EPC, led, `chore: ledger de EPC (${novos} dia(s) novo(s), ${ranking.length} produtos)`);
+  console.log(`[desempenho] EPC: ${novos} dia(s) coletado(s), ${ranking.length} produto(s) `
+    + `na janela de ${EPC_JANELA_DIAS}d, EPC medio R$ ${led.totais.epc}`);
+  return novos;
+}
+
 async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
   if (!AMAZON_COOKIE) {
     console.log('[desempenho] AMAZON_COOKIE ausente — Amazon por tag ignorada');
@@ -752,6 +890,13 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       // ASIN que veio do cache e nao apareceu no top_seller desta janela.
       try { await salvarCategorias(salvas, aplicadas); }
       catch (e) { console.warn('[desempenho] Amazon: cache de categorias nao gravou —', e.message); }
+
+      // Ledger de EPC: mesma fonte (produtos vinculados), outra pergunta. As
+      // descobertas respondem "o que o publico comprou alem do que divulgamos";
+      // o EPC responde "quanto cada produto paga por clique gasto". Roda por
+      // ultimo e em try proprio — e enriquecimento, nao pode custar a coleta.
+      try { await acumularEpcAmazon(ctx, dias, categoriaDe); }
+      catch (e) { console.warn('[desempenho] EPC: acumulacao falhou —', e.message); }
     } catch (e) {
       console.warn('[desempenho] Amazon: produtos vinculados falhou —', e.message);
     }
