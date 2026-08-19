@@ -2284,7 +2284,8 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ MONITOR DE PREÇOS ════════ -->
 <div class="panel" id="panel-monprecos">
   <div class="aviso">
-    O monitor lê o preço dos produtos da <b>Vitrine</b> (Shopee e Mercado Livre) de tempos em tempos e guarda a série.
+    O monitor lê o preço dos produtos da <b>Vitrine</b> (Amazon, Shopee e Mercado Livre) de tempos em tempos e guarda a série.
+    A Amazon é lida em lotes de 10 por chamada; as outras duas, uma por vez.
     O gatilho <b>não usa o desconto que a loja anuncia</b> — usa a queda contra a <b>mediana dos últimos 30 dias</b> do
     próprio histórico, e opcionalmente exige que o preço esteja no <b>menor patamar de 90 dias</b>.
     Enquanto a série não amadurece, o produto não dispara.<br>
@@ -9872,6 +9873,17 @@ var MP_CAMPOS_REGRA = [
 // mesmo critério que o roteamento por trilha já usa.
 var MP_NICHOS_BASE = ['geral', 'bebidas', 'infantil'];
 
+// Ordem fixa de exibição das lojas — a lista vem do servidor, mas sem uma ordem
+// estável os campos de cota trocam de lugar a cada carga.
+var MP_ORDEM_LOJAS = ['Amazon', 'Shopee', 'Mercado Livre'];
+function mpLojas() {
+  var l = (MP_ESTADO && MP_ESTADO.lojasDisponiveis) || [];
+  return l.slice().sort(function(a, b) {
+    var ia = MP_ORDEM_LOJAS.indexOf(a), ib = MP_ORDEM_LOJAS.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
 function mpFmtR(v) {
   if (v === null || v === undefined || !isFinite(v)) return '—';
   return 'R$ ' + Number(v).toFixed(2).replace('.', ',');
@@ -10001,7 +10013,7 @@ function mpPreencherConfig() {
   document.getElementById('mp-janela-inicio').value = j.inicio;
   document.getElementById('mp-janela-fim').value = j.fim;
 
-  var lojas = MP_ESTADO.lojasDisponiveis || [];
+  var lojas = mpLojas();
   document.getElementById('mp-lojas').innerHTML = lojas.map(function(l){
     var on = (c.varredura.lojas || []).indexOf(l) >= 0;
     return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">'
@@ -10012,7 +10024,7 @@ function mpPreencherConfig() {
 
 function mpRenderCotas() {
   var c = MP_ESTADO.config;
-  var lojas = MP_ESTADO.lojasDisponiveis || [];
+  var lojas = mpLojas();
   document.getElementById('mp-cota-lojas').innerHTML = lojas.map(function(l){
     var v = (c.publicacao.cotaPorLoja || {})[l];
     return '<div class="field"><label>' + mpEsc(l) + ' <span class="tag">por dia</span></label>'
