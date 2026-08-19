@@ -2435,6 +2435,24 @@ function switchTab(name) {
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
+  // Lembra a aba: um F5 no meio de um trabalho voltava sempre para a Fila de
+  // envio, obrigando a renavegar ate onde se estava.
+  try { localStorage.setItem(ABA_KEY, name); } catch (e) {}
+}
+
+var ABA_KEY = 'tsp-aba';
+
+// Volta para a ultima aba usada. So roda depois do login, porque antes disso o
+// painel esta travado e nenhum carregador de dados pode disparar.
+function restaurarAba() {
+  var nome;
+  try { nome = localStorage.getItem(ABA_KEY); } catch (e) { return; }
+  if (!nome || TABS.indexOf(nome) < 0) return;
+  var botao = document.getElementById('tab-' + nome);
+  // Aba escondida para este operador (a config decide quais aparecem): cai na
+  // aba inicial em vez de abrir um painel que ele nao deveria ver.
+  if (!botao || botao.style.display === 'none') return;
+  switchTab(nome);
 }
 
 /* ══════ SIDEBAR (drawer no mobile) ══════ */
@@ -9645,6 +9663,7 @@ function abrirPainel(){
   document.body.classList.remove('travado');
   var app = document.getElementById('app-content');
   if (app) app.style.display = 'block';
+  restaurarAba();
   // Recarrega a config JA AUTENTICADO: a chamada do boot sai antes do token
   // existir e o servidor responde como operacao padrao — e daqui que vem a
   // identidade do operador (abas ocultas, nome, links, rodapes dele).
