@@ -1943,6 +1943,24 @@ body.travado > *:not(#login-screen){display:none !important}
     que o coletor já conseguiu casar com aquela ref.
   </div>
 
+  <!-- ─── Etiquetas do Mercado Livre ─── -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px">Etiquetas do Mercado Livre <span class="tag" style="text-transform:none">por nicho</span></div>
+    <div class="aviso" style="margin-bottom:12px">
+      No Mercado Livre a etiqueta n&atilde;o gira por dia como a tag da Amazon &mdash; o relat&oacute;rio n&atilde;o separa por data.
+      Por isso a etiqueta &eacute; do <b>nicho</b>, n&atilde;o do produto: assim ela &eacute; reutiliz&aacute;vel para sempre e a medi&ccedil;&atilde;o
+      melhora com o tempo em vez de fragmentar.<br>
+      A etiqueta precisa <b>existir na conta</b> &mdash; crie em
+      <a href="https://www.mercadolivre.com.br/afiliados/adminlabel" target="_blank">Central de afiliados &rarr; Administrar etiquetas</a>.
+      Etiqueta inexistente faz o link ser refeito com a tag da conta: perde-se a segmenta&ccedil;&atilde;o, nunca a comiss&atilde;o.
+      Campo em branco = aquele nicho sai com a tag da conta.<br>
+      O resultado aparece no ML em <b>M&eacute;tricas &rarr; Etiquetas de rastreamento</b>.
+    </div>
+    <div id="rt-ml-tags"><div class="dv-vazio">Carregando&hellip;</div></div>
+    <button class="btn" id="rt-ml-btn" onclick="salvarTagsMl()">💾 Salvar etiquetas</button>
+    <p class="send-ok" id="rt-ml-status"></p>
+  </div>
+
   <div class="card" id="rt-resumo" style="display:none">
     <div class="desc-cards" id="rt-cards"></div>
     <div style="font-size:11px;color:var(--muted);margin-top:10px" id="rt-meta"></div>
@@ -2658,7 +2676,7 @@ function switchTab(name) {
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'descobertas') carregarDescobertas();
-  if (name === 'rastreio') carregarRastreio();
+  if (name === 'rastreio') { carregarRastreio(); carregarTagsMl(); }
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
@@ -4385,6 +4403,57 @@ function rtDataBR(d){
   if (!d) return '—';
   var p = String(d).split('-');
   return p.length === 3 ? p[2] + '/' + p[1] : d;
+}
+
+// ── ETIQUETAS DO MERCADO LIVRE (por nicho) ───────────────────────────────────
+// A lista de nichos vem da taxonomia do classificador, nao de uma lista escrita
+// aqui: nicho que o classificador nao conhece nunca receberia etiqueta, e o
+// campo ficaria na tela sem nunca ser usado.
+function carregarTagsMl() {
+  return fetch(SERVER + '/rastreio/pool-ml/sugestao')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      var h = '<div class="g2">';
+      (d.linhas || []).forEach(function(l){
+        h += '<div class="field"><label>' + (l.emoji ? l.emoji + ' ' : '') + mpEsc(l.nome) + '</label>'
+          + '<input type="text" class="rt-ml-tag" data-cat="' + mpEsc(l.categoria) + '" value="'
+          + mpEsc(l.etiqueta) + '" placeholder="sem etiqueta" autocomplete="off"'
+          + ' style="font-family:ui-monospace,Menlo,monospace;font-size:12px"/></div>';
+      });
+      h += '</div>';
+      document.getElementById('rt-ml-tags').innerHTML = h;
+    })
+    .catch(function(e){
+      document.getElementById('rt-ml-tags').innerHTML = '<div class="dv-vazio">Erro: ' + mpEsc(e.message) + '</div>';
+    });
+}
+
+function salvarTagsMl() {
+  var btn = document.getElementById('rt-ml-btn');
+  var mapa = {};
+  document.querySelectorAll('.rt-ml-tag').forEach(function(el){
+    var v = (el.value || '').trim().toLowerCase();
+    if (v) mapa[el.dataset.cat] = v;
+  });
+  btn.disabled = true;
+  fetch(SERVER + '/rastreio/pool-ml', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ porCategoria: mapa }),
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falha');
+      var msg = '\u2713 ' + d.categorias + ' nicho(s) com etiqueta.';
+      // Etiqueta recusada e quase sempre hifen ou underscore: o ML so aceita
+      // letras e numeros, e descobrir isso pelo erro 109 sairia caro.
+      if (d.recusados && d.recusados.length) {
+        msg += ' Recusada(s): ' + d.recusados.join(', ') + ' \u2014 use apenas letras e n\u00fameros.';
+      }
+      mpStatus('rt-ml-status', msg, !!(d.recusados && d.recusados.length));
+      return carregarTagsMl();
+    })
+    .catch(function(e){ mpStatus('rt-ml-status', 'Erro: ' + e.message, true); })
+    .then(function(){ btn.disabled = false; });
 }
 
 function carregarRastreio(forcar){
