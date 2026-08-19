@@ -2003,30 +2003,6 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
   </div>
 
-  <div class="card">
-    <p class="card-title" style="margin-bottom:12px">✍️ Rodapés das mensagens</p>
-    <div class="aviso" style="margin-bottom:12px">
-      Texto anexado ao final de cada mensagem. Use crase (<b>`texto`</b>) para o estilo monoespaçado do WhatsApp.
-      Deixe vazio para não anexar nada.
-    </div>
-    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">semente do template de cupom e do combo de cupons</span></label>
-      <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
-    <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e template padrão</span></label>
-      <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
-  </div>
-
-  <div class="card">
-    <p class="card-title" style="margin-bottom:12px">🎯 Rodapés por nicho <span class="tag" style="text-transform:none">convite cruzado</span></p>
-    <div class="aviso" style="margin-bottom:12px">
-      Bloco <b>extra</b> anexado ao final da mensagem e escolhido <b>grupo a grupo</b> na hora do envio — o rodapé
-      padrão acima continua valendo. É o que faz uma oferta de bebida sair no grupo geral convidando para o grupo
-      exclusivo de bebidas, e sair <b>sem</b> esse convite dentro do próprio grupo de bebidas.<br>
-      Vale a <b>primeira regra que casar</b>. Sem nenhuma regra aplicável, a mensagem sai exatamente como hoje.
-      Regra por categoria só entra quando o classificador <b>confirma</b> a categoria do produto.
-    </div>
-    <div id="rod-lista"></div>
-    <button class="btn btn-copy btn-sm" onclick="rodAdd()">+ Nova regra de rodapé</button>
-  </div>
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">⚡ Auto-envio <span class="tag" style="text-transform:none">quem dispara sozinho e quem espera aprova&#231;&#227;o</span></p>
@@ -2243,6 +2219,41 @@ body.travado > *:not(#login-screen){display:none !important}
       </p>
     </div>
   </div>
+
+  <div class="aviso" style="margin:18px 0 14px">
+    <b>Rodapés.</b> O de cima entra no <b>corpo</b> do template — é a semente de um template novo e o que os
+    geradores manuais anexam; template já salvo guarda o rodapé dentro do próprio corpo, então mexer ali em cima
+    é o que vale para ele. O de baixo é decidido <b>na hora do envio, grupo a grupo</b>, e por isso não aparece
+    na prévia acima: ele depende de para qual grupo a mensagem vai.
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">✍️ Rodapés das mensagens</p>
+    <div class="aviso" style="margin-bottom:12px">
+      Texto anexado ao final de cada mensagem. Use crase (<b>`texto`</b>) para o estilo monoespaçado do WhatsApp.
+      Deixe vazio para não anexar nada.
+    </div>
+    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">semente do template _cupom e do combo de cupons</span></label>
+      <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
+    <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e semente do template _padrao</span></label>
+      <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🎯 Rodapés por nicho <span class="tag" style="text-transform:none">convite cruzado</span></p>
+    <div class="aviso" style="margin-bottom:12px">
+      Bloco <b>extra</b> anexado ao final da mensagem e escolhido <b>grupo a grupo</b> na hora do envio — o rodapé
+      padrão acima continua valendo. É o que faz uma oferta de bebida sair no grupo geral convidando para o grupo
+      exclusivo de bebidas, e sair <b>sem</b> esse convite dentro do próprio grupo de bebidas.<br>
+      Vale a <b>primeira regra que casar</b>. Sem nenhuma regra aplicável, a mensagem sai exatamente como hoje.
+      Regra por categoria só entra quando o classificador <b>confirma</b> a categoria do produto.
+    </div>
+    <div id="rod-lista"></div>
+    <button class="btn btn-copy btn-sm" onclick="rodAdd()">+ Nova regra de rodapé</button>
+  </div>
+
+  <button class="btn" id="rod-btn" onclick="rodSalvar()">💾 Salvar rodapés</button>
+  <p class="send-ok" id="rod-status"></p>
 </div>
 
 <!-- ════════ BASE DE CUPONS ════════ -->
@@ -2395,7 +2406,7 @@ function switchTab(name) {
       .then(carregarListas)
       .then(carregarAwinCand);
   }
-  if (name === 'templates') carregarTemplates();
+  if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') cfgAbrir();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
@@ -6074,6 +6085,55 @@ var ROD_ESCOPOS = [
   ['so-trilha',     'Só dentro do grupo do nicho']
 ];
 
+// Abertura da aba Templates: os rodapes precisam da config (textos e regras) e
+// da taxonomia (chips de categoria). Busca so o que ainda nao esta em memoria —
+// refazer o fetch a cada troca de aba apagaria edicao nao salva.
+function rodAbrir() {
+  var p = CFG_TSP ? Promise.resolve() : cfgCarregarServidor();
+  p.then(rodPreencherCampos).catch(function(){});
+  if (!Object.keys((typeof CAT_ESTADO !== 'undefined' && CAT_ESTADO.categorias) || {}).length) {
+    if (typeof catCarregar === 'function') catCarregar();
+  }
+}
+
+function rodPreencherCampos() {
+  var r = (CFG_TSP && CFG_TSP.rodapes) || {};
+  var a = document.getElementById('cfg-rod-cupom');
+  var b = document.getElementById('cfg-rod-oferta');
+  if (a) a.value = r.cupom  || '';
+  if (b) b.value = r.oferta || '';
+  rodPreencher();
+}
+
+// Merge parcial no servidor: mandar so 'rodapes' preserva afiliados, grupos e
+// credenciais — mesmo caminho que a aba Grupos usa para gravar so os grupos.
+function rodSalvar() {
+  var st  = document.getElementById('rod-status');
+  var btn = document.getElementById('rod-btn');
+  var corpo = { rodapes: {
+    cupom:  document.getElementById('cfg-rod-cupom').value,
+    oferta: document.getElementById('cfg-rod-oferta').value,
+    regras: rodColetar()
+  }};
+  if (btn) btn.disabled = true;
+  if (st) { st.style.color = ''; st.textContent = 'Salvando…'; }
+  fetch(SERVER + '/config-tsp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (btn) btn.disabled = false;
+    if (!d.ok) { if (st) { st.style.color='var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; } return; }
+    cfgAplicar(d.config);
+    // Repinta com o que o servidor normalizou: regra sem texto e descartada la,
+    // e a tela precisa mostrar isso em vez de fingir que ela existe.
+    rodPreencherCampos();
+    if (st) { st.style.color='var(--green)'; st.textContent = '✓ Salvo — já valendo para o próximo envio.'; }
+  }).catch(function(e){
+    if (btn) btn.disabled = false;
+    if (st) { st.style.color='var(--red)'; st.textContent = 'Erro de conexão: ' + e.message; }
+  });
+}
+
 function rodPreencher() {
   var r = (CFG_TSP && CFG_TSP.rodapes) || {};
   ROD_REGRAS = (Array.isArray(r.regras) ? r.regras : []).map(function(x){
@@ -6202,10 +6262,11 @@ function cfgPreencher() {
   document.getElementById('cfg-af-shopee-com').value = a.shopee_com || '';
   document.getElementById('cfg-af-magalu').value     = a.magalu || '';
   document.getElementById('cfg-af-ze').value         = a.zedelivery || '';
-  document.getElementById('cfg-rod-cupom').value     = r.cupom || '';
-  document.getElementById('cfg-rod-oferta').value    = r.oferta || '';
   document.getElementById('cfg-tg-ignorados').value  = (t.canaisIgnorados || []).join('\n');
-  rodPreencher();
+  // Rodapes moraram aqui e agora vivem na aba Templates, mas os campos seguem
+  // no mesmo DOM: repintar aqui mantem as duas telas coerentes se o operador
+  // vier da Config para a Templates sem recarregar a pagina.
+  rodPreencherCampos();
 }
 
 function cfgSalvar() {
@@ -6221,11 +6282,8 @@ function cfgSalvar() {
       magalu:       document.getElementById('cfg-af-magalu').value.trim(),
       zedelivery:   document.getElementById('cfg-af-ze').value.trim()
     },
-    rodapes: {
-      cupom:  document.getElementById('cfg-rod-cupom').value,
-      oferta: document.getElementById('cfg-rod-oferta').value,
-      regras: rodColetar()
-    },
+    // 'rodapes' NAO vai aqui: quem grava e o botao da aba Templates. Dois donos
+    // do mesmo campo e como uma das telas apaga o que a outra acabou de salvar.
     // 'grupos' NAO vai aqui de proposito: os papeis sao gravados pela aba
     // Grupos. Mandar deste formulario sobrescreveria a marcacao com o estado
     // de uma tela que nao tem mais esses campos.
@@ -6252,7 +6310,7 @@ function cfgSalvar() {
     btn.disabled = false;
     if (!d.ok) { st.style.color = 'var(--red)'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
     cfgAplicar(d.config);
-    rodPreencher();
+    rodPreencherCampos();
     if (d.autoEnvio) aeAplicar(d.autoEnvio);
     if (d.credenciais) { CRED_ESTADO = d.credenciais; credPreencher(CRED_ESTADO); }
     st.style.color = 'var(--green)'; st.textContent = '✓ Salvo — já valendo para envios e geradores.';
