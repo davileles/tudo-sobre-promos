@@ -3789,6 +3789,7 @@ function lstToggleCupom(){
     var s = document.getElementById('lst-cupom-codigo');
     var atual = s.value; s.innerHTML = opcoesCupom(); if (atual) s.value = atual;
   }
+  if (typeof LST_SEL !== 'undefined' && LST_SEL.length) renderLstSel();
 }
 
 // Envio unico e lista salva usam o MESMO formulario e a mesma maquina de envio.
@@ -3931,6 +3932,14 @@ function lstMover(asin, delta){
   renderLstSel();
 }
 
+// Cupom que o produto carrega da vitrine. O disparo respeita esse vinculo no
+// modo automatico e o ignora nos modos 'sempre este cupom' e 'sem cupom' —
+// mostrar aqui evita marcar um cupom no cadastro e ver outro sair no grupo.
+function lstCupomVinculado(asin){
+  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  return (v && v.cupom) ? v.cupom : null;
+}
+
 function renderLstSel(){
   var el = document.getElementById('lst-sel');
   if (!LST_SEL.length){
@@ -3938,9 +3947,15 @@ function renderLstSel(){
     return;
   }
   var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
+  var modoC = (document.getElementById('lst-cupom-modo') || {}).value || 'auto';
+  var comVinculo = 0;
   el.innerHTML = LST_SEL.map(function(p, i){
     return '<div class="grp-chip">'
-      + '<span style="flex:1">' + (i+1) + '. ' + esc(p.nome) + '</span>'
+      + '<span style="flex:1">' + (i+1) + '. ' + esc(p.nome)
+      + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
+          comVinculo++;
+          return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
+      + '</span>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',1)" title="Descer">↓</button>'
       + '<button onclick="lstRemover(\'' + esc(p.asin) + '\')" title="Remover">✕</button>'
@@ -3949,7 +3964,15 @@ function renderLstSel(){
   + '<div style="font-size:11px;color:var(--muted2);margin-top:8px">'
   + LST_SEL.length + ' produto(s) · duração estimada '
   + (Math.round((LST_SEL.length - 1) * intervalo / 60 * 10) / 10) + 'h'
-  + lstTextoPrevisao(LST_SEL.length, intervalo) + '</div>';
+  + lstTextoPrevisao(LST_SEL.length, intervalo) + '</div>'
+  + (comVinculo
+      ? '<div style="font-size:11px;margin-top:4px;color:var(--muted2)">&#127915; ' + comVinculo
+        + ' produto(s) com cupom vinculado — '
+        + (modoC === 'fixo'   ? 'o cupom fixo escolhido acima vale para todos e substitui o vínculo.'
+         : modoC === 'nenhum' ? 'o modo <b>Sem cupom</b> ignora o vínculo e envia sem cupom nenhum.'
+         : 'no automático cada um sai com o cupom vinculado a ele; os demais recebem o melhor cupom da base.')
+        + '</div>'
+      : '');
 }
 
 function salvarLista(){
@@ -4745,7 +4768,17 @@ function aposCadastroVitrine(salvos, destino, cupom, modoCupom){
     var modo = modoCupom || (cupom ? 'fixo' : 'auto');
     document.getElementById('lst-cupom-modo').value = modo;
     lstToggleCupom();
-    if (modo === 'fixo' && cupom) document.getElementById('lst-cupom-codigo').value = cupom;
+    if (modo === 'fixo' && cupom) {
+      var selC = document.getElementById('lst-cupom-codigo');
+      // Sem a opcao correspondente o value nao gruda e o campo volta a vazio em
+      // silencio — e assim que um disparo escolhido a mao acaba saindo no modo
+      // automatico, com outro cupom.
+      var achou = [].slice.call(selC.options).some(function(o){ return o.value === cupom; });
+      if (!achou) selC.insertAdjacentHTML('beforeend',
+        '<option value="' + esc(cupom) + '">' + esc(cupom) + '</option>');
+      selC.value = cupom;
+    }
+    renderLstSel();
   });
 }
 
