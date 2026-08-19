@@ -118,10 +118,18 @@ try {
   .rod-item.rod-off{opacity:.55}
   .rod-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .rod-head input[type="text"]{flex:1;min-width:0}
+  .rod-semente>summary{cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);list-style:none}
+  .rod-semente>summary::-webkit-details-marker{display:none}
+  .rod-semente>summary::before{content:'▸ ';color:var(--muted2)}
+  .rod-semente[open]>summary::before{content:'▾ '}
   .rod-ord{font-size:11px;font-weight:800;color:var(--muted2);min-width:22px}
   .rod-mv{background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:10px;line-height:1;padding:5px 7px;cursor:pointer}
   .rod-mv:hover:not(:disabled){color:var(--accent);border-color:rgba(255,165,0,.5)}
   .rod-mv:disabled{opacity:.3;cursor:default}
+  .trilha-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+  .trilha-lbl{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);margin-right:2px}
+  .trilha-n{opacity:.6;font-size:10px}
+  .trilha-vazio{font-size:11.5px;color:var(--muted2)}
   .rod-info{margin-top:8px;padding:9px 11px;border:1px dashed var(--border);border-radius:8px;font-size:11.5px;line-height:1.55;color:var(--muted)}
   .rod-info code{display:block;margin-top:6px;font-size:11.5px;white-space:pre-wrap;word-break:break-all;color:var(--text)}
   .rod-chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;min-height:36px;align-items:center}
@@ -954,6 +962,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="result-card" id="c-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <textarea class="out" id="c-msg"></textarea>
+    <div class="trilha-wrap" id="c-trilhas"></div>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('c-msg','c-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
@@ -1067,6 +1076,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="result-card" id="o-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <textarea class="out" id="o-msg"></textarea>
+    <div class="trilha-wrap" id="o-trilhas"></div>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('o-msg','o-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
@@ -1141,6 +1151,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="result-card" id="l-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
     <textarea class="out" id="l-msg"></textarea>
+    <div class="trilha-wrap" id="l-trilhas"></div>
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('l-msg','l-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
@@ -2236,17 +2247,21 @@ body.travado > *:not(#login-screen){display:none !important}
     na prévia acima: ele depende de para qual grupo a mensagem vai.
   </div>
 
-  <div class="card">
-    <p class="card-title" style="margin-bottom:12px">✍️ Rodapés das mensagens</p>
-    <div class="aviso" style="margin-bottom:12px">
-      Texto anexado ao final de cada mensagem. Use crase (<b>`texto`</b>) para o estilo monoespaçado do WhatsApp.
-      Deixe vazio para não anexar nada.
+  <details class="card rod-semente">
+    <summary>✍️ Rodapés semente <span class="tag" style="text-transform:none">herança — só valem para operador novo</span></summary>
+    <div class="aviso" style="margin:12px 0">
+      Estes dois campos <b>não</b> definem o rodapé das mensagens. Quem define é a tabela
+      <b>🎯 Rodapés por nicho</b> abaixo, que resolve grupo a grupo na hora do envio — no radar,
+      no gerador manual e nos cupons.<br>
+      O que sobrou aqui é a <b>semente</b>: o texto usado para criar os templates <code>_padrao</code>,
+      <code>_cupom</code> e <code>_awin</code> na primeira execução de um operador novo. Com os templates
+      já criados, mexer aqui não muda nenhuma mensagem.
     </div>
-    <div class="field" style="margin-bottom:12px"><label>Rodapé dos CUPONS <span class="tag">semente do template _cupom e do combo de cupons</span></label>
+    <div class="field" style="margin-bottom:12px"><label>Semente do rodapé de CUPONS</label>
       <textarea id="cfg-rod-cupom" rows="2" spellcheck="false"></textarea></div>
-    <div class="field"><label>Rodapé das OFERTAS <span class="tag">gerador de oferta, mensagem livre e semente do template _padrao</span></label>
+    <div class="field"><label>Semente do rodapé de OFERTAS</label>
       <textarea id="cfg-rod-oferta" rows="2" spellcheck="false"></textarea></div>
-  </div>
+  </details>
 
   <div class="card">
     <p class="card-title" style="margin-bottom:12px">🎯 Rodapés por nicho <span class="tag" style="text-transform:none">convite cruzado</span></p>
@@ -5669,48 +5684,128 @@ function anexarRodape(msg, rodape) {
   return rodape ? msg + '\n\n' + rodape : msg;
 }
 
-/* ══ RODAPÉ DOS GERADORES MANUAIS ══
+/* ══ DESTINOS E RODAPÉ DOS GERADORES MANUAIS ══
    O rodapé deixou de ser colado no corpo da mensagem: quem resolve é o mesmo
    motor de regras do radar (Config → 🎯 Rodapés por nicho), por GRUPO, na hora
-   do envio. O corpo ia junto no texto enviado e o servidor anexava a regra por
-   cima — o convite saía duas vezes. Aqui só EXIBIMOS o que o grupo geral vai
-   receber, para o operador conferir e para o botão Copiar (colagem à mão). */
-var ROD_PREVIEW = { manual: null, cupom: null };
-var _rodPrevProm = null;
+   do envio — antes o painel colava o texto e o servidor anexava a regra por
+   cima, e o convite saía duas vezes.
+   O destino também deixou de ser fixo: dá para marcar uma trilha de nicho e a
+   mensagem sai no grupo dela. Como quem marca é o operador (que viu o produto),
+   a categoria vai junto e vale como classificação confirmada para as regras. */
+var TRILHAS_CFG   = [];
+var _trilhasProm  = null;
+var TRILHA_SEL    = {};       // prefixo do gerador -> [ids de trilha]
+var _rodPrevCache = {};       // 'tipo|categoria' -> destinos[] (null = falhou)
 
-function rodapeManualCarregar(force) {
-  if (_rodPrevProm && !force) return _rodPrevProm;
-  _rodPrevProm = Promise.all(['manual','cupom'].map(function(t){
-    return fetch(SERVER + '/config-tsp/rodape-preview?tipo=' + t + '&t=' + Date.now())
-      .then(function(r){ return r.json(); })
-      .then(function(d){ ROD_PREVIEW[t] = rodMaisComum((d && d.destinos) || []); })
-      .catch(function(){ ROD_PREVIEW[t] = null; });
-  }));
-  return _rodPrevProm;
+function trilhasCarregar(force) {
+  if (_trilhasProm && !force) return _trilhasProm;
+  _trilhasProm = fetch(SERVER + '/mkt/config?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ TRILHAS_CFG = (d && d.trilhas) || []; })
+    .catch(function(){ TRILHAS_CFG = []; });
+  return _trilhasProm;
 }
 
-// Mensagem manual vai só para os grupos gerais, então o rodapé é o mesmo em
-// todos. A moda cobre o caso de algum destino divergir sem quebrar a exibição.
-function rodMaisComum(destinos) {
-  var cont = {}, melhor = '', max = 0;
-  destinos.forEach(function(d){
-    var v = d.rodape || '';
-    cont[v] = (cont[v] || 0) + 1;
-    if (cont[v] > max) { max = cont[v]; melhor = v; }
+function trilhasGeraisIds() {
+  return TRILHAS_CFG.filter(function(t){ return !t.categoria; }).map(function(t){ return t.id; });
+}
+
+// Sem escolha explicita, vale o comportamento antigo: so os grupos gerais.
+function trilhasSel(pref) {
+  if (!TRILHA_SEL[pref]) TRILHA_SEL[pref] = trilhasGeraisIds();
+  return TRILHA_SEL[pref];
+}
+
+function trilhaToggle(pref, id) {
+  var sel = trilhasSel(pref);
+  var k = sel.indexOf(id);
+  if (k >= 0) sel.splice(k, 1); else sel.push(id);
+  pintarTrilhas(pref);
+  pintarRodapeAplicado(pref + '-msg');
+}
+
+// Categoria so existe quando UMA unica categoria de nicho esta marcada: com
+// duas, dizer ao servidor que a mensagem e 'bebidas' seria mentira, e a regra
+// de rodape por categoria entraria no grupo errado.
+function categoriaSel(pref) {
+  var ids = trilhasSel(pref);
+  var cats = TRILHAS_CFG
+    .filter(function(t){ return ids.indexOf(t.id) >= 0 && t.categoria; })
+    .map(function(t){ return t.categoria; });
+  cats = cats.filter(function(v,i){ return cats.indexOf(v) === i; });
+  return cats.length === 1 ? cats[0] : '';
+}
+
+function jidsSel(pref) {
+  var ids = trilhasSel(pref), out = [];
+  TRILHAS_CFG.forEach(function(t){
+    if (ids.indexOf(t.id) < 0) return;
+    (t.destinos || []).forEach(function(j){ if (out.indexOf(j) < 0) out.push(j); });
   });
-  return melhor;
+  return out;
+}
+
+function pintarTrilhas(pref) {
+  var box = document.getElementById(pref + '-trilhas');
+  if (!box) return;
+  trilhasCarregar().then(function(){
+    if (!TRILHAS_CFG.length) {
+      box.innerHTML = '<span class="trilha-vazio">Nenhuma trilha cadastrada na aba Grupos — a mensagem sai nos grupos de destino atuais.</span>';
+      return;
+    }
+    var sel = trilhasSel(pref);
+    box.innerHTML = '<span class="trilha-lbl">Enviar para</span>'
+      + TRILHAS_CFG.map(function(t){
+          var on = sel.indexOf(t.id) >= 0;
+          var n  = (t.destinos || []).length;
+          return '<button type="button" class="cat-chip' + (on ? ' on' : '') + '" onclick="trilhaToggle(\'' + pref + '\',\'' + t.id + '\')">'
+               + esc(t.nome || t.id) + ' <span class="trilha-n">' + n + '</span></button>';
+        }).join('')
+      + (sel.length ? '' : '<span class="trilha-vazio">Nada marcado — o envio cai nos grupos gerais.</span>');
+  });
+}
+
+function rodPreviewBuscar(tipo, cat) {
+  var chave = tipo + '|' + (cat || '');
+  if (_rodPrevCache[chave]) return _rodPrevCache[chave];
+  _rodPrevCache[chave] = fetch(SERVER + '/config-tsp/rodape-preview?tipo=' + tipo
+      + '&categoria=' + encodeURIComponent(cat || '') + '&t=' + Date.now())
+    .then(function(r){ return r.json(); })
+    .then(function(d){ return (d && d.destinos) || []; })
+    .catch(function(){ return null; });
+  return _rodPrevCache[chave];
 }
 
 function rodTipoDoGerador(msgId) { return msgId === 'c-msg' ? 'cupom' : 'manual'; }
 
-function rodapeDoGerador(msgId) {
-  var v = ROD_PREVIEW[rodTipoDoGerador(msgId)];
-  return typeof v === 'string' ? v : '';
+// Rodapes distintos entre os grupos escolhidos, do mais frequente para o menos.
+function rodapesDosDestinos(pref, destinos) {
+  var alvo = jidsSel(pref);
+  var lista = destinos.filter(function(d){ return !alvo.length || alvo.indexOf(d.jid) >= 0; });
+  if (!lista.length) lista = destinos;
+  var mapa = {};
+  lista.forEach(function(d){
+    var v = d.rodape || '';
+    if (!mapa[v]) mapa[v] = [];
+    mapa[v].push(d.nome || d.jid);
+  });
+  return Object.keys(mapa).map(function(v){ return { texto:v, grupos:mapa[v] }; })
+    .sort(function(a,b){ return b.grupos.length - a.grupos.length; });
 }
+
+// Usado pelo botao Copiar: colagem a mao nao passa pelo servidor, entao ali o
+// rodape precisa estar no texto. Vale o do grupo mais comum.
+function rodapeDoGerador(msgId) {
+  var pref = msgId.charAt(0);
+  var d = _rodPrevUltimo[pref];
+  return (d && d.length && d[0].texto) || '';
+}
+var _rodPrevUltimo = {};
 
 function pintarRodapeAplicado(msgId) {
   var el = document.getElementById(msgId);
   if (!el) return;
+  var pref = msgId.charAt(0);
   var box = document.getElementById(msgId + '-rodinfo');
   if (!box) {
     box = document.createElement('div');
@@ -5719,16 +5814,26 @@ function pintarRodapeAplicado(msgId) {
     el.parentNode.insertBefore(box, el.nextSibling);
   }
   box.innerHTML = 'Consultando o rodapé…';
-  rodapeManualCarregar().then(function(){
-    var v = ROD_PREVIEW[rodTipoDoGerador(msgId)];
-    if (v === null || v === undefined) {
-      box.innerHTML = 'Não deu para consultar o rodapé no servidor. A mensagem sai com o rodapé que as regras definirem no envio.';
-    } else if (!v) {
-      box.innerHTML = '<b>Sem rodapé</b> — nenhuma regra ativa casa com este tipo de mensagem. Cadastre em <b>Config → 🎯 Rodapés por nicho</b>.';
-    } else {
-      box.innerHTML = '<b>➕ Rodapé aplicado no envio</b> — resolvido grupo a grupo pelas regras (Config → 🎯 Rodapés por nicho). '
-        + 'Não faz parte do texto acima; o botão <b>Copiar</b> já o inclui.<code>' + esc(v) + '</code>';
+  trilhasCarregar().then(function(){
+    return rodPreviewBuscar(rodTipoDoGerador(msgId), categoriaSel(pref));
+  }).then(function(destinos){
+    if (!destinos) {
+      _rodPrevUltimo[pref] = [];
+      box.innerHTML = 'Não deu para consultar o rodapé no servidor. O que as regras definirem no envio é o que vale.';
+      return;
     }
+    var grupos = rodapesDosDestinos(pref, destinos);
+    _rodPrevUltimo[pref] = grupos;
+    var comTexto = grupos.filter(function(g){ return g.texto; });
+    if (!comTexto.length) {
+      box.innerHTML = '<b>Sem rodapé</b> — nenhuma regra ativa casa com este tipo de mensagem. Cadastre em <b>Config → 🎯 Rodapés por nicho</b>.';
+      return;
+    }
+    box.innerHTML = '<b>➕ Rodapé aplicado no envio</b> — resolvido grupo a grupo pelas regras (Config → 🎯 Rodapés por nicho). '
+      + 'Não faz parte do texto acima; o botão <b>Copiar</b> já inclui o primeiro.'
+      + grupos.map(function(g){
+          return '<code>' + (g.texto ? esc(g.texto) : '(sem rodapé)') + '\n— ' + esc(g.grupos.length + ' grupo(s): ' + g.grupos.slice(0,4).join(', ') + (g.grupos.length>4?'…':'')) + '</code>';
+        }).join('');
   });
 }
 
@@ -6776,6 +6881,7 @@ function gerarLivre() {
 
 function mostrar(msgId, cardId, okId, msg) {
   document.getElementById(msgId).value = msg;
+  pintarTrilhas(msgId.charAt(0));
   pintarRodapeAplicado(msgId);
   document.getElementById(cardId).style.display = 'block';
   document.getElementById(okId).textContent = '';
@@ -6952,6 +7058,11 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
   // destino MAIS os grupos so-cupons; oferta e mensagem livre saem so nos
   // destinos, porque grupo so-cupons nunca recebe produto.
   var tipoEnvio = (msgId === 'c-msg') ? 'cupom' : 'oferta';
+  // Destino escolhido nos chips: lista de trilhas + a categoria delas, que o
+  // servidor usa para resolver o rodape de cada grupo.
+  var prefEnvio = msgId.charAt(0);
+  var trilhasEnvio = trilhasSel(prefEnvio).slice();
+  var catEnvio = categoriaSel(prefEnvio);
   var s = document.getElementById(statusId);
   if (!wsConectado) { s.className='send-ok send-err'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; },4000); return; }
 
@@ -6978,6 +7089,8 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       var formData = new FormData();
       formData.append('imagem',file); formData.append('legenda',texto); formData.append('grupo','tsp');
       formData.append('tipo',tipoEnvio);
+      formData.append('trilhas', JSON.stringify(trilhasEnvio));
+      if (catEnvio) formData.append('categoria', catEnvio);
       r = await fetch(SERVER+'/enviar-imagem', { method:'POST', body:formData });
     } else if (file && agendarEm) {
       // Agendado com anexo: multipart nao serve porque o arquivo precisa ficar
@@ -6990,9 +7103,11 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       var b64 = await arquivoParaBase64(file);
       r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ mensagem: texto, grupo: 'tsp', tipo: tipoEnvio, agendarEm: agendarEm,
+          trilhas: trilhasEnvio, categoria: catEnvio || null,
           anexo: { base64: b64, mimetype: file.type || 'image/jpeg', nomeArquivo: file.name || '' } }) });
     } else {
-      var payload = { mensagem: texto, grupo: 'tsp', tipo: tipoEnvio };
+      var payload = { mensagem: texto, grupo: 'tsp', tipo: tipoEnvio,
+                      trilhas: trilhasEnvio, categoria: catEnvio || null };
       if (agendarEm) payload.agendarEm = agendarEm;
       // Oferta montada pela busca por link sai com card de preview, igual às do
       // radar — inclusive agendada: o servidor guarda os dados do card e baixa a
