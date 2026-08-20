@@ -21,15 +21,21 @@
         "async function excluirDist(",
         "async function fetchSheet(",
         "async function forcarReconexao(",
+        "async function hojeCarregar(",
         "async function limparAprovacao(",
         "async function loadAll(",
         "async function montarCombo(",
         "async function rejeitarItem(",
         "async function removerImagem(",
         "async function salvarDist(",
-        "async function salvarPapeis(",
         "async function validarCodigo(",
-        "function _fetchTimeout("
+        "function _fetchTimeout(",
+        "function ckAbrir(",
+        "function ckIndexar(",
+        "function hojePintarAlertas(",
+        "function recalcPapeis(",
+        "function renderTrilhas(",
+        "function salvarGruposCfg("
       ]
     }
   }
