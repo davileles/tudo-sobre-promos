@@ -107,7 +107,10 @@ function coletarDaPagina() {
     .replace(/[|;]+/g, ' ')          // separador reservado ao formato da linha
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 140);
+    // Corte na ultima palavra inteira. O .slice(0,140) cru partia no meio do
+    // caractere ("...12V Displa"), e esse recorte vence o titulo real da pagina
+    // no servidor — entrava torto na vitrine e saia torto no WhatsApp.
+    .replace(/^(.{0,180})(?:\s.*)?$/s, '$1');
 
   const num = v => {
     const n = Number(String(v).replace(/[^\d.,]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
