@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Captura TSP",
+  "version": "2.0.0",
+  "description": "Junta links de produtos e despeja no campo de cadastro da vitrine do TSP.",
+  "permissions": [
+    "contextMenus",
+    "scripting",
+    "storage",
+    "notifications"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gestao.tudosobrepromos.com/*"
+      ],
+      "js": ["painel.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Captura TSP",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icones/16.png",
+      "48": "icones/48.png",
+      "128": "icones/128.png"
+    }
+  },
+  "icons": {
+    "16": "icones/16.png",
+    "48": "icones/48.png",
+    "128": "icones/128.png"
+  }
+}
