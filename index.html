@@ -754,6 +754,43 @@ body.travado > *:not(#login-screen){display:none !important}
   .hoje-linha{ grid-template-columns:1fr; }
 }
 
+/* ── NAVEGACAO EM DOIS NIVEIS ── */
+#tabs-legado{ display:none; }
+.side-sec{ display:flex; align-items:center; gap:11px; width:100%;
+  background:transparent; border:1px solid transparent; border-radius:11px;
+  color:var(--muted); font-family:inherit; font-size:14.5px; font-weight:700;
+  padding:12px 14px; margin-bottom:2px; cursor:pointer; text-align:left;
+  transition:background .15s, color .15s, border-color .15s; }
+.side-sec:hover{ background:var(--card); color:var(--fg,inherit); }
+.side-sec.active{ background:var(--card); border-color:var(--accent); color:var(--accent); }
+.sec-ico{ font-size:15px; width:18px; text-align:center; opacity:.9; }
+.sec-badge{ margin-left:auto; background:var(--accent); color:#fff; font-size:11px;
+  font-weight:800; min-width:21px; height:21px; line-height:21px; text-align:center;
+  border-radius:11px; padding:0 6px; }
+#sub-tabs{ display:flex; align-items:center; gap:4px; flex-wrap:wrap;
+  border-bottom:1px solid var(--border); padding:0 0 0 2px; margin-bottom:18px; }
+.sub-tab{ position:relative; background:transparent; border:none; color:var(--muted);
+  font-family:inherit; font-size:14px; font-weight:700; padding:13px 14px;
+  cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .15s, border-color .15s; }
+.sub-tab:hover{ color:var(--accent); }
+.sub-tab.active{ color:var(--accent); border-bottom-color:var(--accent); }
+.sub-badge{ display:inline-block; margin-left:7px; background:var(--accent);
+  color:#fff; font-size:10.5px; font-weight:800; min-width:18px; height:18px;
+  line-height:18px; text-align:center; border-radius:9px; padding:0 5px;
+  vertical-align:middle; }
+.hd-busca{ flex:1; max-width:560px; display:flex; align-items:center; gap:10px;
+  margin:0 20px; background:var(--card); border:1px solid var(--border);
+  border-radius:11px; padding:11px 14px; cursor:text; font-family:inherit;
+  color:var(--muted); font-size:13.5px; font-weight:600; transition:border-color .15s; }
+.hd-busca:hover{ border-color:var(--accent); }
+.hd-busca-ico{ font-size:15px; opacity:.7; }
+.hd-busca-txt{ flex:1; text-align:left; }
+.hd-busca-tecla{ border:1px solid var(--border); border-radius:6px;
+  padding:2px 7px; font-size:11px; font-weight:700; opacity:.8; }
+@media (max-width:820px){ .hd-busca-txt, .hd-busca-tecla{ display:none; }
+  .hd-busca{ flex:0 0 auto; max-width:none; margin:0 10px; } }
+
 /* ── BUSCA ⌘K ── */
 #ck-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
   z-index:9999; padding-top:12vh; justify-content:center; align-items:flex-start; }
@@ -810,6 +847,11 @@ body.travado > *:not(#login-screen){display:none !important}
       <span class="brand-sub">Tudo Sobre Promos</span>
     </div>
   </div>
+  <button class="hd-busca" id="hd-busca" onclick="ckAbrir()">
+    <span class="hd-busca-ico">⌕</span>
+    <span class="hd-busca-txt">Buscar aba, ajuste ou ação…</span>
+    <span class="hd-busca-tecla" id="hd-busca-tecla">⌘K</span>
+  </button>
   <div class="hd-right">
     <button class="theme-btn" id="theme-btn" onclick="alternarTema()" title="Alternar tema">☀</button>
   </div>
@@ -835,8 +877,19 @@ body.travado > *:not(#login-screen){display:none !important}
 
 <div id="shell">
 <div class="main-tabs" id="main-tabs">
-  <button class="main-tab active" id="tab-hoje" onclick="switchTab('hoje')">☀️ Hoje<span class="tab-badge" id="hoje-badge" style="display:none">0</span></button>
-  <div class="side-group">Publicar</div>
+  <button class="side-sec active" id="sec-hoje" onclick="irSecao('hoje')"><span class="sec-ico">◎</span>Hoje<span class="sec-badge" id="badge-hoje" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-publicar" onclick="irSecao('publicar')"><span class="sec-ico">↗</span>Publicar<span class="sec-badge" id="badge-publicar" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-produtos" onclick="irSecao('produtos')"><span class="sec-ico">▦</span>Produtos<span class="sec-badge" id="badge-produtos" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-resultados" onclick="irSecao('resultados')"><span class="sec-ico">↑</span>Resultados<span class="sec-badge" id="badge-resultados" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-grupos" onclick="irSecao('grupos')"><span class="sec-ico">⌸</span>Grupos<span class="sec-badge" id="badge-grupos" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-ajustes" onclick="irSecao('ajustes')"><span class="sec-ico">⚙</span>Ajustes<span class="sec-badge" id="badge-ajustes" style="display:none">0</span></button>
+</div>
+
+<!-- Botoes de aba herdados: ficam fora da tela porque os badges
+     (#aprov-badge, #filaenvio-badge...) sao filhos deles e os carregadores
+     escrevem nesses ids. A faixa #sub-tabs so le os numeros daqui. -->
+<div id="tabs-legado" aria-hidden="true">
+  <button class="main-tab" id="tab-hoje" onclick="switchTab('hoje')">☀️ Hoje<span class="tab-badge" id="hoje-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
@@ -844,25 +897,24 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Criar cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Criar oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem livre</button>
-  <div class="side-group">Produtos</div>
   <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Base de produtos</button>
   <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
-  <div class="side-group" id="grp-resultados">Resultados</div>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
-  <div class="side-group">Grupos</div>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
-  <div class="side-group">Ajustes</div>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Ajustes</button>
 </div>
 
 <div id="shell-main">
+<!-- Sub-abas da secao atual. Desenhada por pintarSubTabs(): a fonte e o mapa
+     SECOES, entao aba nova aparece aqui sem tocar no HTML. -->
+<div id="sub-tabs"></div>
 <div class="wrap">
 
 <!-- ════════ HOJE — abre o painel mostrando o estado da operacao do dia ════════ -->
@@ -2818,11 +2870,112 @@ function switchTab(name) {
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') cfgAbrir();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
+  // Espelha a navegacao de dois niveis: qualquer switchTab (menu, ⌘K, atalho
+  // interno) reposiciona a lateral e a faixa de sub-abas.
+  SECAO_ATUAL = secaoDaAba(name);
+  ULTIMA_ABA_SECAO[SECAO_ATUAL] = name;
+  pintarSecaoAtiva();
+  pintarSubTabs(name);
+  pintarBadgesSecao();
   toggleSidebar(false);          // no mobile a sidebar e drawer: fecha ao escolher
   window.scrollTo({ top: 0 });
   // Lembra a aba: um F5 no meio de um trabalho voltava sempre para a Fila de
   // envio, obrigando a renavegar ate onde se estava.
   try { localStorage.setItem(ABA_KEY, name); } catch (e) {}
+}
+
+/* ══════ NAVEGACAO EM DOIS NIVEIS ══════
+   A lateral mostra so as 6 secoes; as abas da secao aparecem numa faixa no
+   topo do conteudo. switchTab(id) continua sendo a porta de entrada — todo o
+   codigo que ja chamava switchTab segue funcionando e a secao se ajusta
+   sozinha a partir deste mapa. */
+var SECOES = [
+  { id: 'hoje',       label: 'Hoje',       abas: ['hoje'] },
+  { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
+  { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','descobertas','trafego'] },
+  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','conexao'] },
+  { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
+];
+var ROTULO_ABA = {
+  hoje: 'Hoje', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
+  divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
+  livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
+  cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
+  rastreio: 'Rastreio de links', descobertas: 'Descobertas', trafego: 'Tráfego pago',
+  grupos: 'Trilhas', dist: 'Distribuidor', conexao: 'Conexão', config: 'Ajustes'
+};
+var SECAO_ATUAL = 'hoje';
+
+function secaoDaAba(aba) {
+  for (var i = 0; i < SECOES.length; i++) {
+    if (SECOES[i].abas.indexOf(aba) >= 0) return SECOES[i].id;
+  }
+  return 'hoje';
+}
+
+// Os contadores continuam morando nos badges antigos (#aprov-badge etc.), que
+// cada carregador ja atualiza. Aqui so somamos por secao — assim ninguem
+// precisou mudar de dono.
+function badgeDaAba(aba) {
+  var b = document.getElementById(aba + '-badge');
+  if (!b || b.style.display === 'none') return 0;
+  return parseInt(b.textContent, 10) || 0;
+}
+
+// Os carregadores atualizam os badges quando terminam, cada um no seu tempo.
+// Reler o DOM de 5 em 5s e barato e evita ter de tocar em cada carregador.
+setInterval(function () {
+  if (document.body.classList.contains('travado')) return;
+  pintarBadgesSecao();
+  var ativo = document.querySelector('#sub-tabs .sub-tab.active');
+  pintarSubTabs(ativo ? ativo.id.replace('sub-', '') : null);
+}, 5000);
+
+function pintarBadgesSecao() {
+  SECOES.forEach(function (s) {
+    var soma = 0;
+    s.abas.forEach(function (a) { soma += badgeDaAba(a); });
+    var el = document.getElementById('badge-' + s.id);
+    if (!el) return;
+    if (soma > 0) { el.textContent = soma; el.style.display = 'inline-block'; }
+    else { el.style.display = 'none'; }
+  });
+}
+
+function pintarSubTabs(abaAtiva) {
+  var sec = SECOES.filter(function (s) { return s.id === SECAO_ATUAL; })[0];
+  var faixa = document.getElementById('sub-tabs');
+  if (!faixa || !sec) return;
+  // Secao de uma aba so (Hoje, Ajustes) nao ganha faixa: seria uma aba sozinha
+  // repetindo o nome que a lateral ja mostra.
+  if (sec.abas.length < 2) { faixa.innerHTML = ''; faixa.style.display = 'none'; return; }
+  faixa.style.display = 'flex';
+  faixa.innerHTML = sec.abas.map(function (a) {
+    var btn = document.getElementById('tab-' + a);
+    // aba escondida para este operador continua escondida aqui
+    if (btn && btn.dataset && btn.dataset.oculta === '1') return '';
+    var n = badgeDaAba(a);
+    return '<button class="sub-tab' + (a === abaAtiva ? ' active' : '') + '" '
+      + 'id="sub-' + a + '" onclick="switchTab(\'' + a + '\')">' + (ROTULO_ABA[a] || a)
+      + (n > 0 ? '<span class="sub-badge">' + n + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+function pintarSecaoAtiva() {
+  SECOES.forEach(function (s) {
+    var el = document.getElementById('sec-' + s.id);
+    if (el) el.classList.toggle('active', s.id === SECAO_ATUAL);
+  });
+}
+
+// Clique na lateral: abre a primeira aba da secao (ou mantem a que ja estava
+// aberta ali, para nao perder o lugar ao voltar).
+var ULTIMA_ABA_SECAO = {};
+function irSecao(secId) {
+  var sec = SECOES.filter(function (s) { return s.id === secId; })[0];
+  if (!sec || !sec.abas.length) return;
+  switchTab(ULTIMA_ABA_SECAO[secId] || sec.abas[0]);
 }
 
 /* ══════ BUSCA ⌘K ══════
@@ -2834,17 +2987,10 @@ var CK_SEL = 0;
 
 function ckIndexar() {
   CK_ITENS = [];
-  var secao = '';
-  var nav = document.getElementById('main-tabs');
-  if (!nav) return;
-  Array.prototype.forEach.call(nav.children, function (el) {
-    if (el.classList.contains('side-group')) { secao = el.textContent.trim(); return; }
-    if (!el.classList.contains('main-tab')) return;
-    var id = (el.id || '').replace(/^tab-/, '');
-    if (!id) return;
-    // o badge entra no textContent e viraria "Fila3" na busca
-    var rot = el.childNodes[0] ? el.childNodes[0].textContent.trim() : el.textContent.trim();
-    CK_ITENS.push({ id: id, rot: rot, sec: secao || 'Painel' });
+  SECOES.forEach(function (s) {
+    s.abas.forEach(function (a) {
+      CK_ITENS.push({ id: a, rot: ROTULO_ABA[a] || a, sec: s.label });
+    });
   });
   // apelidos: nomes antigos e termos que o operador digita sem pensar na aba
   var APELIDOS = {
@@ -2927,6 +3073,12 @@ function ckTecla(e) {
 function ckRolar() {
   var sel = document.querySelector('#ck-lista .ck-item.sel');
   if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+}
+
+// O selo do atalho segue o teclado de quem abriu.
+if (!/Mac|iPhone|iPad/.test(navigator.platform || '')) {
+  var selo = document.getElementById('hd-busca-tecla');
+  if (selo) selo.textContent = 'Ctrl K';
 }
 
 document.addEventListener('keydown', function (e) {
@@ -3081,12 +3233,14 @@ var ABA_KEY = 'tsp-aba';
 // painel esta travado e nenhum carregador de dados pode disparar.
 function restaurarAba() {
   var nome;
-  try { nome = localStorage.getItem(ABA_KEY); } catch (e) { return; }
-  if (!nome || TABS.indexOf(nome) < 0) return;
+  try { nome = localStorage.getItem(ABA_KEY); } catch (e) { nome = null; }
+  // Sem aba guardada (ou invalida) abre na Hoje, mas sempre passando pelo
+  // switchTab: e ele que monta a faixa de sub-abas e os badges da lateral.
+  if (!nome || TABS.indexOf(nome) < 0) { switchTab('hoje'); return; }
   var botao = document.getElementById('tab-' + nome);
   // Aba escondida para este operador (a config decide quais aparecem): cai na
   // aba inicial em vez de abrir um painel que ele nao deveria ver.
-  if (!botao || botao.style.display === 'none') return;
+  if (!botao || botao.style.display === 'none') { switchTab('hoje'); return; }
   switchTab(nome);
 }
 
