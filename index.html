@@ -791,6 +791,12 @@ body.travado > *:not(#login-screen){display:none !important}
 @media (max-width:820px){ .hd-busca-txt, .hd-busca-tecla{ display:none; }
   .hd-busca{ flex:0 0 auto; max-width:none; margin:0 10px; } }
 
+.mp-efeito{ font-size:12.5px; font-weight:600; line-height:1.55; color:var(--muted);
+  margin:0 0 12px; padding:10px 13px; border:1px solid var(--border); border-radius:10px; }
+.mp-efeito-aviso{ color:var(--amber); border-color:color-mix(in srgb, var(--amber) 45%, transparent); }
+.mp-efeito-ok{ color:var(--blue); border-color:color-mix(in srgb, var(--blue) 45%, transparent); }
+.mp-efeito-on{ color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, transparent); }
+
 /* ── SELOS DE ESTADO ── */
 .ws-bar{ display:none; }
 .selo{ display:inline-flex; align-items:center; gap:7px; background:var(--card);
@@ -2564,20 +2570,24 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="g2" style="margin-bottom:12px">
       <div class="field">
         <label>Monitor</label>
-        <select id="mp-ativo">
+        <select id="mp-ativo" onchange="mpPintarEfeito()">
           <option value="0">Desligado — não lê preço nem avalia</option>
           <option value="1">Ligado</option>
         </select>
       </div>
       <div class="field">
         <label>Modo <span class="tag" style="text-transform:none">comece em sombra</span></label>
-        <select id="mp-modo">
+        <select id="mp-modo" onchange="mpPintarEfeito()">
           <option value="off">Off — não avalia</option>
           <option value="sombra">Sombra — avalia e enfileira, mas NÃO envia</option>
           <option value="on">On — envia automaticamente</option>
         </select>
       </div>
     </div>
+    <!-- Os dois seletores combinam de um jeito que nao e obvio: Monitor
+         Desligado anula o Modo. Sem este aviso da para sair da tela achando
+         que ficou em sombra com o monitor parado. -->
+    <p id="mp-efeito" class="mp-efeito"></p>
     <div class="g2" style="margin-bottom:12px">
       <div class="field">
         <label>Reler preços a cada <span class="tag">minutos</span></label>
@@ -3075,7 +3085,7 @@ var CABECALHOS = {
     var e = _mp() || {};
     var cfg = e.config || {};
     return _n(e.monitorados) + ' vigiados · ' + _n(e.maduros) + ' maduros · '
-      + (cfg.ativo ? 'publicando' : 'modo ' + (cfg.modo || 'sombra'));
+      + mpEstadoReal(cfg).curto;
   } },
   cupons: { titulo: 'Cupons', regras: 'cupons', sub: function () {
     return _n(_tam(typeof CUPONS_CACHE !== 'undefined' && CUPONS_CACHE)) + ' cupons na base';
@@ -3149,9 +3159,8 @@ var REGRAS = {
         return (j.inicio || '—') + '–' + (j.fim || '—') + ' · ' + (p.intervaloMin || '—') + ' min'; },
       ajuda: 'Detecção e publicação são separadas: a varredura empilha candidatos e o publicador solta um por vez, respeitando janela, intervalo e cota. Fila cheia não significa envio imediato.' },
     { nome: 'Modo de operação', estado: function () {
-        var cfg = (_mp() || {}).config || {};
-        return cfg.ativo ? 'publicando' : 'sombra (só registra)'; },
-      ajuda: 'Em sombra o monitor avalia e registra tudo, mas não publica. Serve para conferir se as regras estão pegando o que deveriam antes de soltar no grupo.' }
+        return mpEstadoReal((_mp() || {}).config).curto; },
+      ajuda: 'São dois interruptores e o primeiro manda: com o Monitor em “Desligado” nada roda, mesmo que o Modo esteja em Sombra. Para operar em sombra de verdade — avaliando e enfileirando sem publicar — o Monitor precisa estar Ligado e o Modo em Sombra.' }
   ] },
   cupons: { tit: 'Regras dos cupons', sub: 'Captura, deduplicação e envio', aba: 'cupons', blocos: [
     { nome: 'Deduplicação', estado: function () { return 'janela de 6 h'; },
@@ -3194,6 +3203,46 @@ function rgFechar(ev) {
 }
 
 /* ══════ SELOS DE ESTADO ══════ */
+// Fonte unica do estado do monitor: qualquer lugar que mostre isso na tela
+// chama aqui, para nao existir uma segunda leitura que discorde da primeira.
+// Le os seletores da tela (nao a config salva): mostra o efeito do que esta
+// selecionado agora, inclusive antes de salvar.
+function mpPintarEfeito() {
+  var a = document.getElementById('mp-ativo');
+  var m = document.getElementById('mp-modo');
+  var p = document.getElementById('mp-efeito');
+  if (!a || !m || !p) return;
+  var ativo = a.value === '1', modo = m.value;
+  var txt, cls;
+  if (!ativo && modo !== 'off') {
+    txt = 'Nada roda. Com o Monitor em Desligado o Modo “' + modo + '” não tem efeito: '
+        + 'não lê preço, não avalia e não publica. Para operar em sombra, ponha o Monitor em Ligado.';
+    cls = 'mp-efeito mp-efeito-aviso';
+  } else if (!ativo) {
+    txt = 'Nada roda: não lê preço, não avalia e não publica.';
+    cls = 'mp-efeito';
+  } else if (modo === 'off') {
+    txt = 'Nada roda. Com o Modo em Off o monitor não avalia, mesmo Ligado.';
+    cls = 'mp-efeito mp-efeito-aviso';
+  } else if (modo === 'sombra') {
+    txt = 'Lê preços, avalia e enfileira candidatos — mas não publica nada nos grupos.';
+    cls = 'mp-efeito mp-efeito-ok';
+  } else {
+    txt = 'Lê preços, avalia e PUBLICA automaticamente nos grupos, dentro da janela e das cotas.';
+    cls = 'mp-efeito mp-efeito-on';
+  }
+  p.textContent = txt;
+  p.className = cls;
+}
+
+function mpEstadoReal(cfg) {
+  cfg = cfg || {};
+  if (!cfg.ativo)              return { rot: 'desligado',  cls: 'selo-off',    curto: 'desligado' };
+  if (cfg.modo === 'on')       return { rot: 'ligado',     cls: 'selo-on',     curto: 'publicando' };
+  if (cfg.modo === 'sombra')   return { rot: 'em sombra',  cls: 'selo-alerta', curto: 'sombra (avalia, não envia)' };
+  return { rot: 'desligado', cls: 'selo-off', curto: 'desligado' };
+}
+
 function pintarSeloWA(conectado, txt) {
   var s = document.getElementById('selo-wa');
   var t = document.getElementById('selo-wa-txt');
@@ -3208,10 +3257,13 @@ function pintarSeloMonitor() {
   if (!t || !s) return;
   var cfg = (_mp() || {}).config;
   if (!cfg) { t.textContent = 'Monitor —'; s.className = 'selo selo-neutro'; return; }
-  // "ligado" quando publica de verdade; sombra e um terceiro estado, nao um off
-  if (cfg.ativo) { t.textContent = 'Monitor ligado'; s.className = 'selo selo-on'; }
-  else if ((cfg.modo || '') === 'sombra') { t.textContent = 'Monitor em sombra'; s.className = 'selo selo-alerta'; }
-  else { t.textContent = 'Monitor desligado'; s.className = 'selo selo-off'; }
+  // Espelha monitor-precos.js: `ativo` e a chave-mestra. Com ativo=false o
+  // reprogramarVarredura() sai antes de criar o timer, entao nao varre nem
+  // publica — modo 'sombra' ali dentro nao muda nada. Ler so o modo faria a
+  // tela dizer "em sombra" com o monitor parado.
+  var e = mpEstadoReal(cfg);
+  t.textContent = 'Monitor ' + e.rot;
+  s.className = 'selo ' + e.cls;
 }
 
 /* ══════ BUSCA ⌘K ══════
@@ -10937,6 +10989,7 @@ function mpPreencherConfig() {
   var c = MP_ESTADO.config;
   document.getElementById('mp-ativo').value = c.ativo ? '1' : '0';
   document.getElementById('mp-modo').value = c.modo;
+  mpPintarEfeito();
   document.getElementById('mp-intervalo-varredura').value = c.varredura.intervaloMin;
   document.getElementById('mp-intervalo-envio').value = c.publicacao.intervaloMin;
   document.getElementById('mp-lote').value = c.varredura.lote;
