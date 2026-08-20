@@ -821,6 +821,14 @@ body.travado > *:not(#login-screen){display:none !important}
 #tela-cab p{ font-size:13px; color:var(--muted); font-weight:600; margin:5px 0 0; }
 /* O respiro do topo passa a vir do #tela-cab; sem isto somariam os dois. */
 #shell-main.com-cab .wrap{ padding-top:0; }
+.cab-botoes{ flex-shrink:0; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cab-acao{ background:transparent; border:1px solid var(--border); color:var(--muted);
+  border-radius:10px; padding:9px 15px; font-family:inherit; font-size:12.5px;
+  font-weight:700; cursor:pointer; white-space:nowrap;
+  transition:border-color .15s, color .15s, background .15s; }
+.cab-acao:hover{ border-color:var(--accent); color:var(--accent); }
+.cab-acao-primaria{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.cab-acao-primaria:hover{ background:var(--accent); color:#fff; filter:brightness(1.08); }
 .cab-regras{ flex-shrink:0; background:transparent; border:1px solid var(--border);
   color:var(--muted); border-radius:10px; padding:9px 15px; font-family:inherit;
   font-size:12.5px; font-weight:700; cursor:pointer; transition:border-color .15s, color .15s; }
@@ -854,6 +862,9 @@ body.travado > *:not(#login-screen){display:none !important}
   .sub-tabs-in{ padding:0 14px; }
   #tela-cab{ margin:22px auto 16px; padding:0 14px; }
   #tela-cab h1{ font-size:21px; }
+  #tela-cab{ flex-direction:column; align-items:flex-start; }
+  .cab-botoes{ width:100%; }
+  .cab-acao, .cab-regras{ flex:1; }
 }
 
 /* ── BUSCA ⌘K ── */
@@ -1051,7 +1062,6 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="filaenvio-status">Carregando...</span>
     <div class="fila-acoes">
-      <button class="btn btn-copy btn-sm" onclick="carregarFilaEnvio()">↻ Atualizar</button>
     </div>
   </div>
   <div id="filaenvio-ctx"></div>
@@ -1064,7 +1074,6 @@ body.travado > *:not(#login-screen){display:none !important}
     <span id="aprov-status">Carregando...</span>
     <div class="fila-acoes">
       <button class="btn btn-rej btn-sm" id="btn-limpar-aprov" onclick="limparAprovacao()" disabled>🗑️ Limpar lista</button>
-      <button class="btn btn-copy btn-sm" onclick="carregarAprovacao()">↻ Atualizar</button>
     </div>
   </div>
   <div id="aprov-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
@@ -1075,7 +1084,6 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="agend-status">Carregando...</span>
     <div class="fila-acoes">
-      <button class="btn btn-copy btn-sm" onclick="carregarAgendados()">↻ Atualizar</button>
     </div>
   </div>
   <div id="agend-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
@@ -1087,7 +1095,6 @@ body.travado > *:not(#login-screen){display:none !important}
     <span id="dv-status">Carregando...</span>
     <div class="fila-acoes">
       <input type="month" id="dv-mes" class="dv-mes" onchange="carregarDivulgacoes(true)"/>
-      <button class="btn btn-copy btn-sm" onclick="carregarDivulgacoes(true)">↻ Atualizar</button>
     </div>
   </div>
 
@@ -1433,7 +1440,6 @@ body.travado > *:not(#login-screen){display:none !important}
     <span style="display:flex;gap:8px">
       <button class="btn btn-copy btn-sm" id="btn-grupos-refresh" onclick="atualizarListaGrupos()"
               title="Busca a lista atual no WhatsApp — use depois de criar um grupo novo">🔄 Atualizar lista</button>
-      <button class="btn btn-copy btn-sm" onclick="trilhaNova()">+ Nova trilha</button>
     </span>
   </div>
   <div id="grupos-refresh-fb" style="font-size:11px;font-weight:700;min-height:14px;margin:-4px 0 8px;color:var(--muted)"></div>
@@ -1510,8 +1516,6 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="dist-status">Carregando…</span>
     <div class="fila-acoes">
-      <button class="btn btn-copy btn-sm" onclick="distSincronizar()">🔄 Sincronizar contagens</button>
-      <button class="btn btn-copy btn-sm" onclick="carregarDist()">↻ Atualizar</button>
     </div>
   </div>
 
@@ -2122,7 +2126,6 @@ body.travado > *:not(#login-screen){display:none !important}
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
       <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
-      <button class="btn btn-copy btn-sm" onclick="carregarVitrine()">↻ Atualizar</button>
     </div>
   </div>
 
@@ -2174,7 +2177,6 @@ body.travado > *:not(#login-screen){display:none !important}
         <option value="vendas">Maior faturamento</option>
         <option value="ocorrencias">Mais pedidos</option>
       </select>
-      <button class="btn btn-copy btn-sm" onclick="carregarDescobertas()">↻ Atualizar</button>
     </div>
   </div>
   <div id="desc-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
@@ -2240,7 +2242,6 @@ body.travado > *:not(#login-screen){display:none !important}
         <option value="vendas">Maior faturamento</option>
         <option value="disparos">Mais disparos</option>
       </select>
-      <button class="btn btn-copy btn-sm" onclick="carregarRastreio(true)">↻ Atualizar</button>
     </div>
   </div>
   <div id="rt-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
@@ -2470,7 +2471,6 @@ body.travado > *:not(#login-screen){display:none !important}
     <span id="tpl-status">Carregando...</span>
     <div class="fila-acoes">
       <select id="tpl-loja" onchange="carregarTemplateLoja()" style="width:auto;padding:7px 10px;font-size:12px"></select>
-      <button class="btn btn-copy btn-sm" onclick="carregarTemplates()">↻ Atualizar</button>
     </div>
   </div>
 
@@ -2562,8 +2562,6 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="card-title" style="margin-bottom:10px">Situação</div>
     <div id="mp-resumo" class="mp-resumo"><div class="dv-vazio">Carregando…</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="mpCarregar()">🔄 Atualizar</button>
-      <button class="btn btn-sm" style="margin-top:0" onclick="mpVarrer()">🔍 Varrer preços agora</button>
     </div>
     <p class="send-ok" id="mp-status"></p>
   </div>
@@ -2882,7 +2880,6 @@ body.travado > *:not(#login-screen){display:none !important}
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;margin:0">
         <input type="checkbox" id="cupons-so-vigentes" onchange="salvarFiltroVigentes()" style="width:auto;accent-color:var(--accent)"/> só vigentes
       </label>
-      <button class="btn btn-copy btn-sm" onclick="carregarCupons()">↻ Atualizar</button>
     </div>
   </div>
   <div id="cupons-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
@@ -3081,53 +3078,53 @@ function _n(v) { return (Number(v) || 0).toLocaleString('pt-BR'); }
 function _tam(x) { return x && x.length ? x.length : (x ? Object.keys(x).length : 0); }
 
 var CABECALHOS = {
-  vitrine: { titulo: 'Base de produtos', regras: 'monitor', sub: function () {
+  vitrine: { titulo: 'Base de produtos', acoes: [{ rot: '↻ Atualizar', fn: 'carregarVitrine()' }], regras: 'monitor', sub: function () {
     var vig = (_mp() || {}).monitorados || 0;
     return _n(_tam(typeof VIT_CACHE !== 'undefined' && VIT_CACHE)) + ' produtos'
       + (vig ? ' · ' + _n(vig) + ' vigiados pelo monitor' : '');
   } },
-  monprecos: { titulo: 'Monitor de preços', regras: 'monitor', sub: function () {
+  monprecos: { titulo: 'Monitor de preços', acoes: [{ rot: '🔍 Varrer preços agora', fn: 'mpVarrer()', primario: true }, { rot: '🔄 Atualizar', fn: 'mpCarregar()' }], regras: 'monitor', sub: function () {
     var e = _mp() || {};
     var cfg = e.config || {};
     return _n(e.monitorados) + ' vigiados · ' + _n(e.maduros) + ' maduros · '
       + mpEstadoReal(cfg).curto;
   } },
-  cupons: { titulo: 'Cupons', regras: 'cupons', sub: function () {
+  cupons: { titulo: 'Cupons', acoes: [{ rot: '↻ Atualizar', fn: 'carregarCupons()' }], regras: 'cupons', sub: function () {
     return _n(_tam(typeof CUPONS_CACHE !== 'undefined' && CUPONS_CACHE)) + ' cupons na base';
   } },
-  templates: { titulo: 'Templates', sub: function () {
+  templates: { titulo: 'Templates', acoes: [{ rot: '↻ Atualizar', fn: 'carregarTemplates()' }], sub: function () {
     return _n(_tam(typeof TPL_CACHE !== 'undefined' && TPL_CACHE)) + ' templates';
   } },
-  grupos: { titulo: 'Trilhas', regras: 'trilhas', sub: function () {
+  grupos: { titulo: 'Trilhas', acoes: [{ rot: '+ Nova trilha', fn: 'trilhaNova()', primario: true }], regras: 'trilhas', sub: function () {
     return _n(_tam(typeof TRILHAS !== 'undefined' && TRILHAS)) + ' trilhas · '
       + _n(_tam(typeof GRUPOS_CACHE !== 'undefined' && GRUPOS_CACHE)) + ' grupos';
   } },
-  dist: { titulo: 'Distribuidor', sub: function () {
+  dist: { titulo: 'Distribuidor', acoes: [{ rot: '🔄 Sincronizar contagens', fn: 'distSincronizar()', primario: true }, { rot: '↻ Atualizar', fn: 'carregarDist()' }], sub: function () {
     return _n(_tam(typeof DIST_CACHE !== 'undefined' && DIST_CACHE)) + ' links';
   } },
   conexao: { titulo: 'Conexão', sub: function () { return 'Contas de WhatsApp e status do envio'; } },
-  rastreio: { titulo: 'Rastreio de links', sub: function () {
+  rastreio: { titulo: 'Rastreio de links', acoes: [{ rot: '↻ Atualizar', fn: 'carregarRastreio(true)' }], sub: function () {
     var m = (typeof RT_META === 'object' && RT_META) ? RT_META : null;
     if (!m || !m.totais) return 'Cliques e pedidos atribuidos por produto';
     return _n(m.totais.produtos) + ' produtos · ' + _n(m.totais.cliques) + ' cliques · '
       + _n(m.totais.pedidos) + ' pedidos';
   } },
-  descobertas: { titulo: 'Descobertas', sub: function () {
+  descobertas: { titulo: 'Descobertas', acoes: [{ rot: '↻ Atualizar', fn: 'carregarDescobertas()' }], sub: function () {
     var m = (typeof DESC_META === 'object' && DESC_META) ? DESC_META : null;
     if (!m || !m.totais) return 'Vendas de produtos fora da base';
     return _n(m.totais.unidades) + ' unidades fora da base';
   } },
   comissao:  { titulo: 'Comissão',      sub: function () { return 'Ganhos por plataforma e retorno do investimento'; } },
   trafego:   { titulo: 'Tráfego pago',  sub: function () { return 'Crescimento de membros e custo de aquisição'; } },
-  divulg:    { titulo: 'Divulgações',   sub: function () { return 'O que já saiu para os grupos'; } },
-  filaenvio: { titulo: 'Fila',          sub: function () { return 'O que vai sair e a que horas'; } },
-  agend:     { titulo: 'Agendados',     sub: function () { return 'Publicações com hora marcada'; } },
-  aprov:     { titulo: 'Aprovação',     sub: function () { return 'Itens que esperam a sua decisão'; } },
+  divulg:    { titulo: 'Divulgações', acoes: [{ rot: '↻ Atualizar', fn: 'carregarDivulgacoes(true)' }],   sub: function () { return 'O que já saiu para os grupos'; } },
+  filaenvio: { titulo: 'Fila', acoes: [{ rot: '↻ Atualizar', fn: 'carregarFilaEnvio()' }],          sub: function () { return 'O que vai sair e a que horas'; } },
+  agend:     { titulo: 'Agendados', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAgendados()' }],     sub: function () { return 'Publicações com hora marcada'; } },
+  aprov:     { titulo: 'Aprovação', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAprovacao()' }],     sub: function () { return 'Itens que esperam a sua decisão'; } },
   config:    { titulo: 'Ajustes',       regras: 'ajustes', sub: function () { return 'Marca, automação, categorias e credenciais'; } },
   cupom:  { titulo: 'Criar cupom',    sub: function () { return 'Monta e envia um cupom para os grupos'; } },
   oferta: { titulo: 'Criar oferta',   sub: function () { return 'Monta e envia uma oferta de produto'; } },
   livre:  { titulo: 'Mensagem livre', sub: function () { return 'Texto avulso, sem produto nem cupom'; } },
-  hoje: { titulo: 'Hoje', acao: { rot: '↻ Atualizar', fn: 'hojeCarregar(true)' }, sub: function () {
+  hoje: { titulo: 'Hoje', acoes: [{ rot: '↻ Atualizar', fn: 'hojeCarregar(true)' }], sub: function () {
     var d = new Date();
     return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   } }
@@ -3148,10 +3145,16 @@ function pintarCabecalho(aba) {
   // Cache ainda vazio nao pode derrubar o cabecalho inteiro.
   try { sub = def.sub() || ''; } catch (e) { sub = ''; }
   alvo.style.display = 'flex';
-  var botao = '';
-  if (def.regras) botao = '<button class="cab-regras" onclick="rgAbrir(\'' + def.regras + '\')">⚙ Regras desta seção</button>';
-  else if (def.acao) botao = '<button class="cab-regras" onclick="' + def.acao.fn + '">' + def.acao.rot + '</button>';
-  alvo.innerHTML = '<div><h1>' + def.titulo + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>' + botao;
+  // Acoes da tela + o botao de regras, nesta ordem. Nao entram aqui botoes com
+  // estado (texto ou disabled mexidos por JS): o cabecalho se redesenha a cada
+  // troca de aba e o estado se perderia.
+  var botoes = (def.acoes || []).map(function (a) {
+    return '<button class="cab-acao' + (a.primario ? ' cab-acao-primaria' : '')
+      + '" onclick="' + a.fn + '">' + a.rot + '</button>';
+  });
+  if (def.regras) botoes.push('<button class="cab-regras" onclick="rgAbrir(\'' + def.regras + '\')">⚙ Regras desta seção</button>');
+  alvo.innerHTML = '<div><h1>' + def.titulo + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>'
+    + (botoes.length ? '<div class="cab-botoes">' + botoes.join('') + '</div>' : '');
 }
 
 /* ══════ REGRAS DESTA SEÇÃO ══════
