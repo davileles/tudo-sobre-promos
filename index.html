@@ -749,7 +749,7 @@ body.travado > *:not(#login-screen){display:none !important}
 .hoje-alerta:hover{ border-color:var(--accent); }
 .hoje-alerta b{ font-weight:800; }
 .hoje-ok{ font-size:12px; color:var(--muted); font-weight:600; padding:10px 0; }
-@media (max-width:900px){
+@media(max-width:640px){
   .hoje-grid{ grid-template-columns:repeat(2,1fr); }
   .hoje-linha{ grid-template-columns:1fr; }
 }
@@ -767,8 +767,12 @@ body.travado > *:not(#login-screen){display:none !important}
 .sec-badge{ margin-left:auto; background:var(--accent); color:#fff; font-size:11px;
   font-weight:800; min-width:21px; height:21px; line-height:21px; text-align:center;
   border-radius:11px; padding:0 6px; }
-#sub-tabs{ display:flex; align-items:center; gap:4px; flex-wrap:wrap;
-  border-bottom:1px solid var(--border); padding:0 0 0 2px; margin-bottom:18px; }
+#sub-tabs{ display:block; border-bottom:1px solid var(--border);
+  padding:10px 0 0; margin:0; }
+/* Alinha com a coluna do .wrap (max-width 960 + padding 24): antes a faixa e o
+   titulo eram largura cheia e comecavam ~150px a esquerda do conteudo. */
+.sub-tabs-in{ display:flex; align-items:center; gap:4px; flex-wrap:wrap;
+  max-width:960px; margin:0 auto; padding:0 24px; }
 .sub-tab{ position:relative; background:transparent; border:none; color:var(--muted);
   font-family:inherit; font-size:14px; font-weight:700; padding:13px 14px;
   cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;
@@ -813,9 +817,11 @@ body.travado > *:not(#login-screen){display:none !important}
 
 /* ── CABECALHO DE TELA ── */
 #tela-cab{ display:none; align-items:flex-end; justify-content:space-between;
-  gap:16px; margin-bottom:18px; }
+  gap:16px; max-width:960px; margin:34px auto 22px; padding:0 24px; }
 #tela-cab h1{ font-size:26px; font-weight:800; letter-spacing:-.5px; margin:0; }
 #tela-cab p{ font-size:13px; color:var(--muted); font-weight:600; margin:5px 0 0; }
+/* O respiro do topo passa a vir do #tela-cab; sem isto somariam os dois. */
+#shell-main.com-cab .wrap{ padding-top:0; }
 .cab-regras{ flex-shrink:0; background:transparent; border:1px solid var(--border);
   color:var(--muted); border-radius:10px; padding:9px 15px; font-family:inherit;
   font-size:12.5px; font-weight:700; cursor:pointer; transition:border-color .15s, color .15s; }
@@ -844,6 +850,12 @@ body.travado > *:not(#login-screen){display:none !important}
   color:var(--muted); border-radius:9px; padding:7px 13px; font-family:inherit;
   font-size:12px; font-weight:700; cursor:pointer; }
 .rg-ir:hover{ border-color:var(--accent); color:var(--accent); }
+
+@media(max-width:640px){
+  .sub-tabs-in{ padding:0 14px; }
+  #tela-cab{ margin:22px auto 16px; padding:0 14px; }
+  #tela-cab h1{ font-size:21px; }
+}
 
 /* ── BUSCA ⌘K ── */
 #ck-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
@@ -3038,8 +3050,8 @@ function pintarSubTabs(abaAtiva) {
   // Secao de uma aba so (Hoje, Ajustes) nao ganha faixa: seria uma aba sozinha
   // repetindo o nome que a lateral ja mostra.
   if (sec.abas.length < 2) { faixa.innerHTML = ''; faixa.style.display = 'none'; return; }
-  faixa.style.display = 'flex';
-  faixa.innerHTML = sec.abas.map(function (a) {
+  faixa.style.display = 'block';
+  faixa.innerHTML = '<div class="sub-tabs-in">' + sec.abas.map(function (a) {
     var btn = document.getElementById('tab-' + a);
     // aba escondida para este operador continua escondida aqui
     if (btn && btn.dataset && btn.dataset.oculta === '1') return '';
@@ -3047,7 +3059,7 @@ function pintarSubTabs(abaAtiva) {
     return '<button class="sub-tab' + (a === abaAtiva ? ' active' : '') + '" '
       + 'id="sub-' + a + '" onclick="switchTab(\'' + a + '\')">' + (ROTULO_ABA[a] || a)
       + (n > 0 ? '<span class="sub-badge">' + n + '</span>' : '') + '</button>';
-  }).join('');
+  }).join('') + '</div>';
 }
 
 function pintarSecaoAtiva() {
@@ -3124,8 +3136,14 @@ var CABECALHOS = {
 function pintarCabecalho(aba) {
   var alvo = document.getElementById('tela-cab');
   if (!alvo) return;
+  var main = document.getElementById('shell-main');
   var def = CABECALHOS[aba];
-  if (!def) { alvo.style.display = 'none'; alvo.innerHTML = ''; return; }
+  if (!def) {
+    alvo.style.display = 'none'; alvo.innerHTML = '';
+    if (main) main.classList.remove('com-cab');
+    return;
+  }
+  if (main) main.classList.add('com-cab');
   var sub = '';
   // Cache ainda vazio nao pode derrubar o cabecalho inteiro.
   try { sub = def.sub() || ''; } catch (e) { sub = ''; }
