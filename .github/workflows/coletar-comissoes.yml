@@ -37,6 +37,12 @@ jobs:
 
       - name: Coletar comissões do dia anterior
         env:
+          # Fixado de proposito. O default no codigo e 'davileles/cdv-tsp-dados',
+          # nome antigo do repositorio: hoje so funciona porque o GitHub mantem
+          # redirect permanente do repo renomeado. Se alguem criar um repo novo
+          # com o nome antigo, a coleta passa a gravar no lugar errado em
+          # silencio — e o ledger de EPC e as comissoes iriam para outro dono.
+          REPO_DADOS: davileles/dados
           AMAZON_COOKIE: ${{ secrets.AMAZON_COOKIE }}
           ML_COOKIE: ${{ secrets.ML_COOKIE }}
           SHOPEE_COOKIE: ${{ secrets.SHOPEE_COOKIE }}
