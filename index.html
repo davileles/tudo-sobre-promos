@@ -720,6 +720,60 @@ body.travado > *:not(#login-screen){display:none !important}
   padding:0 0 12px; margin-bottom:16px; }
 .res-scope .logo-wrap{ display:none; }
 
+/* ── HOJE ─────────────────────────────────────────────────────────────
+   Usa as variaveis de tema: a tela acompanha claro/escuro como as demais. */
+.hoje-head{ display:flex; align-items:flex-end; justify-content:space-between;
+  gap:16px; margin-bottom:18px; }
+.hoje-tit{ font-size:19px; font-weight:800; letter-spacing:-.3px; margin:0; }
+.hoje-sub{ font-size:12px; color:var(--muted); font-weight:600; margin:3px 0 0; }
+.hoje-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+.hoje-linha{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.hoje-card,.hoje-bloco{ background:var(--card); border:1px solid var(--border);
+  border-radius:13px; padding:18px 20px; }
+.hoje-card{ cursor:pointer; transition:border-color .15s, transform .15s; }
+.hoje-card:hover,.hoje-bloco[onclick]:hover{ border-color:var(--accent); transform:translateY(-1px); }
+.hoje-bloco[onclick]{ cursor:pointer; }
+.hoje-rot{ font-size:9.5px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.9px; color:var(--muted); }
+.hoje-val{ font-size:30px; font-weight:800; line-height:1; margin:8px 0 4px; color:var(--accent); }
+.hoje-pe{ font-size:11.5px; color:var(--muted); font-weight:600; }
+.hoje-plats{ margin-top:12px; }
+.hoje-plats div{ display:flex; justify-content:space-between; align-items:center;
+  padding:6px 0; border-top:1px solid var(--border); font-size:11.5px; }
+.hoje-plats span:first-child{ color:var(--muted); font-weight:500; }
+.hoje-plats span:last-child{ font-weight:700; }
+.hoje-alertas{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.hoje-alerta{ display:flex; align-items:flex-start; gap:9px; padding:10px 12px;
+  border:1px solid var(--border); border-radius:10px; font-size:12px;
+  font-weight:600; cursor:pointer; }
+.hoje-alerta:hover{ border-color:var(--accent); }
+.hoje-alerta b{ font-weight:800; }
+.hoje-ok{ font-size:12px; color:var(--muted); font-weight:600; padding:10px 0; }
+@media (max-width:900px){
+  .hoje-grid{ grid-template-columns:repeat(2,1fr); }
+  .hoje-linha{ grid-template-columns:1fr; }
+}
+
+/* ── BUSCA ⌘K ── */
+#ck-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+  z-index:9999; padding-top:12vh; justify-content:center; align-items:flex-start; }
+#ck-overlay.aberto{ display:flex; }
+#ck-caixa{ width:min(560px,92vw); background:var(--card); border:1px solid var(--border);
+  border-radius:14px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.45); }
+#ck-input{ width:100%; border:none; outline:none; background:transparent;
+  color:inherit; font-size:15px; font-weight:600; padding:16px 18px;
+  border-bottom:1px solid var(--border); font-family:inherit; }
+#ck-lista{ max-height:52vh; overflow-y:auto; }
+.ck-item{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:11px 18px; cursor:pointer; font-size:13px; font-weight:600; }
+.ck-item.sel{ background:var(--accent); color:#fff; }
+.ck-item .ck-sec{ font-size:10px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.7px; color:var(--muted); }
+.ck-item.sel .ck-sec{ color:#fff; opacity:.75; }
+#ck-rodape{ padding:9px 18px; border-top:1px solid var(--border);
+  font-size:10.5px; color:var(--muted); font-weight:600; }
+.ck-vazio{ padding:18px; font-size:12.5px; color:var(--muted); font-weight:600; }
+
 </style>
 </head>
 <body class="travado">
@@ -769,39 +823,98 @@ body.travado > *:not(#login-screen){display:none !important}
 
 <button class="side-toggle" id="side-toggle" onclick="toggleSidebar()" aria-label="Abrir menu">☰ Menu</button>
 <div id="side-backdrop" onclick="toggleSidebar(false)"></div>
+<!-- ════════ BUSCA ⌘K — atalho para qualquer aba sem caçar no menu ════════ -->
+<div id="ck-overlay" onclick="ckFechar(event)">
+  <div id="ck-caixa" onclick="event.stopPropagation()">
+    <input id="ck-input" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Buscar aba ou ajuste…" oninput="ckFiltrar()" onkeydown="ckTecla(event)">
+    <div id="ck-lista"></div>
+    <div id="ck-rodape">↑↓ navegar · ⏎ abrir · esc fechar</div>
+  </div>
+</div>
+
 <div id="shell">
 <div class="main-tabs" id="main-tabs">
-  <div class="side-group">Operação</div>
-  <button class="main-tab active" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
+  <button class="main-tab active" id="tab-hoje" onclick="switchTab('hoje')">☀️ Hoje<span class="tab-badge" id="hoje-badge" style="display:none">0</span></button>
+  <div class="side-group">Publicar</div>
+  <button class="main-tab" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
-  <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-divulg" onclick="switchTab('divulg')">📊 Divulgações</button>
-  <div class="side-group">Criar mensagem</div>
-  <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Cupom</button>
-  <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Oferta</button>
-  <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem</button>
-  <div class="side-group">Cadastros</div>
-  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Vitrine e disparos</button>
-  <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de Cupons</button>
+  <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Criar cupom</button>
+  <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Criar oferta</button>
+  <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem livre</button>
+  <div class="side-group">Produtos</div>
+  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Base de produtos</button>
+  <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
-  <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">👥 Grupos</button>
-  <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
-  <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
   <div class="side-group" id="grp-resultados">Resultados</div>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
-  <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio de links</button>
+  <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
-  <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego pago</button>
-  <div class="side-group">Sistema</div>
-  <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Configurações</button>
+  <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
+  <div class="side-group">Grupos</div>
+  <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
+  <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
+  <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
+  <div class="side-group">Ajustes</div>
+  <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Ajustes</button>
 </div>
 
 <div id="shell-main">
 <div class="wrap">
 
+<!-- ════════ HOJE — abre o painel mostrando o estado da operacao do dia ════════ -->
+<!-- Nao substitui nenhuma aba: le os mesmos endpoints das outras e resume. -->
+<div class="panel active" id="panel-hoje">
+  <div class="hoje-head">
+    <div>
+      <h1 class="hoje-tit">Hoje</h1>
+      <p class="hoje-sub" id="hoje-data">—</p>
+    </div>
+    <button class="btn btn-copy btn-sm" onclick="hojeCarregar(true)">↻ Atualizar</button>
+  </div>
+
+  <div class="hoje-grid" id="hoje-cards">
+    <div class="hoje-card" onclick="switchTab('filaenvio')">
+      <div class="hoje-rot">Na fila</div>
+      <div class="hoje-val" id="hoje-fila">—</div>
+      <div class="hoje-pe" id="hoje-fila-sub">carregando</div>
+    </div>
+    <div class="hoje-card" onclick="switchTab('aprov')">
+      <div class="hoje-rot">Aguardando aprovação</div>
+      <div class="hoje-val" id="hoje-aprov">—</div>
+      <div class="hoje-pe" id="hoje-aprov-sub">carregando</div>
+    </div>
+    <div class="hoje-card" onclick="switchTab('agend')">
+      <div class="hoje-rot">Agendados</div>
+      <div class="hoje-val" id="hoje-agend">—</div>
+      <div class="hoje-pe" id="hoje-agend-sub">carregando</div>
+    </div>
+    <div class="hoje-card" onclick="switchTab('divulg')">
+      <div class="hoje-rot">Divulgado hoje</div>
+      <div class="hoje-val" id="hoje-envios">—</div>
+      <div class="hoje-pe" id="hoje-envios-sub">carregando</div>
+    </div>
+  </div>
+
+  <div class="hoje-linha">
+    <div class="hoje-bloco" onclick="switchTab('comissao')">
+      <div class="hoje-rot">Comissão do mês</div>
+      <div class="hoje-val" id="hoje-comissao">—</div>
+      <div class="hoje-pe" id="hoje-comissao-sub">carregando</div>
+      <div id="hoje-plats" class="hoje-plats"></div>
+    </div>
+    <div class="hoje-bloco">
+      <div class="hoje-rot">Precisa de você</div>
+      <div id="hoje-alertas" class="hoje-alertas"><div class="hoje-pe">carregando</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- ════════ FILA — o que ja vai pro grupo e so espera a hora (leitura) ════════ -->
-<div class="panel active" id="panel-filaenvio">
+<div class="panel" id="panel-filaenvio">
   <div class="fila-bar">
     <span id="filaenvio-status">Carregando...</span>
     <div class="fila-acoes">
@@ -2666,7 +2779,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
+var TABS = ['hoje','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2675,6 +2788,7 @@ function switchTab(name) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
+  if (name === 'hoje') hojeCarregar();
   if (name === 'descobertas') carregarDescobertas();
   if (name === 'rastreio') { carregarRastreio(); carregarTagsMl(); }
   if (name === 'filaenvio') carregarFilaEnvio();
@@ -2709,6 +2823,256 @@ function switchTab(name) {
   // Lembra a aba: um F5 no meio de um trabalho voltava sempre para a Fila de
   // envio, obrigando a renavegar ate onde se estava.
   try { localStorage.setItem(ABA_KEY, name); } catch (e) {}
+}
+
+/* ══════ BUSCA ⌘K ══════
+   O menu tem 20 abas em 5 grupos: achar "Base de cupons" exigia varrer a
+   lateral. O indice sai da propria navegacao, entao aba nova aparece sozinha
+   aqui — nao ha segunda lista para manter em dia. */
+var CK_ITENS = [];
+var CK_SEL = 0;
+
+function ckIndexar() {
+  CK_ITENS = [];
+  var secao = '';
+  var nav = document.getElementById('main-tabs');
+  if (!nav) return;
+  Array.prototype.forEach.call(nav.children, function (el) {
+    if (el.classList.contains('side-group')) { secao = el.textContent.trim(); return; }
+    if (!el.classList.contains('main-tab')) return;
+    var id = (el.id || '').replace(/^tab-/, '');
+    if (!id) return;
+    // o badge entra no textContent e viraria "Fila3" na busca
+    var rot = el.childNodes[0] ? el.childNodes[0].textContent.trim() : el.textContent.trim();
+    CK_ITENS.push({ id: id, rot: rot, sec: secao || 'Painel' });
+  });
+  // apelidos: nomes antigos e termos que o operador digita sem pensar na aba
+  var APELIDOS = {
+    filaenvio: 'fila envio proximos disparos',
+    aprov: 'aprovacao aprovar pendente revisar',
+    agend: 'agendados agendamento programado horario',
+    divulg: 'divulgacoes enviados historico envios',
+    cupom: 'criar cupom novo codigo desconto',
+    oferta: 'criar oferta produto promocao',
+    livre: 'mensagem livre texto aviso recado',
+    vitrine: 'vitrine base produtos disparos asin catalogo',
+    monprecos: 'monitor precos queda alerta preco cotas semeadura epc',
+    cupons: 'base cupons cupom cadastrados janela',
+    templates: 'templates modelo texto rodape',
+    grupos: 'grupos trilhas destinos fontes papeis',
+    dist: 'distribuidor convite links censo',
+    conexao: 'conexao whatsapp qr contas chip numero',
+    comissao: 'comissao ganhos receita plataformas roi',
+    rastreio: 'rastreio links etiquetas tags atribuicao pool',
+    descobertas: 'descobertas fora da base venda indireta',
+    trafego: 'trafego pago membros anuncio gasto custo',
+    config: 'ajustes configuracoes afiliado awin marca categorias',
+    hoje: 'hoje inicio resumo painel visao geral'
+  };
+  CK_ITENS.forEach(function (it) { it.busca = (it.rot + ' ' + it.sec + ' ' + (APELIDOS[it.id] || '')).toLowerCase(); });
+}
+
+function ckNormalizar(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function ckAbrir() {
+  // Antes do login o body fica com .travado, que esconde tudo fora do
+  // #login-screen. Sem esta guarda o atalho abriria uma busca invisivel.
+  if (document.body.classList.contains('travado')) return;
+  if (!CK_ITENS.length) ckIndexar();
+  var ov = document.getElementById('ck-overlay');
+  var inp = document.getElementById('ck-input');
+  ov.classList.add('aberto');
+  inp.value = '';
+  CK_SEL = 0;
+  ckFiltrar();
+  setTimeout(function () { inp.focus(); }, 0);
+}
+
+function ckFechar(ev) {
+  if (ev && ev.target && ev.target.id !== 'ck-overlay') return;
+  document.getElementById('ck-overlay').classList.remove('aberto');
+}
+
+function ckFiltrar() {
+  var q = ckNormalizar(document.getElementById('ck-input').value.trim());
+  var res = q ? CK_ITENS.filter(function (i) { return ckNormalizar(i.busca).indexOf(q) >= 0; }) : CK_ITENS.slice();
+  if (CK_SEL >= res.length) CK_SEL = 0;
+  var lista = document.getElementById('ck-lista');
+  if (!res.length) { lista.innerHTML = '<div class="ck-vazio">Nada encontrado.</div>'; return; }
+  lista.innerHTML = res.map(function (i, n) {
+    return '<div class="ck-item' + (n === CK_SEL ? ' sel' : '') + '" data-id="' + i.id + '" onclick="ckIr(\'' + i.id + '\')">'
+      + '<span>' + i.rot + '</span><span class="ck-sec">' + i.sec + '</span></div>';
+  }).join('');
+}
+
+function ckIr(id) {
+  ckFechar();
+  switchTab(id);
+}
+
+function ckTecla(e) {
+  var itens = document.querySelectorAll('#ck-lista .ck-item');
+  if (e.key === 'Escape') { ckFechar(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); CK_SEL = Math.min(CK_SEL + 1, itens.length - 1); ckFiltrar(); ckRolar(); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); CK_SEL = Math.max(CK_SEL - 1, 0); ckFiltrar(); ckRolar(); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var alvo = itens[CK_SEL];
+    if (alvo) ckIr(alvo.getAttribute('data-id'));
+  }
+}
+
+function ckRolar() {
+  var sel = document.querySelector('#ck-lista .ck-item.sel');
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+}
+
+document.addEventListener('keydown', function (e) {
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    var ov = document.getElementById('ck-overlay');
+    if (ov && ov.classList.contains('aberto')) ckFechar(); else ckAbrir();
+  }
+});
+
+/* ══════ HOJE ══════
+   Resumo do dia. Nao tem endpoint proprio: le os mesmos que as abas ja usam
+   (/operacao/fila, /painel-json, /agendamentos, /operacao/historico-envios e
+   /afiliados/comissoes) e junta. Falha de um nao derruba os outros. */
+var HOJE_CACHE = 0;
+
+function hojeNum(id, val, sub) {
+  var e = document.getElementById(id);
+  if (e) e.textContent = val;
+  var s = document.getElementById(id + '-sub');
+  if (s && sub != null) s.textContent = sub;
+}
+
+function hojeReal(v) {
+  return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+async function hojeCarregar(forcar) {
+  // A aba costuma ser reaberta varias vezes por sessao; sem isso cada volta
+  // refazia cinco chamadas de rede sem necessidade.
+  if (!forcar && HOJE_CACHE && Date.now() - HOJE_CACHE < 60000) return;
+  HOJE_CACHE = Date.now();
+
+  var hoje = new Date();
+  var dd = String(hoje.getDate()).padStart(2, '0');
+  var mm = String(hoje.getMonth() + 1).padStart(2, '0');
+  var elData = document.getElementById('hoje-data');
+  if (elData) elData.textContent = dd + '/' + mm + '/' + hoje.getFullYear();
+
+  var alertas = [];
+  var j = function (r) { return r.json(); };
+
+  // ── fila ──
+  fetch(SERVER + '/operacao/fila?t=' + Date.now(), { cache: 'no-cache' }).then(j).then(function (d) {
+    var n = ((d && d.itens) || []).length;
+    hojeNum('hoje-fila', n, n === 0 ? 'nada esperando envio' : 'aguardando a hora de sair');
+  }).catch(function () { hojeNum('hoje-fila', '—', 'nao foi possivel ler'); });
+
+  // ── aprovacao (mesmo filtro da aba: pendente + ehTSP) ──
+  fetch(SERVER + '/painel-json?t=' + Date.now(), { cache: 'no-cache' }).then(j).then(function (d) {
+    var pend = ((d && d.ofertas) || []).filter(function (o) {
+      return o.status === 'pendente' && (typeof ehTSP === 'function' ? ehTSP(o) : true);
+    });
+    hojeNum('hoje-aprov', pend.length, pend.length === 0 ? 'nada pendente' : 'esperando sua decisao');
+    if (pend.length > 0) {
+      alertas.push({ ico: '✅', txt: '<b>' + pend.length + '</b> item(ns) aguardando aprovacao', aba: 'aprov' });
+      hojePintarAlertas(alertas);
+    }
+  }).catch(function () { hojeNum('hoje-aprov', '—', 'nao foi possivel ler'); });
+
+  // ── agendados ──
+  fetch(SERVER + '/agendamentos?t=' + Date.now(), { cache: 'no-cache' }).then(j).then(function (d) {
+    var n = ((d && d.agendamentos) || d.itens || []).length;
+    hojeNum('hoje-agend', n, n === 0 ? 'nenhum agendamento' : 'programados');
+  }).catch(function () { hojeNum('hoje-agend', '—', 'nao foi possivel ler'); });
+
+  // ── divulgado hoje ──
+  var mesRef = hoje.getFullYear() + '-' + mm;
+  fetch(SERVER + '/operacao/historico-envios?mes=' + mesRef + '&t=' + Date.now(), { cache: 'no-cache' })
+    .then(j).then(function (d) {
+      var regs = (d && d.registros) || [];
+      var chaveHoje = hoje.getFullYear() + '-' + mm + '-' + dd;
+      var doDia = regs.filter(function (r) { return String(r.enviadoEm || '').slice(0, 10) === chaveHoje; });
+      var dias = {};
+      regs.forEach(function (r) { dias[String(r.enviadoEm || '').slice(0, 10)] = 1; });
+      var qtdDias = Object.keys(dias).length || 1;
+      var media = Math.round(regs.length / qtdDias);
+      hojeNum('hoje-envios', doDia.length,
+        doDia.length + ' de ' + regs.length + ' no mes · média ' + media + '/dia');
+    }).catch(function () { hojeNum('hoje-envios', '—', 'nao foi possivel ler'); });
+
+  // ── comissao do mes (mesma fonte da aba: coletor, com planilha de reserva) ──
+  fetch('https://cdv-proxy-production.up.railway.app/afiliados/comissoes?t=' + Date.now(), { cache: 'no-cache' })
+    .then(j).then(function (d) {
+      if (!d || !d.ok || !d.dias) throw new Error('resposta invalida');
+      var chaves = Object.keys(d.dias).sort();
+      var ultima = chaves[chaves.length - 1];
+      var mesAtual = ultima.slice(0, 7);
+      var refDia = Number(ultima.slice(8, 10));
+      var acc = { total: 0, amazon: 0, ml: 0, shopee: 0 };
+      var mesAnt = 0;
+      // mesmo dia do mes anterior, para a comparacao nao pegar meia janela
+      var dtAnt = new Date(Number(ultima.slice(0, 4)), Number(ultima.slice(5, 7)) - 2, 1);
+      var chaveAnt = dtAnt.getFullYear() + '-' + String(dtAnt.getMonth() + 1).padStart(2, '0');
+      chaves.forEach(function (k) {
+        var dia = Number(k.slice(8, 10));
+        if (dia > refDia) return;
+        var reg = d.dias[k] || {};
+        var soma = 0;
+        ['amazon', 'ml', 'shopee'].forEach(function (pl) {
+          // FOTO (comissao), nunca os *Rev: e o criterio dos meses importados
+          soma += Number((reg[pl] || {}).comissao) || 0;
+        });
+        if (k.slice(0, 7) === mesAtual) {
+          acc.total += soma;
+          ['amazon', 'ml', 'shopee'].forEach(function (pl) {
+            acc[pl] += Number((reg[pl] || {}).comissao) || 0;
+          });
+        } else if (k.slice(0, 7) === chaveAnt) { mesAnt += soma; }
+      });
+      var varPct = mesAnt ? ((acc.total / mesAnt - 1) * 100) : 0;
+      hojeNum('hoje-comissao', hojeReal(acc.total),
+        'dias 1–' + refDia + ' · mês anterior ' + hojeReal(mesAnt)
+        + (mesAnt ? ' (' + (varPct >= 0 ? '+' : '−') + Math.abs(varPct).toFixed(1) + '%)' : ''));
+      var alvo = document.getElementById('hoje-plats');
+      if (alvo) {
+        alvo.innerHTML =
+          '<div><span>Amazon</span><span style="color:var(--amazon)">' + hojeReal(acc.amazon) + '</span></div>'
+          + '<div><span>Mercado Livre</span><span style="color:var(--ml)">' + hojeReal(acc.ml) + '</span></div>'
+          + '<div><span>Shopee</span><span style="color:var(--shopee,#f4654a)">' + hojeReal(acc.shopee) + '</span></div>';
+      }
+      // Coleta diaria: se a serie parou, todo numero de Resultados envelhece junto.
+      var atraso = Math.floor((Date.now() - new Date(ultima + 'T12:00:00').getTime()) / 86400000);
+      if (atraso >= 2) {
+        alertas.push({ ico: '⚠️', txt: 'Comissao sem coleta ha <b>' + atraso + ' dias</b> (ultimo: ' + ultima.split('-').reverse().join('/') + ')', aba: 'comissao' });
+        hojePintarAlertas(alertas);
+      }
+    }).catch(function () { hojeNum('hoje-comissao', '—', 'nao foi possivel ler'); });
+
+  setTimeout(function () { hojePintarAlertas(alertas); }, 2500);
+}
+
+function hojePintarAlertas(lista) {
+  var alvo = document.getElementById('hoje-alertas');
+  // O badge da aba mostra o mesmo numero: assim o operador ve que algo pede
+  // atencao mesmo estando em outra aba.
+  var badge = document.getElementById('hoje-badge');
+  if (badge) {
+    if (lista.length) { badge.textContent = lista.length; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+  if (!alvo) return;
+  if (!lista.length) { alvo.innerHTML = '<div class="hoje-ok">Nada pendente. Operacao rodando.</div>'; return; }
+  alvo.innerHTML = lista.map(function (a) {
+    return '<div class="hoje-alerta" onclick="switchTab(\'' + a.aba + '\')"><span>' + a.ico + '</span><span>' + a.txt + '</span></div>';
+  }).join('');
 }
 
 var ABA_KEY = 'tsp-aba';
