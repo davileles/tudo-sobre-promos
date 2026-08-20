@@ -662,6 +662,57 @@ const EPC_MAX_DIAS_RODADA = 8;
 // descreve o publico de hoje.
 const EPC_JANELA_DIAS = 90;
 
+/**
+ * Separa comissao DIRETA de INDIRETA no ledger de EPC.
+ *
+ * O problema: `epc-produtos.json` e montado do relatorio de produtos VINCULADOS,
+ * que atribui tudo ao item CLICADO. Quando a pessoa clica num link e compra
+ * outra coisa nas 24h — que e a regra, nao a excecao — a comissao aparece no
+ * item comprado, nao no clicado. O resultado e um ledger em que produto com
+ * dezenas de cliques e vendas reais figura com comissao zero.
+ *
+ * Caso medido em 19/08: soundcore P40i com 53 cliques e R$ 0,00 no EPC,
+ * enquanto vendas-descobertas registrava 22 unidades e R$ 80,81 no MESMO
+ * periodo. Os dois numeros estao certos — respondem perguntas diferentes.
+ *
+ * Aqui os dois viram campos separados, sem que um sobrescreva o outro:
+ *   comissao / epc              o que o relatorio de vinculados atribuiu (direta)
+ *   comissaoIndireta            o que o produto rendeu sendo comprado, nao clicado
+ *   epcTotal                    (direta + indireta) / cliques
+ */
+async function cruzarEpcComDescobertas(itensDescobertos) {
+  const { dados: led } = await lerJson(ARQ_EPC, null);
+  if (!led || !led.produtos) return;
+
+  const porId = new Map();
+  for (const it of itensDescobertos || []) {
+    const id = String(it.id || '').toUpperCase();
+    if (!/^B[A-Z0-9]{9}$/.test(id)) continue;          // ledger de EPC e so Amazon
+    const a = porId.get(id) || { comissao: 0, unidades: 0 };
+    a.comissao = num(a.comissao + (it.comissao || 0));
+    a.unidades += it.unidades || 0;
+    porId.set(id, a);
+  }
+
+  let tocados = 0;
+  for (const [asin, p] of Object.entries(led.produtos)) {
+    const ind = porId.get(asin);
+    const indComis = ind ? ind.comissao : 0;
+    const indUnid  = ind ? ind.unidades : 0;
+    const antes = p.comissaoIndireta ?? null;
+    p.comissaoIndireta = indComis;
+    p.unidadesIndiretas = indUnid;
+    p.epcTotal = p.cliques
+      ? Math.round(((p.comissao + indComis) / p.cliques) * 100) / 100 : 0;
+    if (antes !== indComis) tocados++;
+  }
+
+  led.atualizadoEm = new Date().toISOString();
+  await gravarJson(ARQ_EPC, led,
+    `chore: EPC cruzado com vendas descobertas (${tocados} produto(s) com comissao indireta)`);
+  console.log(`[desempenho] EPC cruzado: ${tocados} produto(s) ganharam comissao indireta`);
+}
+
 function epcVazio() {
   return { atualizadoEm: null, dias: {}, produtos: {} };
 }
@@ -1399,6 +1450,12 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
       }, `chore: vendas descobertas (${itens.length} produtos)`);
       console.log(`[desempenho] descobertas: ${itens.length} produtos `
         + `(R$ ${totais.comissao} em comissao) — ${Object.keys(porLoja).join(', ')}`);
+
+      // Enriquecimento do ledger de EPC. Roda AQUI, depois das descobertas
+      // existirem nesta rodada — dentro de acumularEpcAmazon o arquivo ainda
+      // seria o da rodada anterior.
+      try { await cruzarEpcComDescobertas(itens); }
+      catch (e) { console.warn('[desempenho] cruzamento EPC x descobertas falhou:', e.message); }
     } catch (e) {
       console.warn('[desempenho] gravacao das vendas descobertas falhou:', e.message);
     }
