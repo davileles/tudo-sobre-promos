@@ -1944,6 +1944,10 @@ body.travado > *:not(#login-screen){display:none !important}
         <select id="vit-cupom-novo"></select>
       </div>
     </div>
+    <div class="field" style="margin-top:10px">
+      <label>Nicho curado <span class="tag">vale para todos os links acima</span></label>
+      <select id="vit-nicho"><option value="">Deixar o classificador decidir</option></select>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine('so')">➕ Só cadastrar na base</button>
       <button class="btn" style="margin-top:0;flex:1;min-width:170px" onclick="cadastrarVitrine('unico')">🚀 Cadastrar e disparar agora</button>
@@ -1961,6 +1965,11 @@ body.travado > *:not(#login-screen){display:none !important}
       a partir do horário que você marcar em <b>Quando começar</b> (sempre no mesmo dia).
       <b>Lista salva</b> abre o mesmo formulário no modo guardado, com nome e agendamento,
       para reenviar quando quiser.
+      <br><b>Nicho curado</b> é a sua garantia de que estes produtos são daquele nicho. Marcado,
+      o classificador deixa de ter voto: o produto vai para o grupo do nicho mesmo que o título
+      não tenha nenhuma palavra reconhecível — e o monitor de preços passa a tratar toda queda
+      dele como publicável, sem cota e no intervalo curto. Deixe em branco quando não tiver
+      certeza; aí o classificador decide, e o que ele não confirmar sai só no grupo geral.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
     <div id="vit-cad-erros" style="display:none;margin-top:8px;border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:10px 12px;background:rgba(248,113,113,.05)"></div>
@@ -2122,9 +2131,11 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="fila-acoes">
       <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
       <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <select id="vit-filtro-nicho" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"><option value="">Todos os nichos</option></select>
       <button class="btn btn-copy btn-sm" onclick="resolverNomesVitrine()" title="Lê na Amazon o título dos itens que ficaram como &quot;Produto ASIN&quot;">✎ Resolver nomes</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
+      <button class="btn btn-copy btn-sm" id="vit-btn-nicho" onclick="marcarNichoSelecionados()" disabled>🏷 Definir nicho dos selecionados</button>
       <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
     </div>
   </div>
@@ -2943,7 +2954,11 @@ function switchTab(name) {
   if (name === 'vitrine') {
     // Cupons primeiro (alimentam os selects), depois a base de produtos (da os
     // nomes dos itens de cada disparo) e por fim os disparos.
-    (CUPONS_CACHE.length ? Promise.resolve() : carregarCupons())
+    // Nichos antes da base: o selo de cada linha usa o rotulo da taxonomia, e sem
+    // a lista carregada ele sairia como o id cru ("infantil" em vez de "🍼 Bebê
+    // e Infantil").
+    (VIT_NICHOS.length ? Promise.resolve() : carregarNichosVitrine())
+      .then(function(){ return CUPONS_CACHE.length ? Promise.resolve() : carregarCupons(); })
       .then(carregarVitrine)
       .then(carregarListas)
       .then(carregarAwinCand);
@@ -5728,11 +5743,67 @@ function editarPrecoVitrine(btn){
 
 // Busca por nome, codigo e cupom: o operador procura de todo jeito, e obrigar a
 // lembrar o ASIN exato seria pior do que rolar a lista inteira.
+// ── NICHOS ───────────────────────────────────────────────────────────────────
+// A lista vem do servidor, que a deriva da taxonomia do classificador. Manter
+// uma copia fixa aqui significaria que um nicho novo na taxonomia nao apareceria
+// no painel — e produto curado para um nicho que o roteamento nao conhece nao
+// chega a grupo nenhum.
+var VIT_NICHOS = [];
+
+function carregarNichosVitrine(){
+  return fetch(SERVER + '/vitrine/nichos?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      VIT_NICHOS = (d.nichos || []).sort(function(a,b){
+        return (a.nome || '').localeCompare(b.nome || '', 'pt-BR');
+      });
+      preencherSelectsNicho();
+    })
+    .catch(function(e){ console.warn('[VITRINE] Nichos:', e.message); });
+}
+
+function rotuloNicho(id){
+  if (!id) return '';
+  for (var k = 0; k < VIT_NICHOS.length; k++) {
+    if (VIT_NICHOS[k].id === id) {
+      return ((VIT_NICHOS[k].emoji || '') + ' ' + (VIT_NICHOS[k].nome || id)).trim();
+    }
+  }
+  return id;
+}
+
+function preencherSelectsNicho(){
+  var cad = document.getElementById('vit-nicho');
+  if (cad) {
+    var atualC = cad.value;
+    cad.innerHTML = '<option value="">Deixar o classificador decidir</option>'
+      + VIT_NICHOS.map(function(n){
+          return '<option value="' + esc(n.id) + '">' + esc(((n.emoji || '') + ' ' + n.nome).trim()) + '</option>';
+        }).join('');
+    cad.value = atualC;
+  }
+  var flt = document.getElementById('vit-filtro-nicho');
+  if (flt) {
+    var atualF = flt.value;
+    flt.innerHTML = '<option value="">Todos os nichos</option>'
+      + '<option value="__sem">Sem nicho definido</option>'
+      + VIT_NICHOS.map(function(n){
+          return '<option value="' + esc(n.id) + '">' + esc(((n.emoji || '') + ' ' + n.nome).trim()) + '</option>';
+        }).join('');
+    flt.value = atualF;
+  }
+}
+
 function vitFiltrados(){
   var q    = valorCampo('vit-busca').trim().toLowerCase();
   var loja = valorCampo('vit-loja');
+  var nic  = valorCampo('vit-filtro-nicho');
   return VIT_CACHE.filter(function(i){
     if (loja && (i.loja || 'Amazon') !== loja) return false;
+    // '__sem' = os que ainda dependem do classificador. E a lista de trabalho da
+    // curadoria: o que falta marcar.
+    if (nic === '__sem' && (i.nicho || '')) return false;
+    if (nic && nic !== '__sem' && (i.nicho || '') !== nic) return false;
     if (!q) return true;
     return ((i.nome || '') + ' ' + (i.asin || '') + ' ' + (i.cupom || '') + ' ' + (i.loja || ''))
       .toLowerCase().indexOf(q) >= 0;
@@ -5814,7 +5885,8 @@ function renderVitrine(){
       + '<div class="vit-info">'
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome)
           + (nomeProvisorio(i.nome) ? ' <span style="color:var(--red);font-weight:700;font-size:10px">nome não lido</span>' : '') + '</div>'
-        + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '') + '</div>'
+        + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '')
+          + (i.nicho ? ' · <span style="color:#22c55e;font-weight:600">' + esc(rotuloNicho(i.nicho)) + '</span>' : '') + '</div>'
       + '</div>'
       + precoVitrine(i)
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
@@ -5852,6 +5924,11 @@ function atualizarBarraVitrine(){
     bx.disabled = !n;
     bx.textContent = n ? '🗑 Excluir selecionados (' + n + ')' : '🗑 Excluir selecionados';
   }
+  var bn = document.getElementById('vit-btn-nicho');
+  if (bn) {
+    bn.disabled = !n;
+    bn.textContent = n ? '🏷 Definir nicho (' + n + ')' : '🏷 Definir nicho dos selecionados';
+  }
   document.getElementById('vit-sel-txt').textContent =
     n + ' produto' + (n === 1 ? '' : 's') + ' selecionado' + (n === 1 ? '' : 's')
     + ' — no próximo passo você escolhe se é envio único ou lista salva.';
@@ -5884,7 +5961,7 @@ function cadastrarVitrine(destino){
 
   fetch(SERVER + '/vitrine', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ texto: texto, cupom: cupom })
+    body: JSON.stringify({ texto: texto, cupom: cupom, nicho: valorCampo('vit-nicho') || '' })
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
@@ -6150,6 +6227,53 @@ function removerVitrine(btn){
 
 // Exclusao em lote. Os DELETE saem em SERIE de proposito: o proxy grava todos no
 // mesmo vitrine.json e requisicoes paralelas colidem por SHA no commit.
+// Marcacao em MASSA do nicho. Uma requisicao para todos os ASINs (o endpoint
+// aceita a lista inteira), e nao um PUT por item: sao 221 produtos na base e o
+// vitrine.json e o mesmo arquivo — requisicoes paralelas colidiriam por SHA no
+// commit, que e exatamente o problema que a exclusao em serie ja contorna.
+function marcarNichoSelecionados(){
+  var asins = Object.keys(VIT_SEL);
+  if (!asins.length) return;
+
+  var opcoes = VIT_NICHOS.map(function(n, k){
+    return '  ' + (k + 1) + ') ' + ((n.emoji || '') + ' ' + n.nome).trim();
+  }).join('\n');
+  var resp = prompt('Definir o nicho de ' + asins.length + ' produto(s).\n\n'
+    + 'Digite o número:\n' + opcoes + '\n\n'
+    + '  0) Limpar o nicho (volta a depender do classificador)\n\n'
+    + 'Produto com nicho declarado vai para o grupo daquele nicho mesmo que o título '
+    + 'não seja reconhecível, e toda queda de preço dele vira oferta publicável.');
+  if (resp === null) return;
+
+  var n = Number(String(resp).trim());
+  if (!Number.isFinite(n) || n < 0 || n > VIT_NICHOS.length) {
+    alert('Número inválido. Nada foi alterado.'); return;
+  }
+  var nicho = n === 0 ? '' : VIT_NICHOS[n - 1].id;
+
+  var st = document.getElementById('vit-status');
+  var bn = document.getElementById('vit-btn-nicho');
+  if (bn) bn.disabled = true;
+  st.textContent = 'Aplicando nicho a ' + asins.length + ' produto(s)…';
+
+  fetch(SERVER + '/vitrine/nicho', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins: asins, nicho: nicho })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok === false) { alert('Não deu certo: ' + (d.erro || 'erro desconhecido')); return; }
+    VIT_SEL = {};
+    return carregarVitrine().then(function(){
+      st.textContent = d.atualizados + ' produto(s) agora '
+        + (nicho ? 'no nicho ' + rotuloNicho(nicho) : 'sem nicho definido')
+        + (d.faltando && d.faltando.length ? ' · ' + d.faltando.length + ' não estavam mais na base' : '');
+    });
+  })
+  .catch(function(e){ alert('Erro: ' + e.message); })
+  .then(function(){ atualizarBarraVitrine(); });
+}
+
 function excluirSelecionadosVitrine(){
   var asins = Object.keys(VIT_SEL);
   if (!asins.length) return;
