@@ -737,6 +737,34 @@ async function acumularEpcAmazon(ctx, janela, categoriaDe) {
     return 0;
   }
 
+  // ── GANHOS PELA JANELA CONSOLIDADA ──
+  // A Amazon atribui `total_earnings` na data do ENVIO, nao na do clique.
+  // Pedindo o relatorio de um dia isolado, um clique do dia 6 que virou compra
+  // no dia 7 e envio no dia 10 aparece com 28 cliques e ganho ZERO — foi o que
+  // deixou 6 dos 7 produtos do ledger com comissao 0,00 apesar de terem vendido.
+  // A consulta pela janela inteira devolve o mesmo relatorio ja consolidado.
+  //
+  // Os CLIQUES continuam vindo do relatorio diario, que os atribui corretamente
+  // por data; so o dinheiro vem da janela. Falha aqui nao derruba a rodada: sem
+  // o mapa, o comportamento volta a ser o de antes.
+  let ganhosJanela = new Map();
+  try {
+    const consolidado = await amazonProdutosVinculados(ctx, faltando[0], faltando[faltando.length - 1]);
+    for (const it of consolidado) {
+      const asin = String(it.linked_product || '').toUpperCase();
+      if (!/^B[A-Z0-9]{9}$/.test(asin)) continue;
+      ganhosJanela.set(asin, {
+        r: num(numApi(it.shipped_revenue || it.total_ordered_revenue)),
+        g: num(numApi(it.total_earnings)),
+        p: Math.round(numApi(it.total_ordered_items)),
+      });
+    }
+    console.log(`[desempenho] EPC: ganhos consolidados de ${faltando[0]} a `
+      + `${faltando[faltando.length - 1]} — ${ganhosJanela.size} produto(s)`);
+  } catch (e) {
+    console.warn('[desempenho] EPC: janela consolidada falhou, usando so o diario —', e.message);
+  }
+
   let novos = 0;
   for (const dia of faltando) {
     let linhas;
@@ -750,9 +778,14 @@ async function acumularEpcAmazon(ctx, janela, categoriaDe) {
       const reg = {
         c: Math.round(numApi(it.clicks)),
         p: Math.round(numApi(it.total_ordered_items)),
-        r: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue)),
+        r: num(numApi(it.shipped_revenue || it.total_ordered_revenue)),
         g: num(numApi(it.total_earnings)),
       };
+      // Ganho zerado no dia com a janela dizendo que houve ganho: e o caso do
+      // envio fora da data do clique. Marca o dia para o rateio depois — nao da
+      // para ratear agora porque so no fim se sabe o total de cliques do produto
+      // na janela.
+      if (!reg.g && ganhosJanela.has(asin)) reg._ratear = true;
       if (!reg.c && !reg.p && !reg.g) continue;
       doDia[asin] = reg;
 
@@ -766,6 +799,41 @@ async function acumularEpcAmazon(ctx, janela, categoriaDe) {
     led.dias[dia] = doDia;
     novos++;
     await new Promise((res) => setTimeout(res, 500));
+  }
+
+  // ── RATEIO DOS GANHOS DA JANELA ──
+  // O total consolidado do produto e distribuido entre os dias marcados, na
+  // proporcao dos cliques de cada dia. Nao e a data exata do envio — essa o
+  // relatorio nao entrega — mas coloca o dinheiro no produto certo, que e o que
+  // o EPC precisa. Dias que ja vieram com ganho proprio sao respeitados: o
+  // rateio distribui apenas o que sobrou.
+  for (const [asin, tot] of ganhosJanela) {
+    const diasDoAsin = Object.entries(led.dias)
+      .filter(([, d]) => d[asin] && d[asin]._ratear);
+    if (!diasDoAsin.length) continue;
+
+    const jaContado = Object.values(led.dias)
+      .reduce((soma, d) => soma + (d[asin] && !d[asin]._ratear ? (d[asin].g || 0) : 0), 0);
+    const sobra = num(tot.g - jaContado);
+    const sobraR = num(tot.r - Object.values(led.dias)
+      .reduce((soma, d) => soma + (d[asin] && !d[asin]._ratear ? (d[asin].r || 0) : 0), 0));
+    if (sobra <= 0 && sobraR <= 0) {
+      for (const [, d] of diasDoAsin) delete d[asin]._ratear;
+      continue;
+    }
+
+    const totalCliques = diasDoAsin.reduce((soma, [, d]) => soma + (d[asin].c || 0), 0);
+    for (const [, d] of diasDoAsin) {
+      const fatia = totalCliques > 0 ? (d[asin].c || 0) / totalCliques : 1 / diasDoAsin.length;
+      d[asin].g = num(Math.max(0, sobra) * fatia);
+      d[asin].r = num(Math.max(0, sobraR) * fatia);
+      d[asin].gRateado = true;
+      delete d[asin]._ratear;
+    }
+  }
+  // Marca residual de dias anteriores a esta versao.
+  for (const d of Object.values(led.dias)) {
+    for (const reg of Object.values(d)) delete reg._ratear;
   }
 
   // Poda e recalculo. Totais SEMPRE derivados dos dias — nunca incrementados.
@@ -930,7 +998,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
           nome: it.linked_product_title || '', categoria: categoriaDe(asin), vendedor: '',
           link: 'https://www.amazon.com.br/dp/' + asin,
           unidades,
-          vendas: num(numApi(it.shipped_revenue ?? it.total_ordered_revenue) * proporcao),
+          vendas: num(numApi(it.shipped_revenue || it.total_ordered_revenue) * proporcao),
           comissao: num(numApi(it.total_earnings) * proporcao),
         });
       }
