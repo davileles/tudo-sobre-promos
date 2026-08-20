@@ -45,7 +45,10 @@ try {
   [data-theme="light"] .main-tab:hover:not(.active){background:rgba(0,0,0,.04)}
 
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;font-size:14px;min-height:100vh}
+  /* Barra de rolagem sempre reservada: em tela curta (Hoje) ela sumia e o
+   layout inteiro deslocava alguns px para a direita ao trocar de aba. */
+html{scrollbar-gutter:stable}
+body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;font-size:14px;min-height:100vh}
 
   /* ══ HEADER ══ */
   header{background:var(--surface);border-bottom:2px solid var(--accent);padding:12px 24px;position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -722,10 +725,6 @@ body.travado > *:not(#login-screen){display:none !important}
 
 /* ── HOJE ─────────────────────────────────────────────────────────────
    Usa as variaveis de tema: a tela acompanha claro/escuro como as demais. */
-.hoje-head{ display:flex; align-items:flex-end; justify-content:space-between;
-  gap:16px; margin-bottom:18px; }
-.hoje-tit{ font-size:19px; font-weight:800; letter-spacing:-.3px; margin:0; }
-.hoje-sub{ font-size:12px; color:var(--muted); font-weight:600; margin:3px 0 0; }
 .hoje-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
 .hoje-linha{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .hoje-card,.hoje-bloco{ background:var(--card); border:1px solid var(--border);
@@ -768,7 +767,7 @@ body.travado > *:not(#login-screen){display:none !important}
   font-weight:800; min-width:21px; height:21px; line-height:21px; text-align:center;
   border-radius:11px; padding:0 6px; }
 #sub-tabs{ display:block; border-bottom:1px solid var(--border);
-  padding:10px 0 0; margin:0; }
+  padding:10px 0 0; margin:0; min-height:56px; box-sizing:border-box; }
 /* Alinha com a coluna do .wrap (max-width 960 + padding 24): antes a faixa e o
    titulo eram largura cheia e comecavam ~150px a esquerda do conteudo. */
 .sub-tabs-in{ display:flex; align-items:center; gap:4px; flex-wrap:wrap;
@@ -1009,13 +1008,6 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ HOJE — abre o painel mostrando o estado da operacao do dia ════════ -->
 <!-- Nao substitui nenhuma aba: le os mesmos endpoints das outras e resume. -->
 <div class="panel active" id="panel-hoje">
-  <div class="hoje-head">
-    <div>
-      <h1 class="hoje-tit">Hoje</h1>
-      <p class="hoje-sub" id="hoje-data">—</p>
-    </div>
-    <button class="btn btn-copy btn-sm" onclick="hojeCarregar(true)">↻ Atualizar</button>
-  </div>
 
   <div class="hoje-grid" id="hoje-cards">
     <div class="hoje-card" onclick="switchTab('filaenvio')">
@@ -3047,10 +3039,11 @@ function pintarSubTabs(abaAtiva) {
   var sec = SECOES.filter(function (s) { return s.id === SECAO_ATUAL; })[0];
   var faixa = document.getElementById('sub-tabs');
   if (!faixa || !sec) return;
-  // Secao de uma aba so (Hoje, Ajustes) nao ganha faixa: seria uma aba sozinha
-  // repetindo o nome que a lateral ja mostra.
-  if (sec.abas.length < 2) { faixa.innerHTML = ''; faixa.style.display = 'none'; return; }
+  // Secao de uma aba so (Hoje, Ajustes) nao lista aba nenhuma — seria repetir o
+  // nome que a lateral ja mostra. Mas a faixa continua ocupando a mesma altura:
+  // escondendo-a, tudo abaixo subia 56px a cada ida e volta.
   faixa.style.display = 'block';
+  if (sec.abas.length < 2) { faixa.innerHTML = ''; return; }
   faixa.innerHTML = '<div class="sub-tabs-in">' + sec.abas.map(function (a) {
     var btn = document.getElementById('tab-' + a);
     // aba escondida para este operador continua escondida aqui
@@ -3130,7 +3123,14 @@ var CABECALHOS = {
   filaenvio: { titulo: 'Fila',          sub: function () { return 'O que vai sair e a que horas'; } },
   agend:     { titulo: 'Agendados',     sub: function () { return 'Publicações com hora marcada'; } },
   aprov:     { titulo: 'Aprovação',     sub: function () { return 'Itens que esperam a sua decisão'; } },
-  config:    { titulo: 'Ajustes',       regras: 'ajustes', sub: function () { return 'Marca, automação, categorias e credenciais'; } }
+  config:    { titulo: 'Ajustes',       regras: 'ajustes', sub: function () { return 'Marca, automação, categorias e credenciais'; } },
+  cupom:  { titulo: 'Criar cupom',    sub: function () { return 'Monta e envia um cupom para os grupos'; } },
+  oferta: { titulo: 'Criar oferta',   sub: function () { return 'Monta e envia uma oferta de produto'; } },
+  livre:  { titulo: 'Mensagem livre', sub: function () { return 'Texto avulso, sem produto nem cupom'; } },
+  hoje: { titulo: 'Hoje', acao: { rot: '↻ Atualizar', fn: 'hojeCarregar(true)' }, sub: function () {
+    var d = new Date();
+    return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  } }
 };
 
 function pintarCabecalho(aba) {
@@ -3148,8 +3148,10 @@ function pintarCabecalho(aba) {
   // Cache ainda vazio nao pode derrubar o cabecalho inteiro.
   try { sub = def.sub() || ''; } catch (e) { sub = ''; }
   alvo.style.display = 'flex';
-  alvo.innerHTML = '<div><h1>' + def.titulo + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>'
-    + (def.regras ? '<button class="cab-regras" onclick="rgAbrir(\'' + def.regras + '\')">⚙ Regras desta seção</button>' : '');
+  var botao = '';
+  if (def.regras) botao = '<button class="cab-regras" onclick="rgAbrir(\'' + def.regras + '\')">⚙ Regras desta seção</button>';
+  else if (def.acao) botao = '<button class="cab-regras" onclick="' + def.acao.fn + '">' + def.acao.rot + '</button>';
+  alvo.innerHTML = '<div><h1>' + def.titulo + '</h1>' + (sub ? '<p>' + sub + '</p>' : '') + '</div>' + botao;
 }
 
 /* ══════ REGRAS DESTA SEÇÃO ══════
@@ -3425,8 +3427,7 @@ async function hojeCarregar(forcar) {
   var hoje = new Date();
   var dd = String(hoje.getDate()).padStart(2, '0');
   var mm = String(hoje.getMonth() + 1).padStart(2, '0');
-  var elData = document.getElementById('hoje-data');
-  if (elData) elData.textContent = dd + '/' + mm + '/' + hoje.getFullYear();
+  // a data agora vive no subtitulo do #tela-cab, montado por pintarCabecalho()
 
   var alertas = [];
   var j = function (r) { return r.json(); };
