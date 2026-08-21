@@ -1,4 +1,4 @@
-# Captura TSP
+# Captura Tica
 
 Extensão do Chrome que junta links de produtos enquanto você navega e despeja
 todos de uma vez no campo **Links** da aba Vitrine do painel.
@@ -35,7 +35,8 @@ inteira à vista — é lá que você escolhe o cupom e o modo de disparo.
    nome no cadastro, igual a colar link puro. É o modo para varrer uma lista.
 2. **Conferindo:** clique no ícone da extensão para ver a fila e remover o que
    não quer. O número no ícone é quantos estão guardados.
-3. **Cadastrando:** abra `gestao.tudosobrepromos.com` → aba 🏬 Vitrine e disparos.
+3. **Cadastrando:** abra `gestao.tudosobrepromos.com` (em breve
+   `gestao.ticapromos.com.br`) → aba 🏬 Vitrine e disparos.
    Abaixo do campo Links aparece **📥 Inserir N produtos capturados**. Clique,
    e as linhas caem no campo. A fila se esvazia.
 4. Dali em diante é o painel de sempre: escolhe o cupom, escolhe entre
