@@ -8938,8 +8938,14 @@ async function carregarAprovacao() {
       var valor = d2.valor || '';
       var tipo = d2.tipo === 'pct' ? '%' : (valor ? ' R$' : '');
       var cod = d2.codigo ? ' · '+d2.codigo : '';
+      // Lote: uma mensagem com varios cupons da mesma loja. O titulo tem de
+      // dizer isso, senao o card mostra so o primeiro codigo e o operador
+      // aprova achando que esta liberando um cupom quando sao oito.
+      var lote = (o.loteCupons || []).length;
       var titulo = (o.tipoConteudo === 'cupom_tsp')
-        ? (loja+' '+valor+tipo+cod)
+        ? (lote > 1
+            ? (loja+' · lote de '+lote+' cupons · '+(d2.codigosLote||[]).filter(Boolean).join(', '))
+            : (loja+' '+valor+tipo+cod))
         : (d2.titulo || loja);
       var data = new Date(o.timestamp).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       var orig = (o.conteudoOriginal || '').replace(/</g,'&lt;');
