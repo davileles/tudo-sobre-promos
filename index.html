@@ -2297,7 +2297,7 @@ body.travado > *:not(#login-screen){display:none !important}
       Loja com o campo <b>vazio</b> fica sem o bloco "RESGATE O CUPOM AQUI" e <b>fora do auto-envio</b> de cupons.
     </div>
     <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Amazon</label><input type="url" id="cfg-af-amazon" placeholder="https://amzn.to/…"/></div>
+      <div class="field"><label>Amazon</label><input type="url" id="cfg-af-amazon" placeholder="https://link.amazon/…"/></div>
       <div class="field"><label>Mercado Livre</label><input type="url" id="cfg-af-ml" placeholder="https://meli.la/…"/></div>
     </div>
     <div class="g2" style="margin-bottom:12px">
@@ -7018,7 +7018,7 @@ function aplicarPreset(btn, key) {
 // Os literais abaixo são só fallback para o painel não quebrar se o GET falhar.
 var CFG_TSP = null;
 var linksMap = {
-  'Amazon': 'https://amzn.to/4dFRSzy',
+  'Amazon': 'https://link.amazon/B0aA3uVrC',
   'Mercado Livre': 'https://meli.la/2xystLt',
   'Shopee_sem': 'https://s.shopee.com.br/9fHPmP3QZF',
   'Shopee_com': 'https://s.shopee.com.br/30kdYeLY0W'
@@ -7618,7 +7618,7 @@ var CRED_CAMPOS = [
   { g: 'Mercado Livre', k: 'ML_TAG',           r: 'Tag de afiliado', d: 'identificador da sua conta' },
   { g: 'Amazon', k: 'AMZ_CLIENT_ID',     r: 'Client ID',     d: 'Amazon PA-API' },
   { g: 'Amazon', k: 'AMZ_CLIENT_SECRET', r: 'Client Secret', d: 'Amazon PA-API' },
-  { g: 'Amazon', k: 'AMZ_PARTNER_TAG',   r: 'Partner tag',   d: 'ex.: seusite-20' },
+  { g: 'Amazon', k: 'AMZ_PARTNER_TAG',   r: 'Partner tag',   d: 'ex.: davileles-20' },
   { g: 'Magazine Luiza', k: 'MAGALU_LOJA', r: 'Nome da loja no Magazine Você', d: 'aparece na URL do seu link' },
   { g: 'Outros', k: 'ANTHROPIC_API_KEY', r: 'Chave da Anthropic', d: 'leitura de cupons por IA' },
   { g: 'Outros', k: 'TG_API_ID',   r: 'Telegram API ID',   d: 'my.telegram.org — exige restart' },
