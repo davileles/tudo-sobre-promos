@@ -1,4 +1,4 @@
-// ── Captura TSP — ponte com o painel ─────────────────────────────────────────
+// ── Captura Tica — ponte com o painel ─────────────────────────────────────────
 // Coloca um botao logo abaixo do campo "Links" da aba Vitrine. Ele despeja o
 // que foi capturado no textarea e para por ai: cupom, modo de disparo e o
 // cadastro em si continuam sendo escolha sua, com a lista inteira a vista.
