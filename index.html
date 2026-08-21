@@ -1526,6 +1526,9 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="fila-bar">
     <span id="dist-status">Carregando…</span>
     <div class="fila-acoes">
+      <span id="dist-convites" style="font-size:11.5px;padding:4px 10px;border-radius:999px;
+            background:var(--surface2);color:var(--muted)">convites: verificando…</span>
+      <button class="btn btn-copy btn-sm" onclick="checarConvites()">🔎 Checar convites</button>
     </div>
   </div>
 
@@ -3895,10 +3898,74 @@ async function carregarDist(){
     st.textContent = DIST_CACHE.length + ' link(s) · ' + totalCliques + ' clique(s) no total';
     renderDist();
     renderDistGrafico();
+    carregarBadgeConvites();
   } catch(e){
     st.textContent = 'Não foi possível carregar os links.';
     document.getElementById('dist-lista').innerHTML =
       '<div class="aviso"><b>Erro:</b> ' + esc(e.message) + '</div>';
+  }
+}
+
+/* ── Badge de saude dos convites ──
+   Um convite revogado no WhatsApp nao aparece em lugar nenhum do painel: o link
+   continua listado, o distribuidor entrega e quem clica ve "o link foi
+   redefinido". A badge le o resultado da ultima varredura do servidor — ela
+   NAO dispara a verificacao, senao cada abertura da aba viraria 40+ chamadas
+   de grupo e alguns segundos de espera. Para forcar, existe o botao. */
+function pintarBadgeConvites(d){
+  var el = document.getElementById('dist-convites');
+  if (!el) return;
+  if (!d || !d.ok){
+    el.textContent = 'convites: sem resposta';
+    el.style.background = 'var(--surface2)'; el.style.color = 'var(--muted2)';
+    el.title = 'O servidor nao respondeu a consulta de status.';
+    return;
+  }
+  if (!d.verificado){
+    el.textContent = 'convites: aguardando';
+    el.style.background = 'var(--surface2)'; el.style.color = 'var(--muted)';
+    el.title = d.motivo || 'A primeira verificacao ainda nao rodou.';
+    return;
+  }
+  var n = (d.quebrados || []).length;
+  var quando = d.verificadoEm ? new Date(d.verificadoEm).toLocaleString('pt-BR') : '—';
+  if (n === 0){
+    el.textContent = '✅ ' + d.checados + ' convites ok';
+    el.style.background = 'rgba(0,180,80,.12)'; el.style.color = 'var(--green)';
+    el.title = 'Verificado em ' + quando;
+  } else {
+    el.textContent = '⚠️ ' + n + ' convite(s) quebrado(s)';
+    el.style.background = 'rgba(220,50,50,.14)'; el.style.color = 'var(--red)';
+    el.title = d.quebrados.map(function(g){ return g.nome + ' (link: ' + g.slug + ')'; }).join('\n')
+             + '\n\nVerificado em ' + quando;
+  }
+}
+
+async function carregarBadgeConvites(){
+  try {
+    var r = await fetch(SERVER + '/gg/convites-status', { signal: AbortSignal.timeout(6000) });
+    pintarBadgeConvites(await r.json());
+  } catch(e){ pintarBadgeConvites(null); }
+}
+
+async function checarConvites(){
+  var el = document.getElementById('dist-convites');
+  if (el){ el.textContent = 'convites: checando…'; el.style.color = 'var(--muted)';
+           el.style.background = 'var(--surface2)'; }
+  try {
+    // Varredura real: uma chamada por grupo, com respiro entre elas. Passa de
+    // um minuto com muitos grupos, por isso o timeout largo.
+    var r = await fetch(SERVER + '/gg/checar-convites', { method:'POST', signal: AbortSignal.timeout(180000) });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    await carregarBadgeConvites();
+    distMsg((d.quebrados||[]).length
+      ? (d.quebrados.length + ' convite(s) quebrado(s) — passe o mouse na badge')
+      : ('Todos os ' + d.checados + ' convites estao ok.'),
+      (d.quebrados||[]).length > 0);
+  } catch(e){
+    pintarBadgeConvites(null);
+    distMsg('Falha ao checar convites: ' + e.message, true);
   }
 }
 
