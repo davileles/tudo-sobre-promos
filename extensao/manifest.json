@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Captura TSP",
+  "name": "Captura Tica",
   "version": "2.0.1",
-  "description": "Junta links de produtos e despeja no campo de cadastro da vitrine do TSP.",
+  "description": "Junta links de produtos e despeja no campo de cadastro da vitrine do Tica Promos.",
   "permissions": [
     "contextMenus",
     "scripting",
@@ -18,14 +18,15 @@
   "content_scripts": [
     {
       "matches": [
-        "https://gestao.tudosobrepromos.com/*"
+        "https://gestao.tudosobrepromos.com/*",
+        "https://gestao.ticapromos.com.br/*"
       ],
       "js": ["painel.js"],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_title": "Captura TSP",
+    "default_title": "Captura Tica",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icones/16.png",
