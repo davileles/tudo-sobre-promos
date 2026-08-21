@@ -1,4 +1,4 @@
-// ── Captura TSP ───────────────────────────────────────────────────────────────
+// ── Captura Tica ───────────────────────────────────────────────────────────────
 // Junta links de produtos numa fila local. NAO cadastra nada: o cadastro
 // continua sendo feito por voce no painel, com a lista inteira na mao, onde
 // escolhe cupom e modo de disparo. A extensao so evita o copia-e-cola.
