@@ -1,4 +1,4 @@
-const PAINEL = 'https://gestao.tudosobrepromos.com/';
+const PAINEL = 'https://gestao.ticapromos.com.br/';
 
 function pedir(msg) {
   return new Promise(r => chrome.runtime.sendMessage(msg, resp => r(chrome.runtime.lastError ? null : resp)));
