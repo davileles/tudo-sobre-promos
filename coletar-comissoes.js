@@ -14,6 +14,13 @@
 //         que só o bundle deles gera), então NÃO tente migrar para elas.
 //         vendas = revenue - returned_revenue ; comissão = total_earnings_with_hva
 //
+//         O relatório é POR CONTA Associados. Durante a transição de
+//         tudosobrepromos-20 para davileles-20 as DUAS rendem no mesmo mês (a
+//         antiga pelos links já publicados, a nova pelo que sai daqui em
+//         diante), então as séries são somadas dia a dia. Quando a conta
+//         antiga parar de render, basta remover o secret AMAZON_COOKIE_TS e
+//         o código volta sozinho a ler uma conta só.
+//
 // ML      API REST limpa, /affiliate-program/api/dashboard/general. Um dia por
 //         requisição. Não precisa de CSRF apesar de o navegador mandar.
 //
@@ -43,7 +50,12 @@ const PROXY_URL = process.env.CDV_PROXY_URL || 'https://cdv-proxy-production.up.
 const ATIVO = process.env.COLETA_COMISSOES !== 'false';
 const JANELA_REV = Number(process.env.JANELA_REV || 15);
 
-const AMAZON_COOKIE = process.env.AMAZON_COOKIE;
+// [rótulo, cookie] — o rótulo só aparece em log e mensagem de erro, para o
+// alerta dizer QUAL sessão caiu. A ordem não importa: tudo é somado.
+const AMAZON_CONTAS = [
+  ['davileles-20', process.env.AMAZON_COOKIE],
+  ['tudosobrepromos-20', process.env.AMAZON_COOKIE_TS],
+].filter(([, cookie]) => cookie);
 const ML_COOKIE = process.env.ML_COOKIE;
 const SHOPEE_COOKIE = process.env.SHOPEE_COOKIE;
 const SHOPEE_APP_ID = process.env.SHOPEE_APP_ID;
@@ -109,16 +121,15 @@ async function alertar(titulo, linhas) {
 
 // ── Amazon ────────────────────────────────────────────────────────────────
 
-async function coletarAmazon() {
-  if (!AMAZON_COOKIE) throw new Error('AMAZON_COOKIE ausente');
-
+// Série diária de UMA conta Associados.
+async function amazonDeUmaConta(cookie) {
   const r = await req('https://associados.amazon.com.br/p/reporting/earnings', {
-    headers: { 'user-agent': UA, 'accept-language': 'pt-BR,pt;q=0.9', cookie: AMAZON_COOKIE },
+    headers: { 'user-agent': UA, 'accept-language': 'pt-BR,pt;q=0.9', cookie },
     redirect: 'manual',
   });
 
   // 302 = cookie expirou e caiu no redirect de login.
-  if (r.status >= 300 && r.status < 400) throw new Error('sessão expirada (302) — renove AMAZON_COOKIE');
+  if (r.status >= 300 && r.status < 400) throw new Error('sessão expirada (302) — recapture o cookie desta conta');
   if (!r.ok) throw new Error(`status ${r.status}`);
 
   const html = (await r.text())
@@ -139,6 +150,48 @@ async function coletarAmazon() {
     };
   }
   if (!Object.keys(out).length) throw new Error('série diária veio vazia');
+  return out;
+}
+
+// Soma das contas configuradas.
+//
+// Falha de UMA conta derruba a Amazon inteira de propósito: a foto do dia é
+// gravada uma vez e nunca mais revisada (Amazon não revisa), então uma soma
+// pela metade ficaria errada para sempre. Lacuna, não: a rodada seguinte
+// preenche o dia que ficou faltando.
+//
+// Pelo mesmo motivo, com duas contas só entram os dias presentes nas DUAS
+// séries — dia que só uma reportou é dia incompleto.
+async function coletarAmazon() {
+  if (!AMAZON_CONTAS.length) throw new Error('AMAZON_COOKIE ausente');
+
+  const series = [];
+  for (const [conta, cookie] of AMAZON_CONTAS) {
+    try {
+      series.push(await amazonDeUmaConta(cookie));
+    } catch (e) {
+      throw new Error(`conta ${conta}: ${e.message}`);
+    }
+  }
+
+  const dias = Object.keys(series[0]).filter((d) => series.every((s) => s[d]));
+  const out = {};
+  for (const d of dias) {
+    out[d] = {
+      cliques: series.reduce((t, s) => t + s[d].cliques, 0),
+      vendas: num(series.reduce((t, s) => t + s[d].vendas, 0)),
+      comissao: num(series.reduce((t, s) => t + s[d].comissao, 0)),
+    };
+  }
+  if (!Object.keys(out).length) throw new Error('nenhum dia em comum entre as contas');
+
+  if (AMAZON_CONTAS.length > 1) {
+    const ontem = diasAtras(hojeSP(), 1);
+    const detalhe = AMAZON_CONTAS
+      .map(([conta], i) => `${conta}=${(series[i][ontem]?.comissao ?? 0).toFixed(2)}`)
+      .join(' + ');
+    console.log(`[amazon] ${ontem}: ${detalhe} → ${(out[ontem]?.comissao ?? 0).toFixed(2)}`);
+  }
   return out;
 }
 
