@@ -44,6 +44,10 @@ jobs:
           # silencio — e o ledger de EPC e as comissoes iriam para outro dono.
           REPO_DADOS: davileles/dados
           AMAZON_COOKIE: ${{ secrets.AMAZON_COOKIE }}
+          # Conta antiga (tudosobrepromos-20). Enquanto os links ja publicados
+          # ainda renderem, as duas contas sao somadas. Secret vazio/ausente =
+          # coleta volta a ler so a conta nova, sem quebrar nada.
+          AMAZON_COOKIE_TS: ${{ secrets.AMAZON_COOKIE_TS }}
           ML_COOKIE: ${{ secrets.ML_COOKIE }}
           SHOPEE_COOKIE: ${{ secrets.SHOPEE_COOKIE }}
           SHOPEE_APP_ID: ${{ secrets.SHOPEE_APP_ID }}
