@@ -34,6 +34,10 @@ li{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-top:1px soli
      transition:filter .15s}
 .btn:hover{filter:brightness(1.08)}
 .btn-copy{background:transparent;border:1px solid rgba(255,165,0,.4);color:var(--accent)}
+.rodape{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);
+        color:var(--muted2);font-size:10px;letter-spacing:.3px;
+        display:flex;justify-content:space-between;gap:8px}
+.rodape b{color:var(--muted);font-weight:700}
 </style>
 </head>
 <body>
@@ -43,6 +47,10 @@ li{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-top:1px soli
   <div class="acoes">
     <button class="btn" id="abrir">Abrir painel</button>
     <button class="btn btn-copy" id="limpar">Limpar fila</button>
+  </div>
+  <div class="rodape">
+    <span>v<b id="versao">—</b></span>
+    <span id="dominio">—</span>
   </div>
 <script src="popup.js"></script>
 </body>
