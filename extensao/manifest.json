@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Captura Tica",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Junta links de produtos e despeja no campo de cadastro da vitrine do Tica Promos.",
   "permissions": [
     "contextMenus",
@@ -18,10 +18,13 @@
   "content_scripts": [
     {
       "matches": [
+        "https://gestao.ticapromos.com.br/*",
         "https://gestao.tudosobrepromos.com/*",
-        "https://gestao.ticapromos.com.br/*"
+        "https://davileles.github.io/tudo-sobre-promos/*"
       ],
-      "js": ["painel.js"],
+      "js": [
+        "painel.js"
+      ],
       "run_at": "document_idle"
     }
   ],
