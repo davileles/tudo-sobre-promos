@@ -1,5 +1,11 @@
 const PAINEL = 'https://gestao.ticapromos.com.br/';
 
+// Versao a vista: a extensao e carregada sem compactacao, entao a unica forma de
+// saber se a pasta no disco e a mesma do repositorio e comparar aqui. Quando o
+// dominio do painel mudou, o build antigo continuou marcado 2.0.1 e nao havia
+// como perceber que o content script nao casava mais com a URL do painel.
+const VERSAO = chrome.runtime.getManifest().version;
+
 function pedir(msg) {
   return new Promise(r => chrome.runtime.sendMessage(msg, resp => r(chrome.runtime.lastError ? null : resp)));
 }
@@ -55,5 +61,8 @@ document.getElementById('limpar').addEventListener('click', async () => {
   await pedir({ tipo: 'limpar' });
   pintar();
 });
+
+document.getElementById('versao').textContent = VERSAO;
+document.getElementById('dominio').textContent = new URL(PAINEL).hostname;
 
 pintar();
