@@ -11,8 +11,14 @@ inteira à vista — é lá que você escolhe o cupom e o modo de disparo.
 1. Descompacte numa pasta definitiva — o Chrome carrega da pasta original, então
    se ela for movida ou apagada a extensão para de funcionar.
 2. `chrome://extensions` → ative **Modo do desenvolvedor**.
-3. **Carregar sem compactação** → selecione a pasta `cdv-captura`.
+3. **Carregar sem compactação** → selecione a pasta `extensao`.
 4. Fixe o ícone na barra: é nele que aparece quantos produtos estão na fila.
+
+**Atualizando depois de um commit:** o Chrome não busca versão nova sozinho em
+extensão sem compactação — ele lê a pasta do disco. Baixe os arquivos de novo
+por cima e clique em ↻ **Atualizar** no cartão da extensão em
+`chrome://extensions`. O rodapé do popup mostra a versão carregada; se ela não
+bater com a do `manifest.json` no repositório, a pasta está velha.
 
 ## Fluxo
 
@@ -35,8 +41,7 @@ inteira à vista — é lá que você escolhe o cupom e o modo de disparo.
    nome no cadastro, igual a colar link puro. É o modo para varrer uma lista.
 2. **Conferindo:** clique no ícone da extensão para ver a fila e remover o que
    não quer. O número no ícone é quantos estão guardados.
-3. **Cadastrando:** abra `gestao.tudosobrepromos.com` (em breve
-   `gestao.ticapromos.com.br`) → aba 🏬 Vitrine e disparos.
+3. **Cadastrando:** abra `gestao.ticapromos.com.br` → aba 🏬 Vitrine e disparos.
    Abaixo do campo Links aparece **📥 Inserir N produtos capturados**. Clique,
    e as linhas caem no campo. A fila se esvazia.
 4. Dali em diante é o painel de sempre: escolhe o cupom, escolhe entre
@@ -121,4 +126,10 @@ nome sai do slug da URL, que já é legível.
   fica logo abaixo do campo Links. Se acabou de instalar, recarregue o painel.
 - **Nada é guardado:** veja a notificação do Chrome — ela diz o motivo.
 - **O domínio do painel mudou:** ajuste `matches` em `manifest.json` e `PAINEL`
-  em `popup.js`.
+  em `popup.js` — e **suba a versão** no `manifest.json` no mesmo commit. Foi o
+  que faltou na migração `tudosobrepromos` → `ticapromos`: o `matches` novo foi
+  commitado ainda como `2.0.1`, então a pasta instalada continuou casando só com
+  o domínio antigo (hoje 404) e o botão sumiu do painel sem nenhum sinal de que
+  a causa era build velho.
+- **O botão sumiu depois de trocar de domínio:** compare a versão no rodapé do
+  popup com a do `manifest.json` no repositório. Diferente = recarregue a pasta.
