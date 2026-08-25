@@ -226,6 +226,12 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .sw{position:relative;width:34px;height:19px;border-radius:10px;background:var(--border-ctrl);border:none;cursor:pointer;transition:background .18s;flex-shrink:0;padding:0}
   .sw::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .18s}
   .sw.on{background:var(--accent)}
+  .sw:disabled{opacity:.35;cursor:not-allowed}
+  .cup-selo{font-size:9px;font-weight:800;letter-spacing:.3px;padding:1px 5px;border-radius:4px;
+            background:rgba(240,160,60,.16);color:#f0a03c;white-space:nowrap}
+  .cup-restrito{width:auto;border:none;background:transparent;cursor:pointer;padding:0 2px;
+                font-size:12px;line-height:1;opacity:.35;transition:opacity .15s}
+  .cup-restrito.on{opacity:1}
   .sw.on::after{transform:translateX(15px)}
   .cup-del{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-del:hover{color:#e5534b}
@@ -2893,6 +2899,14 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="field" style="margin-bottom:12px">
       <label>Observação <span class="tag">opcional</span></label>
       <input type="text" id="nc-obs" placeholder="Ex: só no app"/>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="nc-restrito" style="width:auto;accent-color:var(--accent)"/>
+        🎯 Vale só em produtos específicos
+      </label>
+      <span class="tag" style="text-transform:none">fica fora da escolha automática, do combo
+      &ldquo;Cupons ativos&rdquo; e do site público — só entra quando você vincular o código a um produto</span>
     </div>
     <button class="btn" id="nc-btn" onclick="criarCupomManual()">Criar cupom</button>
     <p class="send-ok" id="nc-status"></p>
@@ -5746,11 +5760,10 @@ function carregarVitrine(){
 }
 
 // Só cupons vigentes: oferecer cupom morto no select seria oferecer erro.
+// Restritos CONTINUAM aqui de propósito: este select é a vinculação explícita a
+// um produto — exatamente o único uso permitido para eles. O rótulo avisa.
 function cuponsVigentes(){
-  var agora = Date.now();
-  return CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
-  }).sort(function(a,b){
+  return CUPONS_CACHE.filter(cupomUsavel).sort(function(a,b){
     var l = (a.loja||'').localeCompare(b.loja||'','pt-BR');
     return l !== 0 ? l : (a.codigo||'').localeCompare(b.codigo||'');
   });
@@ -5770,8 +5783,10 @@ function opcoesCupom(){
     if (c.maximo != null) extra.push('produto até R$ ' + c.maximo);
     if (c.minimo)         extra.push('mín R$ ' + c.minimo);
     return '<option value="' + esc(c.codigo) + '">'
+      + (c.restrito === true ? '🎯 ' : '')
       + esc(c.loja || 'Outros') + ' · ' + esc(c.codigo) + ' · ' + v
       + (extra.length ? ' (' + extra.join(', ') + ')' : '')
+      + (c.restrito === true ? ' — só produtos específicos' : '')
       + '</option>';
   }).join('');
 }
@@ -6683,7 +6698,8 @@ function criarCupomManual() {
     minimo: minimoRaw === '' ? null : Number(minimoRaw),
     maximo: maximoRaw === '' ? null : Number(maximoRaw),
     limite: limiteRaw === '' ? null : Number(limiteRaw),
-    observacao: document.getElementById('nc-obs').value.trim() || null
+    observacao: document.getElementById('nc-obs').value.trim() || null,
+    restrito: document.getElementById('nc-restrito').checked
   };
 
   // O campo é lido como horário de Brasília, igual ao agendamento de envio.
@@ -6709,6 +6725,7 @@ function criarCupomManual() {
     document.getElementById('nc-maximo').value = '';
     document.getElementById('nc-validade').value = '';
     document.getElementById('nc-obs').value = '';
+    document.getElementById('nc-restrito').checked = false;
     document.querySelectorAll('#nc-presets .preset-btn').forEach(function(b){ b.classList.remove('active'); });
     carregarCupons();
   })
@@ -6771,6 +6788,24 @@ function vencimento(iso) {
   return { txt:'expira em ' + Math.floor(h/24) + 'd' + (h%24 ? ' ' + (h%24) + 'h' : ''), cls:'ok' };
 }
 
+// Uma unica definicao de "expirado" no painel inteiro. Antes cada tela repetia
+// o new Date(...) > agora, e bastava um esquecimento para um cupom morto voltar
+// a aparecer como usavel em algum select.
+function expirouCupom(c) {
+  var ms = new Date(c && c.validadeAte).getTime();
+  return !isFinite(ms) || ms <= Date.now();
+}
+
+/** Vigente de verdade: ligado e dentro da validade. */
+function cupomUsavel(c) {
+  return !!c && c.ativo !== false && !expirouCupom(c);
+}
+
+/** Usavel E liberado para escolha automatica / listagem generica. */
+function cupomGeral(c) {
+  return cupomUsavel(c) && c.restrito !== true;
+}
+
 function regraCupom(c) {
   var partes = [];
   if (c.minimo === 0)              partes.push('sem minimo');
@@ -6782,17 +6817,16 @@ function regraCupom(c) {
 
 function renderCupons() {
   var soVigentes = document.getElementById('cupons-so-vigentes').checked;
-  var agora = Date.now();
   var itens = CUPONS_CACHE.filter(function(c){
     if (!soVigentes) return true;
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
+    return cupomUsavel(c);
   });
 
-  var vig = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora;
-  }).length;
+  var vig = CUPONS_CACHE.filter(cupomUsavel).length;
+  var res = CUPONS_CACHE.filter(function(c){ return cupomUsavel(c) && c.restrito === true; }).length;
   document.getElementById('cupons-status').textContent =
-    CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)';
+    CUPONS_CACHE.length + ' cupom(ns) na base · ' + vig + ' vigente(s)'
+    + (res ? ' · ' + res + ' só em produtos específicos' : '');
 
   var el = document.getElementById('cupons-lista');
   if (!itens.length) {
@@ -6810,11 +6844,16 @@ function renderCupons() {
     var lista = lojas[loja].sort(function(a,b){
       return new Date(b.capturadoEm || 0) - new Date(a.capturadoEm || 0);
     });
-    var algumAtivo = lista.some(function(c){ return c.ativo !== false; });
+    // "Ativar todos" so faz sentido para quem ainda pode ser ativado: se a loja
+    // so tem cupom vencido, o botao nao deve prometer o que o servidor recusa.
+    var algumAtivo = lista.some(cupomUsavel);
+    var temAtivavel = lista.some(function(c){ return !expirouCupom(c); });
     return '<div class="cup-grupo">'
          +   '<span>' + esc(loja) + ' · ' + lista.length + '</span>'
-         +   '<button class="cup-grupo-acao" data-loja="' + esc(loja) + '" data-ativo="' + (algumAtivo ? '0' : '1') + '" '
-         +     'onclick="alternarLoja(this)">' + (algumAtivo ? 'desativar todos' : 'ativar todos') + '</button>'
+         +   ((algumAtivo || temAtivavel)
+             ? '<button class="cup-grupo-acao" data-loja="' + esc(loja) + '" data-ativo="' + (algumAtivo ? '0' : '1') + '" '
+               + 'onclick="alternarLoja(this)">' + (algumAtivo ? 'desativar todos' : 'ativar todos') + '</button>'
+             : '<span class="cup-grupo-acao" style="opacity:.4">todos expirados</span>')
          + '</div>'
          + '<div class="cup-grid">' + lista.map(cardCupom).join('') + '</div>';
   }).join('');
@@ -6840,7 +6879,13 @@ function ordemLojaCupom(a, b) {
 
 function cardCupom(c) {
   var v   = vencimento(c.validadeAte);
-  var on  = c.ativo !== false;
+  // Expirado NUNCA aparece ligado. O servidor ja rebaixa o registro, mas a aba
+  // pode estar aberta desde antes do vencimento: sem isto o operador veria
+  // "expirado" ao lado de um interruptor ligado e concluiria que o cupom ainda
+  // vai sair nas mensagens.
+  var venceu = expirouCupom(c);
+  var on  = c.ativo !== false && !venceu;
+  var res = c.restrito === true;
   var mk  = MK[c.loja] || 'mk-outra';
   var val = c.tipo === 'pct' ? fmtBRL(c.valor) + '%' : 'R$ ' + fmtBRL(c.valor);
   var ch  = esc(c.chave);
@@ -6851,17 +6896,47 @@ function cardCupom(c) {
       + '<div class="cup-cod" title="Clique para copiar: ' + esc(c.codigo) + '" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)">' + esc(c.codigo) + '</div>'
       + '<div class="cup-val">' + val + '</div>'
     + '</div>'
-    + '<div class="cup-regra">' + esc(regraCupom(c)) + '</div>'
+    + '<div class="cup-regra">' + esc(regraCupom(c))
+      + (res ? ' <span class="cup-selo">🎯 SÓ PRODUTOS ESPECÍFICOS</span>' : '') + '</div>'
     + '<div class="cup-bot">'
       + '<span class="cup-venc ' + v.cls + '">' + v.txt + '</span>'
       + '<span style="display:flex;align-items:center;gap:4px">'
+        + '<button class="cup-restrito ' + (res ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarRestrito(this)" '
+        + 'title="' + (res ? 'Restrito a produtos específicos — clique para liberar para ofertas em geral'
+                            : 'Vale em ofertas em geral — clique para restringir a produtos específicos') + '">🎯</button>'
         + '<button class="cup-copy" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)" title="Copiar código">📋</button>'
         + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
-        + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)" '
-        + 'title="' + (on ? 'Desativar' : 'Ativar') + '"></button>'
+        + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)"'
+        + (venceu ? ' disabled' : '')
+        + ' title="' + (venceu ? 'Expirado — estenda a validade antes de ativar'
+                                : (on ? 'Desativar' : 'Ativar')) + '"></button>'
       + '</span>'
     + '</div>'
   + '</div>';
+}
+
+/** Alterna a marca de "só em produtos específicos" do cupom. */
+function alternarRestrito(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  if (!c) return;
+  var novo = !(c.restrito === true);
+  if (novo && !confirm('Marcar ' + c.codigo + ' como válido só em produtos específicos?\n\n'
+      + 'Ele sai da escolha automática, do combo "Cupons ativos" e do site público.\n'
+      + 'Continua funcionando quando você vincular o código a um produto ou disparo.')) return;
+
+  btn.disabled = true;
+  fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ restrito: novo })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    c.restrito = novo;
+    renderCupons();
+  })
+  .catch(function(e){ alert('Não foi possível alterar: ' + e.message); btn.disabled = false; });
 }
 
 function copiarCupom(el){
@@ -6891,7 +6966,13 @@ function alternarLoja(btn) {
   var loja  = btn.dataset.loja;
   var ativo = btn.dataset.ativo === '1';
   var alvos = CUPONS_CACHE.filter(function(c){ return (c.loja || 'Outros') === loja; });
-  if (!alvos.length) return;
+  // Ao LIGAR, os vencidos ficam de fora — o servidor os ignora e o estado local
+  // precisa refletir isso, senao o painel mostraria ligado o que continua morto.
+  if (ativo) alvos = alvos.filter(function(c){ return !expirouCupom(c); });
+  if (!alvos.length) {
+    if (ativo) alert('Todos os cupons de ' + loja + ' estão expirados — não há o que ativar.');
+    return;
+  }
   if (!ativo && !confirm('Desativar os ' + alvos.length + ' cupons de ' + loja + '?')) return;
 
   btn.disabled = true;
@@ -6912,7 +6993,14 @@ function alternarCupom(btn) {
   var chave = btn.dataset.chave;
   var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
   if (!c) return;
-  var novo = !(c.ativo !== false);
+  var novo = !cupomUsavel(c);
+  // Cupom vencido nao volta pelo interruptor. O servidor tambem recusa (409),
+  // mas barrar aqui explica o caminho certo em vez de mostrar um erro cru.
+  if (novo && expirouCupom(c)) {
+    alert('O cupom ' + c.codigo + ' está expirado e não pode ser ativado.\n\n'
+      + 'Se ele voltou a valer, exclua e cadastre de novo em "Criar cupom à mão" com a nova validade.');
+    return;
+  }
 
   btn.disabled = true;
   fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), {
@@ -8025,10 +8113,11 @@ async function montarCombo(loja) {
     status.textContent = '';
   }
 
-  var agora = Date.now();
+  // Mensagem de lista de cupons da loja: o cliente lê sem produto na mão, então
+  // é o caso mais genérico que existe. Cupom restrito fica de fora — anunciá-lo
+  // solto viraria promessa que o checkout não cumpre.
   var itens = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false
-      && new Date(c.validadeAte).getTime() > agora
+    return cupomGeral(c)
       && String(c.loja || '').toLowerCase() === loja.toLowerCase();
   }).sort(ordenarCupons);
 
@@ -8149,10 +8238,9 @@ function preencherCuponsVinculo(cupons) {
 // vigentes da loja escolhida (ou todos, quando a loja nao tem nenhum), e o
 // operador pode ignorar tudo isso e digitar o codigo no campo de baixo.
 function cuponsVigentesDaLoja(loja) {
-  var agora = Date.now();
-  var vig = CUPONS_CACHE.filter(function(c){
-    return c.ativo !== false && new Date(c.validadeAte).getTime() > agora && c.codigo;
-  });
+  // Escolha explícita do operador para UMA oferta: o restrito entra, sinalizado
+  // no rótulo. O que ele não pode é ser escolhido sozinho pelo sistema.
+  var vig = CUPONS_CACHE.filter(function(c){ return cupomUsavel(c) && c.codigo; });
   var norm = function(x){ return String(x || '').toLowerCase().trim(); };
   var daLoja = vig.filter(function(c){ return norm(c.loja) === norm(loja); });
   return (daLoja.length ? daLoja : vig).sort(ordenarCupons);
@@ -8163,9 +8251,11 @@ function rotuloCupomBase(c) {
   var reg = [];
   if (c.minimo) reg.push('mín. R$ ' + fmtBRL(c.minimo));
   if (c.limite != null && c.tipo === 'pct') reg.push('teto R$ ' + fmtBRL(c.limite));
-  return String(c.codigo).toUpperCase() + ' — ' + val
+  return (c.restrito === true ? '🎯 ' : '')
+       + String(c.codigo).toUpperCase() + ' — ' + val
        + (reg.length ? ' (' + reg.join(' · ') + ')' : '')
-       + ' · ' + (c.loja || 'sem loja');
+       + ' · ' + (c.loja || 'sem loja')
+       + (c.restrito === true ? ' · só produtos específicos' : '');
 }
 
 function preencherCupomBaseOferta() {
