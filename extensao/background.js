@@ -229,6 +229,19 @@ function avisar(titulo, corpo) {
 function desembrulhar(url) {
   try {
     const u = new URL(url);
+    // Mercado Livre: card patrocinado da busca vem como contador de clique
+    // (click1.mercadolivre.com.br/mclics/clicks/...). O "a=" e cifrado, mas o
+    // item esta em claro em pdp_filters=item_id:MLBxxxx (e em wid= no hash).
+    // So leitura de string — nenhuma consulta a pagina.
+    if (/^click\d*\.mercadoli(vre|bre)\./i.test(u.hostname)) {
+      const m = (u.searchParams.get('pdp_filters') || '').match(/item_id:(ML[A-Z])(\d+)/i)
+             || u.hash.match(/[?&#]wid=(ML[A-Z])(\d+)/i);
+      if (!m) return url;
+      const site = m[1].toUpperCase();
+      const dom = site === 'MLB' ? 'produto.mercadolivre.com.br' : 'articulo.mercadolibre.com';
+      return 'https://' + dom + '/' + site + '-' + m[2];
+    }
+    // Amazon: /sspa/click?...&url=%2Fdp%2FB0XXXX e /gp/slredirect
     if (!/\/(sspa\/click|gp\/slredirect)/i.test(u.pathname)) return url;
     const dentro = u.searchParams.get('url') || u.searchParams.get('u');
     if (!dentro) return url;
