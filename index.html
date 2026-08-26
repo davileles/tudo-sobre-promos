@@ -95,6 +95,41 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   #side-backdrop{display:none}
   .main-tab{background:transparent;border:1px solid transparent;border-radius:10px;color:var(--muted);font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:700;padding:9px 12px;cursor:pointer;transition:color .15s,border-color .15s,background .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:9px;width:100%;text-align:left;justify-content:flex-start}
   .main-tab:hover:not(.active){color:var(--text);background:rgba(255,255,255,.05)}
+  /* ── ALERTAS ── A cor carrega o nivel: vermelho para na operacao, ambar para
+     dinheiro parado, cinza para registro. O resto da tela e deliberadamente
+     silencioso para a faixa colorida da esquerda ser o unico sinal forte. */
+  .al-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  .al-f{background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);
+        font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer}
+  .al-f:hover{color:var(--text)}
+  .al-f.active{color:var(--accent);border-color:var(--accent);background:rgba(250,81,80,.10)}
+  .al-f span{opacity:.75;margin-left:4px}
+  .al-busca{flex:1;min-width:160px;background:transparent;border:1px solid var(--border);border-radius:8px;
+            color:var(--text);font-size:12px;padding:7px 10px}
+  .al-pulso{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .al-pl{border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--muted)}
+  .al-pl b{color:var(--text);font-weight:700}
+  .al-pl.parada{border-color:#e5484d;color:#e5484d}
+  .al-pl.parada b{color:#e5484d}
+  .al-lista{display:flex;flex-direction:column;gap:9px}
+  .al-item{border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:9px;padding:11px 13px;
+           background:rgba(255,255,255,.02)}
+  .al-item.critico{border-left-color:#e5484d}
+  .al-item.atencao{border-left-color:#f5a524}
+  .al-item.info{border-left-color:#5a6072}
+  .al-item.lido{opacity:.5}
+  .al-cab{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .al-tit{font-weight:700;font-size:13.5px;color:var(--text)}
+  .al-meta{font-size:11px;color:var(--muted);margin-left:auto;display:flex;gap:9px;align-items:center}
+  .al-tag{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+          border-radius:6px;padding:2px 7px;background:rgba(255,255,255,.06);color:var(--muted)}
+  .al-rep{font-size:10px;font-weight:800;background:rgba(250,81,80,.15);color:var(--accent);border-radius:6px;padding:2px 6px}
+  .al-corpo{white-space:pre-wrap;font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+  .al-acoes{display:flex;gap:8px;margin-top:9px}
+  .al-acoes button{background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--muted);
+                   font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer}
+  .al-acoes button:hover{color:var(--text)}
+  .al-vazio{color:var(--muted);font-size:12.5px;padding:22px 0;text-align:center}
   .main-tab.active{color:var(--accent);background:rgba(250,81,80,.12);border-color:rgba(250,81,80,.45);border-left:3px solid var(--accent);padding-left:9px}
   .tab-badge{background:var(--accent);color:#0f0f0f;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:800;line-height:1.5}
 
@@ -1002,6 +1037,7 @@ body.travado > *:not(#login-screen){display:none !important}
      escrevem nesses ids. A faixa #sub-tabs so le os numeros daqui. -->
 <div id="tabs-legado" aria-hidden="true">
   <button class="main-tab" id="tab-hoje" onclick="switchTab('hoje')">☀️ Hoje<span class="tab-badge" id="hoje-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-alertas" onclick="switchTab('alertas')">🚨 Alertas<span class="tab-badge" id="alertas-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
@@ -1071,6 +1107,24 @@ body.travado > *:not(#login-screen){display:none !important}
       <div id="hoje-alertas" class="hoje-alertas"><div class="hoje-pe">carregando</div></div>
     </div>
   </div>
+</div>
+
+<!-- ════════ ALERTAS — tudo que o servidor avisou, por nivel de urgencia ════════
+     O grupo do operador recebe so 'critico' e 'atencao'; 'info' vive aqui.
+     O roteamento e do servidor (DESTINO_POR_NIVEL): esta tela nunca decide
+     destino, so mostra o que foi decidido. -->
+<div class="panel" id="panel-alertas">
+  <div class="al-filtros">
+    <button class="al-f active" data-nivel="" onclick="alFiltrar('')">Todos</button>
+    <button class="al-f al-f-critico" data-nivel="critico" onclick="alFiltrar('critico')">🛑 Operação parada <span id="al-c-critico">0</span></button>
+    <button class="al-f al-f-atencao" data-nivel="atencao" onclick="alFiltrar('atencao')">💸 Dinheiro na mesa <span id="al-c-atencao">0</span></button>
+    <button class="al-f al-f-info" data-nivel="info" onclick="alFiltrar('info')">📁 Registro <span id="al-c-info">0</span></button>
+    <input id="al-busca" class="al-busca" placeholder="buscar no texto..." oninput="alBuscarDebounce()"/>
+    <button class="al-f" onclick="carregarAlertas()">↻ Atualizar</button>
+    <button class="al-f" onclick="alMarcarTodos()">✓ Marcar tudo como lido</button>
+  </div>
+  <div id="al-pulso" class="al-pulso"></div>
+  <div id="al-lista" class="al-lista"><div class="al-vazio">Carregando...</div></div>
 </div>
 
 <!-- ════════ FILA — o que ja vai pro grupo e so espera a hora (leitura) ════════ -->
@@ -2951,7 +3005,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['hoje','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -2961,6 +3015,7 @@ function switchTab(name) {
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
   if (name === 'hoje') hojeCarregar();
+  if (name === 'alertas') carregarAlertas();
   if (name === 'descobertas') carregarDescobertas();
   if (name === 'rastreio') { carregarRastreio(); carregarTagsMl(); }
   if (name === 'filaenvio') carregarFilaEnvio();
@@ -3015,7 +3070,7 @@ function switchTab(name) {
    codigo que ja chamava switchTab segue funcionando e a secao se ajusta
    sozinha a partir deste mapa. */
 var SECOES = [
-  { id: 'hoje',       label: 'Hoje',       abas: ['hoje'] },
+  { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
   { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
   { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
   { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','descobertas','trafego'] },
@@ -3023,7 +3078,7 @@ var SECOES = [
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
 ];
 var ROTULO_ABA = {
-  hoje: 'Hoje', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
+  hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
   livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
@@ -3145,6 +3200,13 @@ var CABECALHOS = {
     return _n(_tam(typeof DIST_CACHE !== 'undefined' && DIST_CACHE)) + ' links';
   } },
   conexao: { titulo: 'Conexão', sub: function () { return 'Contas de WhatsApp e status do envio'; } },
+  alertas: { titulo: 'Alertas', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAlertas()' }], sub: function () {
+    var n = (typeof AL_NAO_LIDOS === 'object' && AL_NAO_LIDOS) ? AL_NAO_LIDOS : null;
+    if (!n) return 'Avisos do servidor por nível de urgência';
+    var criticos = n.critico || 0, atencao = n.atencao || 0;
+    if (!criticos && !atencao) return 'Nada exigindo ação · ' + _n(n.info || 0) + ' registro(s)';
+    return _n(criticos) + ' parada(s) · ' + _n(atencao) + ' exigindo decisão';
+  } },
   rastreio: { titulo: 'Rastreio de links', acoes: [{ rot: '↻ Atualizar', fn: 'carregarRastreio(true)' }], sub: function () {
     var m = (typeof RT_META === 'object' && RT_META) ? RT_META : null;
     if (!m || !m.totais) return 'Cliques e pedidos atribuidos por produto';
@@ -8451,6 +8513,171 @@ document.addEventListener('paste', function(e) {
     }
   }
 });
+
+/* ══════ ALERTAS ══════
+   A tela nao classifica nada: o nivel vem do servidor, que e quem decide
+   tambem o destino no WhatsApp. Aqui so exibimos e marcamos como lido. */
+var AL_NIVEL = '';
+var AL_BUSCA = '';
+var AL_NAO_LIDOS = null;
+var _alTimer = null;
+
+var AL_ROTULO = { critico: 'Operação parada', atencao: 'Dinheiro na mesa', info: 'Registro' };
+
+function alEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function alQuando(iso) {
+  var d = new Date(iso);
+  if (isNaN(d)) return '';
+  var min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return min + ' min';
+  if (min < 1440) return Math.floor(min / 60) + 'h';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+       + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function alFiltrar(nivel) {
+  AL_NIVEL = nivel || '';
+  var bs = document.querySelectorAll('#panel-alertas .al-f[data-nivel]');
+  for (var i = 0; i < bs.length; i++) {
+    bs[i].classList.toggle('active', (bs[i].getAttribute('data-nivel') || '') === AL_NIVEL);
+  }
+  carregarAlertas();
+}
+
+function alBuscarDebounce() {
+  clearTimeout(_alTimer);
+  _alTimer = setTimeout(function () {
+    AL_BUSCA = (document.getElementById('al-busca') || {}).value || '';
+    carregarAlertas();
+  }, 350);
+}
+
+async function carregarAlertas() {
+  var alvo = document.getElementById('al-lista');
+  if (!alvo) return;
+  try {
+    var qs = '?n=200&t=' + Date.now()
+      + (AL_NIVEL ? '&nivel=' + encodeURIComponent(AL_NIVEL) : '')
+      + (AL_BUSCA ? '&busca=' + encodeURIComponent(AL_BUSCA) : '');
+    var r = await fetch(SERVER + '/alertas' + qs, { cache: 'no-cache' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+    AL_NAO_LIDOS = d.naoLidos || null;
+    alPintarContadores(d.naoLidos || {});
+    alPintarLista(d.itens || []);
+    alPintarBadge(d.naoLidos || {});
+  } catch (e) {
+    alvo.innerHTML = '<div class="al-vazio">Não consegui carregar os alertas: ' + alEsc(e.message) + '</div>';
+  }
+  carregarPulsoLojas();
+}
+
+function alPintarContadores(n) {
+  ['critico', 'atencao', 'info'].forEach(function (k) {
+    var el = document.getElementById('al-c-' + k);
+    if (el) el.textContent = n[k] || 0;
+  });
+}
+
+// O badge da aba conta so o que exige acao: registro nao pode fazer o menu
+// piscar, senao o numero vira ruido e ninguem mais olha.
+function alPintarBadge(n) {
+  var total = (n.critico || 0) + (n.atencao || 0);
+  var b = document.getElementById('alertas-badge');
+  if (!b) return;
+  b.textContent = total;
+  b.style.display = total ? '' : 'none';
+}
+
+function alPintarLista(itens) {
+  var alvo = document.getElementById('al-lista');
+  if (!itens.length) {
+    alvo.innerHTML = '<div class="al-vazio">Nenhum alerta' + (AL_NIVEL ? ' neste nível' : '') + '.</div>';
+    return;
+  }
+  alvo.innerHTML = itens.map(function (a) {
+    var rep = (a.repeticoes || 1) > 1 ? '<span class="al-rep">' + a.repeticoes + 'x</span>' : '';
+    var oferta = a.ofertaId
+      ? '<button onclick="alIrParaOferta(\'' + alEsc(a.ofertaId) + '\')">ver oferta #' + alEsc(a.ofertaId) + '</button>'
+      : '';
+    return '<div class="al-item ' + alEsc(a.nivel) + (a.lido ? ' lido' : '') + '" id="al-' + alEsc(a.id) + '">'
+      + '<div class="al-cab">'
+      +   '<span class="al-tag">' + alEsc(AL_ROTULO[a.nivel] || a.nivel) + '</span>'
+      +   '<span class="al-tit">' + alEsc(a.titulo) + '</span>' + rep
+      +   '<span class="al-meta"><span class="al-tag">' + alEsc(a.origem) + '</span>'
+      +     (a.enviado ? '<span title="entregue no grupo do operador">📱</span>' : '')
+      +     '<span>' + alQuando(a.ultimaEm || a.em) + '</span></span>'
+      + '</div>'
+      + '<div class="al-corpo">' + alEsc(a.corpo) + '</div>'
+      + '<div class="al-acoes">'
+      +   '<button onclick="alMarcar(\'' + alEsc(a.id) + '\',' + (a.lido ? 'false' : 'true') + ')">'
+      +     (a.lido ? '↺ marcar como não lido' : '✓ marcar como lido') + '</button>'
+      +   oferta
+      + '</div></div>';
+  }).join('');
+}
+
+function alIrParaOferta(id) {
+  switchTab('aprov');
+  setTimeout(function () {
+    var el = document.getElementById('card-' + id) || document.getElementById('of-' + id);
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 600);
+}
+
+async function alMarcar(id, lido) {
+  try {
+    await fetch(SERVER + '/alertas/lido/' + encodeURIComponent(id), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lido: lido }),
+    });
+  } catch (e) { /* falha de marcacao nunca trava a tela */ }
+  carregarAlertas();
+}
+
+async function alMarcarTodos() {
+  try {
+    await fetch(SERVER + '/alertas/lidos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nivel: AL_NIVEL || '' }),
+    });
+  } catch (e) { /* idem */ }
+  carregarAlertas();
+}
+
+// Pulso: quando cada plataforma rendeu oferta pela ultima vez. E o dado que
+// sustenta o alerta de "plataforma parada" — ver a faixa vermelha aqui costuma
+// ser mais rapido que ler o alerta correspondente.
+async function carregarPulsoLojas() {
+  var alvo = document.getElementById('al-pulso');
+  if (!alvo) return;
+  try {
+    var r = await fetch(SERVER + '/alertas/pulso?t=' + Date.now(), { cache: 'no-cache' });
+    var d = await r.json();
+    if (!d.ok || !(d.itens || []).length) { alvo.innerHTML = ''; return; }
+    alvo.innerHTML = d.itens.map(function (x) {
+      return '<div class="al-pl' + (x.parada ? ' parada' : '') + '">'
+        + '<b>' + alEsc(x.loja) + '</b> · '
+        + (x.horasParada < 1 ? 'agora há pouco' : 'há ' + x.horasParada + 'h')
+        + '</div>';
+    }).join('');
+  } catch (e) { alvo.innerHTML = ''; }
+}
+
+// O badge precisa existir mesmo com a aba fechada: e assim que um alerta
+// critico chama a atencao de quem esta em outra tela.
+setInterval(function () {
+  if (document.body.classList.contains('travado')) return;
+  fetch(SERVER + '/alertas?n=1&t=' + Date.now(), { cache: 'no-cache' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (d && d.ok) { AL_NAO_LIDOS = d.naoLidos; alPintarBadge(d.naoLidos || {}); } })
+    .catch(function () {});
+}, 60000);
 
 /* ══════ STATUS BAILEYS ══════ */
 function verificarServidor() {
