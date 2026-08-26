@@ -157,7 +157,18 @@ function coletarDaPagina() {
 
   if (!titulo) titulo = document.querySelector('meta[property="og:title"]')?.content || document.title || '';
 
-  return { titulo: limpar(titulo), preco, precoDe, url: location.href };
+  // Mercado Livre: anuncio que pertence a catalogo traz o canonical em /p/MLB.
+  // O id de catalogo e o unico que a API oficial cobre (/products/{id}/items);
+  // o id de anuncio (produto.mercadolivre.com.br/MLB-...) so a pagina le, e com
+  // o antibot ligado nao ha plano B. Leitura de DOM da pagina ja aberta —
+  // nenhuma requisicao a mais.
+  let endereco = location.href;
+  if (/mercadoli(vre|bre)\./i.test(location.hostname)) {
+    const canon = document.querySelector('link[rel="canonical"]')?.href || '';
+    if (/\/(?:p|up)\/MLBU?\d{6,}/i.test(canon)) endereco = canon;
+  }
+
+  return { titulo: limpar(titulo), preco, precoDe, url: endereco };
 }
 
 // ── MONTAGEM DA LINHA ─────────────────────────────────────────────────────────
