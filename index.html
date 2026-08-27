@@ -444,17 +444,19 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .ag-previa-btn{background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:inherit;font-size:10.5px;font-weight:700;padding:5px 10px;cursor:pointer;margin-top:8px;transition:color .15s,border-color .15s}
   .ag-previa-btn:hover{color:var(--text);border-color:var(--accent)}
   .ag-previa-btn.aberta{color:var(--accent);border-color:var(--accent)}
-  /* Prévia estilo WhatsApp: fundo escuro do app + bolha de mensagem recebida */
-  .wa-prev{display:none;margin-top:10px;background:#0b141a;border:1px solid var(--border);border-radius:12px;padding:16px 14px}
+  /* Textos da fila: o que sai no grupo x a mensagem original que gerou.
+     Texto cru de proposito (com os *asteriscos* do WhatsApp visiveis): a
+     pergunta aqui e "o que exatamente foi entregue", nao "como fica bonito". */
+  .wa-prev{display:none;margin-top:10px;background:var(--card-deep,var(--card));border:1px solid var(--border);border-radius:12px;padding:12px 14px}
   .wa-prev.aberta{display:block}
-  .wa-bolha{background:#1f2c34;border-radius:10px;border-top-left-radius:2px;padding:7px 9px 8px;max-width:420px;box-shadow:0 1px 1px rgba(0,0,0,.3);position:relative}
-  .wa-remetente{font-size:11.5px;font-weight:700;color:#53bdeb;margin-bottom:3px}
-  .wa-img{width:100%;max-width:400px;border-radius:8px;display:block;margin-bottom:6px}
-  .wa-txt{font-size:13px;line-height:1.45;color:#e9edef;white-space:pre-wrap;word-break:break-word}
-  .wa-txt a{color:#53bdeb;text-decoration:none;pointer-events:none}
-  .wa-txt code{font-family:monospace;background:rgba(255,255,255,.06);border-radius:4px;padding:0 3px}
-  .wa-hora{font-size:10px;color:#8696a0;text-align:right;margin-top:3px}
-  .wa-prev-carregando{font-size:11px;color:#8696a0;padding:4px 0}
+  .fp-bloco + .fp-bloco{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border)}
+  .fp-rotulo{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:7px}
+  .fp-copiar{background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:inherit;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:2px 7px;cursor:pointer}
+  .fp-copiar:hover{color:var(--text);border-color:var(--accent)}
+  .fp-txt{font-size:12.5px;line-height:1.5;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  .fp-txt.vazio{color:var(--muted);font-style:italic}
+  .wa-img{width:100%;max-width:400px;border-radius:8px;display:block;margin-bottom:8px}
+  .wa-prev-carregando{font-size:11px;color:var(--muted);padding:4px 0}
   .ag-acoes{display:flex;justify-content:flex-end;margin-top:10px}
 
   /* ══ GRUPOS ══ */
@@ -8988,7 +8990,7 @@ function cardEnviadoFila(it) {
   var dest = it.gruposDestino != null ? '<span class="ag-tag">→ ' + it.gruposDestino + ' grupo(s)</span>' : '';
   var hora = it.enviadoEm ? fmtHoraSP(it.enviadoEm) : (it.capturadoEm ? fmtHoraSP(it.capturadoEm) : '');
   // Mesmo padrao da secao Aguardando: previa de como a publicacao saiu no grupo.
-  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', temImagem: !!it.temImagem };
+  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', original: it.original || '', temImagem: !!it.temImagem };
   var aberta = _previasAbertas.has(String(it.id));
   return '<div class="ag-card">'
     + '<div class="ag-topo">'
@@ -9000,7 +9002,7 @@ function cardEnviadoFila(it) {
     +   dest
     + '</div>'
     + '<button class="ag-previa-btn' + (aberta ? ' aberta' : '') + '" id="wa-btn-' + it.id + '" data-id="' + it.id + '" onclick="togglePreviaFila(this.dataset.id)">'
-    +   (aberta ? '👁 Ocultar prévia' : '👁 Prévia no grupo') + '</button>'
+    +   (aberta ? '📄 Ocultar textos' : '📄 Ver textos') + '</button>'
     + '<div class="wa-prev' + (aberta ? ' aberta' : '') + '" id="wa-prev-' + it.id + '"></div>'
     + '</div>';
 }
@@ -9032,7 +9034,7 @@ function cardFilaEnvio(it) {
     : '';
   // Mensagem fica num mapa (nao em atributo HTML) para a previa nao sofrer
   // com escape de aspas/quebras; sobrevive ao re-render do ciclo de 12s.
-  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', temImagem: !!it.temImagem };
+  _FILA_MSGS[it.id] = { mensagem: it.mensagem || '', original: it.original || '', temImagem: !!it.temImagem };
   var aberta = _previasAbertas.has(String(it.id));
   return '<div class="ag-card' + (it.travado ? ' trav' : '') + '">'
     + '<div class="ag-topo">' + quando
@@ -9044,7 +9046,7 @@ function cardFilaEnvio(it) {
     + (it.motivo && !it.travado ? '<div class="fe-motivo">' + esc(it.motivo) + '</div>' : '')
     + '<div class="ag-msg">' + esc(it.mensagem || '') + '</div>'
     + '<button class="ag-previa-btn' + (aberta ? ' aberta' : '') + '" id="wa-btn-' + it.id + '" data-id="' + it.id + '" onclick="togglePreviaFila(this.dataset.id)">'
-    +   (aberta ? '👁 Ocultar prévia' : '👁 Prévia no grupo') + '</button>'
+    +   (aberta ? '📄 Ocultar textos' : '📄 Ver textos') + '</button>'
     + '<div class="wa-prev' + (aberta ? ' aberta' : '') + '" id="wa-prev-' + it.id + '"></div>'
     + '</div>';
 }
@@ -9056,23 +9058,33 @@ var _FILA_MSGS = {};
 var _previasAbertas = new Set();
 var _previaImgCache = {};
 
-// Formatacao do WhatsApp -> HTML: *negrito*, _italico_, ~riscado~, ```mono```.
-// Mesmas regras do app, aplicadas apos escapar o HTML.
-function waFormatar(txt) {
-  var t = esc(txt);
-  t = t.replace(/```([\s\S]+?)```/g, '<code>$1</code>');
-  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s.,!?;:)])/gm, '$1<b>$2</b>');
-  t = t.replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s.,!?;:)])/gm, '$1<i>$2</i>');
-  t = t.replace(/(^|[\s(])~([^~\n]+)~(?=$|[\s.,!?;:)])/gm, '$1<s>$2</s>');
-  t = t.replace(/(https?:\/\/[^\s<]+)/g, '<a>$1</a>');
-  return t;
+// Copia para a area de transferencia sem depender de permissao do navegador
+// em contexto inseguro: fallback para textarea + execCommand.
+function fpCopiar(id, qual, btn) {
+  var d = _FILA_MSGS[id] || {};
+  var txt = qual === 'original' ? (d.original || '') : (d.mensagem || '');
+  if (!txt) return;
+  var aviso = function(){ var t = btn.textContent; btn.textContent = 'copiado'; setTimeout(function(){ btn.textContent = t; }, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(aviso).catch(function(){});
+    return;
+  }
+  var ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); aviso(); } catch (e) {}
+  document.body.removeChild(ta);
 }
 
+// Dois textos lado a lado, ambos crus (sem interpretar *negrito* etc.):
+//  1) o que foi/vai ser entregue no grupo — a mensagem formatada pelo template;
+//  2) a captura da fonte que gerou essa mensagem — grupo, Telegram ou feed.
+// Ver os dois juntos e o unico jeito de flagrar no painel um cupom que saiu
+// com codigo, preco ou loja diferentes do que o post original dizia.
 function renderPreviaFila(id) {
   var box = document.getElementById('wa-prev-' + id);
   if (!box) return;
-  var dados = _FILA_MSGS[id] || { mensagem: '', temImagem: false };
-  var agora = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' });
+  var dados = _FILA_MSGS[id] || { mensagem: '', original: '', temImagem: false };
   var img = '';
   if (dados.temImagem) {
     var cache = _previaImgCache[id];
@@ -9085,11 +9097,22 @@ function renderPreviaFila(id) {
       buscarImagemPrevia(id);
     }
   }
-  box.innerHTML = '<div class="wa-bolha">'
-    + '<div class="wa-remetente">Tica Promos</div>'
-    + img
-    + '<div class="wa-txt">' + waFormatar(dados.mensagem) + '</div>'
-    + '<div class="wa-hora">' + agora + '</div>'
+  var orig = String(dados.original || '').trim();
+  box.innerHTML =
+      '<div class="fp-bloco">'
+    +   '<div class="fp-rotulo">\ud83d\udce4 Texto entregue no grupo'
+    +     '<button class="fp-copiar" data-id="' + id + '" onclick="fpCopiar(this.dataset.id,\'mensagem\',this)">copiar</button>'
+    +   '</div>'
+    +   img
+    +   '<div class="fp-txt">' + esc(dados.mensagem || '') + '</div>'
+    + '</div>'
+    + '<div class="fp-bloco">'
+    +   '<div class="fp-rotulo">\ud83d\udce5 Mensagem original que gerou'
+    +     (orig ? '<button class="fp-copiar" data-id="' + id + '" onclick="fpCopiar(this.dataset.id,\'original\',this)">copiar</button>' : '')
+    +   '</div>'
+    +   (orig
+        ? '<div class="fp-txt">' + esc(orig) + '</div>'
+        : '<div class="fp-txt vazio">Sem original registrado — item criado direto no painel ou capturado antes deste campo existir.</div>')
     + '</div>';
 }
 
@@ -9113,11 +9136,11 @@ function togglePreviaFila(id) {
   if (_previasAbertas.has(id)) {
     _previasAbertas.delete(id);
     box.classList.remove('aberta'); box.innerHTML = '';
-    btn.classList.remove('aberta'); btn.textContent = '👁 Prévia no grupo';
+    btn.classList.remove('aberta'); btn.textContent = '📄 Ver textos';
   } else {
     _previasAbertas.add(id);
     box.classList.add('aberta');
-    btn.classList.add('aberta'); btn.textContent = '👁 Ocultar prévia';
+    btn.classList.add('aberta'); btn.textContent = '📄 Ocultar textos';
     renderPreviaFila(id);
   }
 }
