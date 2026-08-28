@@ -5302,11 +5302,14 @@ function salvarLista(){
       : Date.now();
     var _prev = lstPrevisaoTermino(produtos.length, intervalo, _inicioMs);
     var _janTxt = lstJanelasEfetivas().map(function(j){ return j.inicio + '–' + j.fim; }).join(', ');
+    lstMsg('Conferindo o preço dos produtos…');
+    lstCheckCobertura(produtos).then(function(_sc){
     if (!confirm('Disparar ' + produtos.length + ' produto(s) ' + quando + ', um a cada ' + intervalo
       + ' min — cerca de ' + horas + 'h de fila?\n\nJanela de envio: ' + _janTxt
       + '\nÚltimo produto sai em ' + lstFmtDataHora(_prev.terminaEm)
       + (_prev.cabeNoDia ? '' : '\n\n⚠️ A fila não cabe na janela de hoje: ela pausa no fechamento e continua na abertura seguinte.')
-      + '\n\nEste envio não fica salvo.')) return;
+      + lstTextoCobertura(_sc)
+      + '\n\nEste envio não fica salvo.')) { lstMsg(''); return; }
     lstMsg(inicioHora && !jaPassou ? 'Agendando a fila…' : 'Abrindo a fila…');
     fetch(SERVER + '/listas/disparo-unico', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -5319,14 +5322,17 @@ function salvarLista(){
       .then(function(d){
         if (!d.ok) throw new Error(d.erro || 'falhou');
         var _fim = d.terminaAs ? ' Último produto às ' + d.terminaAs + '.' : '';
+        var _cob = (d.semCobertura && d.semCobertura.length)
+          ? ' ⚠️ ' + d.semCobertura.length + ' item(ns) do ML sem preço serão pulados.' : '';
         lstMsg((d.aguardando
           ? '✓ Disparo agendado para ' + (d.iniciaAs || inicioHora) + ' — fica aguardando abaixo.'
           : '✓ Disparo iniciado — acompanhe o andamento abaixo.') + _fim
-          + (d.aviso ? ' ⚠️ ' + d.aviso : ''));
+          + (d.aviso ? ' ⚠️ ' + d.aviso : '') + _cob);
         VIT_SEL = {}; cancelarFormLista();
         renderVitrine(); carregarListas();
       })
       .catch(function(e){ lstMsg('Não foi possível disparar: ' + e.message, true); });
+    });
     return;
   }
 
@@ -5360,19 +5366,43 @@ function salvarLista(){
     .catch(function(e){ lstMsg('Não foi possível salvar: ' + e.message, true); });
 }
 
+/* ══════ COBERTURA DE PRECO NO ML ══════
+   Produto do ML sem catalogo nao tem preco enquanto a leitura de pagina esta
+   desligada no servidor: ele entra na fila, espera a vez e vira "pulado". A
+   conferencia acontece ANTES do confirm, quando ainda da para trocar o item. */
+function lstCheckCobertura(produtos){
+  return fetch(SERVER + '/listas/checar-cobertura', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ produtos: produtos })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ return (d && d.semCobertura) || []; })
+    .catch(function(){ return []; });   // sem resposta: nao trava o disparo
+}
+function lstTextoCobertura(sc){
+  if (!sc || !sc.length) return '';
+  var nomes = sc.slice(0, 8).map(function(x){ return '• ' + (x.nome || x.asin); }).join('\n');
+  return '\n\n⚠️ ' + sc.length + ' produto(s) do Mercado Livre sem preço disponível — vão ser PULADOS:\n'
+       + nomes + (sc.length > 8 ? '\n• …e mais ' + (sc.length - 8) : '')
+       + '\n\nMotivo: anúncio clássico, sem página de catálogo. Troque pelo link /p/ do produto, se existir.';
+}
+
 function dispararLista(id){
   var l = LST_CACHE.find(function(x){ return x.id === id; });
   if (!l) return;
   var horas = Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10;
-  if (!confirm('Disparar "' + l.nome + '"?\n\n' + l.produtos.length + ' produto(s), um a cada '
-    + l.intervaloMin + ' min — cerca de ' + horas + 'h até o último.')) return;
-  fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/disparar', { method:'POST' })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d.ok) throw new Error(d.erro || 'falhou');
-      carregarListas();
-    })
-    .catch(function(e){ alert('Não foi possível disparar: ' + e.message); });
+  lstCheckCobertura(l.produtos).then(function(sc){
+    if (!confirm('Disparar "' + l.nome + '"?\n\n' + l.produtos.length + ' produto(s), um a cada '
+      + l.intervaloMin + ' min — cerca de ' + horas + 'h até o último.'
+      + lstTextoCobertura(sc))) return;
+    fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/disparar', { method:'POST' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok) throw new Error(d.erro || 'falhou');
+        carregarListas();
+      })
+      .catch(function(e){ alert('Não foi possível disparar: ' + e.message); });
+  });
 }
 
 function acaoLista(id, acao){
