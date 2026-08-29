@@ -5323,7 +5323,7 @@ function salvarLista(){
         if (!d.ok) throw new Error(d.erro || 'falhou');
         var _fim = d.terminaAs ? ' Último produto às ' + d.terminaAs + '.' : '';
         var _cob = (d.semCobertura && d.semCobertura.length)
-          ? ' ⚠️ ' + d.semCobertura.length + ' item(ns) do ML sem preço serão pulados.' : '';
+          ? ' ℹ️ ' + d.semCobertura.length + ' item(ns) do ML terão o preço lido pelo card do perfil.' : '';
         lstMsg((d.aguardando
           ? '✓ Disparo agendado para ' + (d.iniciaAs || inicioHora) + ' — fica aguardando abaixo.'
           : '✓ Disparo iniciado — acompanhe o andamento abaixo.') + _fim
@@ -5382,9 +5382,11 @@ function lstCheckCobertura(produtos){
 function lstTextoCobertura(sc){
   if (!sc || !sc.length) return '';
   var nomes = sc.slice(0, 8).map(function(x){ return '• ' + (x.nome || x.asin); }).join('\n');
-  return '\n\n⚠️ ' + sc.length + ' produto(s) do Mercado Livre sem preço disponível — vão ser PULADOS:\n'
+  return '\n\nℹ️ ' + sc.length + ' produto(s) do Mercado Livre são anúncio clássico:\n'
        + nomes + (sc.length > 8 ? '\n• …e mais ' + (sc.length - 8) : '')
-       + '\n\nMotivo: anúncio clássico, sem página de catálogo. Troque pelo link /p/ do produto, se existir.';
+       + '\n\nA API oficial não cobre esses itens — o preço vem do card do nosso perfil'
+       + '\nde afiliado no momento do disparo. Costuma funcionar; só é um caminho'
+       + '\na mais, e falha se o produto não for elegível ao programa de afiliados.';
 }
 
 function dispararLista(id){
