@@ -7287,6 +7287,17 @@ var _trilhasProm  = null;
 var TRILHA_SEL    = {};       // prefixo do gerador -> [ids de trilha]
 var _rodPrevCache = {};       // 'tipo|categoria' -> destinos[] (null = falhou)
 
+// Regras de rodape acabaram de mudar: o preview de cada gerador esta em cache
+// por 'tipo|categoria' e continuaria mostrando a regra antiga ate a proxima
+// recarga da pagina. Zera o cache e repinta so os geradores com card aberto —
+// pintar os fechados dispararia fetch para caixa que ninguem esta vendo.
+function rodPreviewInvalidar() {
+  _rodPrevCache = {};
+  ['c-msg', 'o-msg', 'l-msg'].forEach(function(id){
+    if (document.getElementById(id + '-rodinfo')) pintarRodapeAplicado(id);
+  });
+}
+
 function trilhasCarregar(force) {
   if (_trilhasProm && !force) return _trilhasProm;
   _trilhasProm = fetch(SERVER + '/mkt/config?t=' + Date.now(), { cache:'no-cache' })
@@ -7894,7 +7905,7 @@ function rodSalvar() {
     // Repinta com o que o servidor normalizou: regra sem texto e descartada la,
     // e a tela precisa mostrar isso em vez de fingir que ela existe.
     rodPreencherCampos();
-    rodapeManualCarregar(true);
+    rodPreviewInvalidar();
     if (st) { st.style.color='var(--green)'; st.textContent = '✓ Salvo — já valendo para o próximo envio.'; }
   }).catch(function(e){
     if (btn) btn.disabled = false;
