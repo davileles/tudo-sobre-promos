@@ -3024,7 +3024,7 @@ function switchTab(name) {
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
   if (name === 'divulg') carregarDivulgacoes();
-  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarMonitor(); }
+  if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); if (!TG_CANAIS_CACHE.length) carregarCanaisTg(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
   if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); carregarCensoHist(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
@@ -4568,8 +4568,7 @@ function renderMonitor(){
   }
   el.innerHTML = fontes.map(function(jid){
     var c = MON_CACHE[jid];
-    var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
-    var nome = g ? (g.nome || '(sem nome)') : jid.split('@')[0];
+    var nome = nomeDoGrupo(jid);
     var e = estadoMonitor(c);
     var lojas = (c && c.lojas) || [];
 
@@ -9616,6 +9615,7 @@ async function atualizarBadge() {
 // PAPEIS deixa de ser editado aqui e vira retrato derivado das trilhas — o
 // monitoramento por grupo e a previsao de espacamento continuam lendo dele.
 var GRUPOS_CACHE = [];
+var TG_CANAIS_CACHE = [];   // canais do Telegram que a conta segue — so podem ser FONTE
 var TRILHAS = [];
 var PAPEIS = {};      // jid -> 'fonte' | 'destino'  (DERIVADO de TRILHAS)
 var PERSIST_SERVER = false;
@@ -9654,6 +9654,10 @@ function papelDe(jid) {
 }
 
 function nomeDoGrupo(jid) {
+  if (jid && jid.indexOf('tg:') === 0) {
+    var c = TG_CANAIS_CACHE.find(function(x){ return x.id === jid; });
+    return 'TG · ' + (c ? (c.nome || '(sem nome)') : jid.slice(3));
+  }
   var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
   return g ? (g.nome || '(sem nome)') : jid.split('@')[0];
 }
@@ -9769,7 +9773,14 @@ function sugerirTrilha(i, tipo) {
     return;
   }
   var jaNaTrilha = TRILHAS[i][tipo] || [];
-  var lista = GRUPOS_CACHE
+  // FONTE aceita também canal do Telegram; destino continua só WhatsApp,
+  // porque é no WhatsApp que a oferta é publicada.
+  var universo = tipo === 'fontes'
+    ? GRUPOS_CACHE.concat(TG_CANAIS_CACHE.map(function(c){
+        return { id: c.id, nome: 'TG · ' + (c.nome || c.username || c.id) };
+      }))
+    : GRUPOS_CACHE;
+  var lista = universo
     .filter(function(g){ return !termo || (g.nome || '').toLowerCase().indexOf(termo) !== -1; })
     .filter(function(g){ return jaNaTrilha.indexOf(g.id) === -1; })
     .slice(0, 12);
@@ -10073,6 +10084,17 @@ async function carregarGrupos(forcar) {
     av.innerHTML = '<b>Não deu para listar os grupos.</b> Verifique se o WhatsApp está conectado e recarregue.';
     return false;
   }
+}
+
+// Canais do Telegram para a caixa de FONTES das trilhas. Falha é silenciosa:
+// com o Telegram desconectado a aba segue funcionando só com os grupos de
+// WhatsApp — o canal simplesmente não aparece no autocomplete.
+async function carregarCanaisTg(forcar) {
+  try {
+    var r = await fetch(SERVER + '/tg/canais' + (forcar ? '?refresh=1' : ''), { cache:'no-cache', signal: AbortSignal.timeout(30000) });
+    var d = await r.json();
+    if (d && d.ok) { TG_CANAIS_CACHE = d.canais || []; renderGrupos(); }
+  } catch(e) { /* Telegram fora do ar não derruba a aba */ }
 }
 
 /* ══════ ESPACAMENTO ENTRE GRUPOS ══════ */
