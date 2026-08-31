@@ -4226,6 +4226,18 @@ function gruposDestino(){
   return GRUPOS_CACHE.filter(function(g){ return PAPEIS[g.id] === 'destino'; });
 }
 
+// Elegiveis para um link do distribuidor: destinos das trilhas MAIS os grupos
+// de cupons. O grupo "so cupons" nao e destino de trilha nenhuma — o servidor
+// publica nele por CFG_TSP.grupos.cupons — entao com o filtro so de 'destino'
+// ele nunca aparecia na busca. Fonte e grupo do operador ficam de fora de
+// proposito: divulgar convite de um grupo-fonte enche o radar de gente.
+function gruposDistribuiveis(){
+  var cupons = cfgGrupos().cupons;
+  return GRUPOS_CACHE.filter(function(g){
+    return PAPEIS[g.id] === 'destino' || cupons.indexOf(g.id) >= 0;
+  });
+}
+
 /* ══════ CENSO DE MEMBROS ══════ */
 // Contagem por grupo medida pelo servidor as 00:10 (SP) e guardada la. Aqui e
 // so leitura — "Medir agora" forca uma nova passada no WhatsApp.
@@ -4357,9 +4369,9 @@ function distSugerir(){
     box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Carregando grupos do WhatsApp…</div>';
     box.style.display = 'block'; return;
   }
-  var destinos = gruposDestino();
+  var destinos = gruposDistribuiveis();
   if (!destinos.length){
-    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Nenhum grupo marcado como <b>destino</b>. Marque na aba 👥 Grupos.</div>';
+    box.innerHTML = '<div style="padding:10px;font-size:12px;color:var(--muted)">Nenhum grupo elegível. Marque o grupo como <b>destino</b> em uma trilha (aba \u{1F465} Grupos) ou como <b>somente cupons</b> na Configuração.</div>';
     box.style.display = 'block'; return;
   }
   var jaTem = {}; DIST_SEL.forEach(function(g){ jaTem[g.jid] = true; });
@@ -4368,8 +4380,11 @@ function distSugerir(){
   }).slice(0, 12);
   if (!lista.length){ box.style.display = 'none'; return; }
   box.innerHTML = lista.map(function(g){
-    return '<div onclick="distAdd(\'' + esc(g.id) + '\')" style="padding:9px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)">'
-      + esc(g.nome || '(sem nome)') + '</div>';
+    var pa = papelDe(g.id);
+    return '<div onclick="distAdd(\'' + esc(g.id) + '\')" style="padding:9px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">'
+      + '<span style="flex:1">' + esc(g.nome || '(sem nome)') + '</span>'
+      + (pa ? '<span class="tag">' + esc(PAPEIS_LABEL[pa] || pa) + '</span>' : '')
+      + '</div>';
   }).join('');
   box.style.display = 'block';
 }
