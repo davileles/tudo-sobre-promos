@@ -1723,6 +1723,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <span style="font-weight:600;text-transform:none;letter-spacing:0" id="contas-agora"></span>
   </div>
   <div id="contas-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+  <div id="ga-painel"></div>
 
   <div class="card" style="margin-top:12px">
     <div class="g2" style="margin-bottom:12px">
@@ -4785,6 +4786,7 @@ function renderContas() {
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
             + urlComToken(SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr')) + '">QR</a>'
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
+          + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gerenciarGruposConta(\'' + esc(c.id) + '\')">Gerenciar grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="excluirConta(\'' + esc(c.id) + '\')">Excluir</button>')
         + '</div></div>'
       + '</div>'
@@ -4918,6 +4920,142 @@ function conferirGruposConta(id) {
       }
     })
     .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
+}
+
+// ── GERENCIAR PARTICIPACAO DE UM NUMERO NOS GRUPOS DE DESTINO ────────────────
+// "Conferir grupos" acima só diagnostica. Aqui o operador corrige: entrar nos
+// grupos que faltam, virar admin, sair. Tudo passa pelo servidor, que serializa
+// as alterações com intervalo — mexer em participante em rajada é o caminho
+// mais curto para o número levar bloqueio do WhatsApp.
+var GA_CACHE = { conta:null, grupos:[] };
+
+function gaFechar() {
+  GA_CACHE = { conta:null, grupos:[] };
+  document.getElementById('ga-painel').innerHTML = '';
+}
+
+function gerenciarGruposConta(id) {
+  var alvo = document.getElementById('ga-painel');
+  alvo.innerHTML = '<div class="card" style="margin-top:12px"><div class="fila-loading"><div class="spinner"></div></div>'
+    + '<p class="send-ok">Lendo os grupos de ' + esc(id) + '…</p></div>';
+  fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/grupos-estado?t=' + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      GA_CACHE = { conta:id, grupos:d.grupos || [] };
+      gaRender(d);
+    })
+    .catch(function(e){
+      alvo.innerHTML = '<div class="card" style="margin-top:12px"><p class="send-ok send-err">Não deu: '
+        + esc(e.message) + '</p></div>';
+    });
+}
+
+function gaBadge(g) {
+  if (!g.membro)  return '<span class="tag" style="color:#f87171;border-color:#f87171">fora do grupo</span>';
+  if (g.admin)    return '<span class="tag" style="color:#4ade80;border-color:#4ade80">admin</span>';
+  return '<span class="tag">membro</span>';
+}
+
+function gaRender(d) {
+  var linhas = (d.grupos || []).map(function(g, i){
+    return '<label class="mon-loja" style="display:flex;align-items:center;gap:8px;padding:6px 0">'
+      + '<input type="checkbox" data-ga="' + i + '" value="' + esc(g.jid) + '"'
+        + (g.bloqueado ? ' disabled' : '') + '/>'
+      + '<span style="flex:1">' + esc(g.nome || g.jid.split('@')[0]) + ' ' + gaBadge(g)
+      + (g.bloqueado
+          ? ' <span class="tag" style="color:#fbbf24;border-color:#fbbf24">sem admin nosso</span>'
+          : '')
+      + '</span></label>';
+  }).join('');
+
+  document.getElementById('ga-painel').innerHTML =
+    '<div class="card" style="margin-top:12px">'
+    + '<div class="mon-top"><span class="mon-nome">Grupos de destino — ' + esc(d.conta) + '</span>'
+      + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gaFechar()">Fechar</button></div>'
+    + '<p class="send-ok" style="margin:6px 0 12px">' + d.total + ' grupo(s) · '
+      + d.foraDoGrupo + ' fora · ' + d.semAdmin + ' sem admin'
+      + (d.bloqueados ? ' · <span style="color:#fbbf24">' + d.bloqueados
+          + ' sem nenhum número nosso como admin</span>' : '') + '</p>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gaMarcar(\'todos\')">Marcar todos</button>'
+      + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gaMarcar(\'fora\')">Só os que faltam</button>'
+      + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gaMarcar(\'semadmin\')">Só sem admin</button>'
+      + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gaMarcar(\'nenhum\')">Limpar</button>'
+    + '</div>'
+    + '<div style="max-height:320px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-bottom:12px">'
+      + (linhas || '<div class="cup-vazio">Nenhum grupo de destino configurado.</div>')
+    + '</div>'
+    + '<div class="g2" style="margin-bottom:10px">'
+      + '<div class="field"><label>Ação</label><select id="ga-acao">'
+        + '<option value="add">Entrar no grupo</option>'
+        + '<option value="promote">Tornar administrador</option>'
+        + '<option value="demote">Remover o administrador</option>'
+        + '<option value="remove">Sair do grupo</option>'
+      + '</select></div>'
+      + '<div class="field"><label>Intervalo entre grupos (segundos)</label>'
+        + '<input type="number" id="ga-pausa" min="1" max="60" value="5"/></div>'
+    + '</div>'
+    + '<button class="btn" id="ga-btn" style="margin-top:0" onclick="gaAplicar()">Aplicar aos selecionados</button>'
+    + '<p class="send-ok" id="ga-status" style="margin-top:10px"></p>'
+    + '<div id="ga-resultado"></div>'
+    + '</div>';
+}
+
+function gaMarcar(modo) {
+  [].slice.call(document.querySelectorAll('#ga-painel [data-ga]')).forEach(function(cb){
+    if (cb.disabled) { cb.checked = false; return; }
+    var g = GA_CACHE.grupos[parseInt(cb.getAttribute('data-ga'), 10)] || {};
+    cb.checked = modo === 'todos'    ? true
+               : modo === 'fora'     ? !g.membro
+               : modo === 'semadmin' ? (g.membro && !g.admin)
+               : false;
+  });
+}
+
+function gaAplicar() {
+  var jids = [].slice.call(document.querySelectorAll('#ga-painel [data-ga]:checked'))
+    .map(function(cb){ return cb.value; });
+  var st  = document.getElementById('ga-status');
+  var btn = document.getElementById('ga-btn');
+  if (!jids.length) { st.className='send-ok send-err'; st.textContent='Marque pelo menos um grupo.'; return; }
+
+  var acao  = document.getElementById('ga-acao').value;
+  var pausa = Math.min(Math.max(parseInt(document.getElementById('ga-pausa').value, 10) || 5, 1), 60);
+  var rotulo = { add:'ENTRAR em', promote:'virar ADMIN de', demote:'DEIXAR de ser admin de', remove:'SAIR de' }[acao];
+  // Confirmação com o número na frente: as ações são todas visíveis para os
+  // membros do grupo, e 'remove' em massa não tem desfazer barato.
+  if (!confirm('O número “' + GA_CACHE.conta + '” vai ' + rotulo + ' ' + jids.length + ' grupo(s).\n\n'
+      + 'Intervalo de ' + pausa + 's entre cada um — a operação leva cerca de '
+      + Math.ceil(jids.length * pausa / 60) + ' min.\n\nConfirma?')) return;
+
+  btn.disabled = true;
+  st.className = 'send-ok';
+  st.textContent = 'Executando… não feche a aba (≈' + Math.ceil(jids.length * pausa / 60) + ' min).';
+  document.getElementById('ga-resultado').innerHTML = '';
+
+  fetch(SERVER + '/contas/' + encodeURIComponent(GA_CACHE.conta) + '/grupos-acao', {
+    method:'POST', headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ acao: acao, jids: jids, pausaMs: pausa * 1000 })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false;
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    st.className = d.falhas ? 'send-ok send-err' : 'send-ok';
+    st.textContent = (d.falhas ? '⚠️ ' : '✓ ') + d.feitos + ' feito(s), '
+      + d.pulados + ' pulado(s), ' + d.falhas + ' falha(s).';
+    document.getElementById('ga-resultado').innerHTML =
+      '<div style="max-height:240px;overflow:auto;margin-top:8px;font-size:12px">'
+      + (d.resultados || []).map(function(r){
+          var cor = r.estado === 'ok' ? '#4ade80' : r.estado === 'pulado' ? 'var(--muted)' : '#f87171';
+          return '<div style="color:' + cor + '">· ' + esc(r.nome) + ' — ' + esc(r.detalhe) + '</div>';
+        }).join('')
+      + '</div>';
+    // Reabre o retrato: sem isso os badges continuam mostrando o estado velho.
+    gerenciarGruposConta(GA_CACHE.conta);
+  }).catch(function(e){
+    btn.disabled = false;
+    st.className='send-ok send-err'; st.textContent='Não deu: ' + e.message;
+  });
 }
 
 function contasDisponiveis() {
