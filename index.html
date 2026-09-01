@@ -4744,10 +4744,20 @@ function papeisDaConta(id) {
   });
   var envioCdv = CONTAS_CACHE.envioCdv || 'principal';
   if (envioCdv === id) tags.push('dispara o CDV');
-  // O disparo do TSP e por turno, nao fixo: quem esta na escala aparece assim.
+  // O disparo do TSP tem dois modos: numero FIXO por grupo (atribuição) e
+  // turno por horário. Contar só a escala fazia um número que alimenta 20
+  // grupos aparecer como "sem papel" — o rótulo mais perigoso que existe aqui.
+  var fixos = (NG_CACHE.ativo ? (NG_CACHE.grupos || []) : []).filter(function(g){ return g.conta === id; }).length;
+  if (fixos) tags.push('dispara ' + fixos + ' grupo' + (fixos > 1 ? 's' : '') + ' do TSP');
   var naEscala = (TURNOS_CACHE.turnos || []).some(function(t){ return t.conta === id; });
   if (naEscala) tags.push('na escala do TSP');
-  if (id === 'principal' && !naEscala) tags.push('envia por padrão');
+  // O principal só é "quem envia por padrão" enquanto sobrar grupo sem dono.
+  // Com todos atribuídos, o papel dele vira outro: rede de segurança.
+  if (id === 'principal' && !naEscala && !fixos) {
+    var semDono = (NG_CACHE.grupos || []).filter(function(g){ return !g.conta; }).length;
+    tags.push(NG_CACHE.ativo && (NG_CACHE.grupos || []).length && !semDono
+      ? 'reserva (só em falha)' : 'envia por padrão');
+  }
   if (!tags.length) tags.push('sem papel');
   return tags;
 }
@@ -4996,6 +5006,9 @@ function carregarNumerosGrupo(conferir) {
       NG_CACHE = d;
       document.getElementById('ng-ativo').checked = !!d.ativo;
       renderNumerosGrupo();
+      // Os papéis de cada número dependem da atribuição, que chega depois da
+      // lista de contas: sem este redesenho os rótulos ficam um passo atrás.
+      renderContas();
       if (conferir) {
         var semGrupo = d.grupos.filter(function(g){ return g.participa === false; });
         if (semGrupo.length) {
