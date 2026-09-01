@@ -1692,9 +1692,30 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ CONEXÃO ════════ -->
 <div class="panel" id="panel-conexao">
   <div class="aviso">
-    Quem <b>lê</b> os grupos é sempre o número principal — os extras <b>só disparam</b>.
+    Cada operação escolhe <b>quem lê</b> os grupos dela — pode ser o principal ou qualquer número pareado aqui.
+    O principal continua sendo a base do sistema: resolve números, responde o bot e assume a leitura de quem cair.
     Fora de qualquer turno, ou se o número da vez estiver fora do ar, o envio cai no principal.
-    A escala vale só para os disparos do <b>TSP</b> (cupons e ofertas de marketplace).
+    A escala de turnos vale só para os disparos do <b>TSP</b> (cupons e ofertas de marketplace).
+  </div>
+
+  <div class="sec-label">👁️ Quem lê os grupos-fonte do TSP</div>
+  <div class="card">
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field">
+        <label>Número leitor do TSP</label>
+        <select id="leitor-tsp"></select>
+      </div>
+      <div class="field" style="justify-content:flex-end">
+        <button class="btn" style="margin-top:0" id="leitor-btn" onclick="salvarLeitorTsp()">Salvar leitura</button>
+      </div>
+    </div>
+    <div id="leitores-estado" style="font-size:12.5px;line-height:1.7"></div>
+    <p class="send-ok" id="leitor-status"></p>
+    <p style="font-size:11.5px;color:var(--muted);line-height:1.6;margin:10px 0 0">
+      O número precisa já estar <b>dentro</b> dos grupos marcados como fonte — senão eles ficam sem captura.
+      Leitor fora do ar devolve a leitura ao principal sozinho; leitor conectado e mudo <b>não</b>, e nesse caso entra alerta.
+      A leitura dos grupos de passagem (CDV) é escolhida no gerador.
+    </p>
   </div>
 
   <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -4699,6 +4720,7 @@ function carregarContas() {
       TURNOS_CACHE = d.turnosTsp || { ativo:false, turnos:[] };
       document.getElementById('contas-agora').textContent = 'disparando agora: ' + (d.contaAgora || 'principal');
       renderContas();
+      renderLeitores();
       renderTurnos();
       carregarNumerosGrupo(false);
     })
@@ -4708,6 +4730,28 @@ function carregarContas() {
     });
 }
 
+// Papeis EFETIVOS de um numero. Antes a tela cravava "lê e envia" para o
+// principal e "só envia" para os demais — deixou de ser verdade quando a
+// leitura passou a ser escolhida por operacao. Um rotulo errado aqui e pior
+// que rotulo nenhum: e nele que o operador confia para decidir o que desligar.
+function papeisDaConta(id) {
+  var tags = [];
+  if (id === 'principal') tags.push('base do sistema');
+  (CONTAS_CACHE.leitores || []).forEach(function(l) {
+    var alvo = l.operacao === 'cdv' ? 'passagens (CDV)' : 'fontes do TSP';
+    if (l.efetiva === id) tags.push('lê ' + alvo + (l.configurada !== l.efetiva ? ' (assumido)' : ''));
+    else if (l.configurada === id) tags.push('deveria ler ' + alvo + ' — fora do ar');
+  });
+  var envioCdv = CONTAS_CACHE.envioCdv || 'principal';
+  if (envioCdv === id) tags.push('dispara o CDV');
+  // O disparo do TSP e por turno, nao fixo: quem esta na escala aparece assim.
+  var naEscala = (TURNOS_CACHE.turnos || []).some(function(t){ return t.conta === id; });
+  if (naEscala) tags.push('na escala do TSP');
+  if (id === 'principal' && !naEscala) tags.push('envia por padrão');
+  if (!tags.length) tags.push('sem papel');
+  return tags;
+}
+
 function renderContas() {
   var linhas = [CONTAS_CACHE.principal || { id:'principal' }].concat(CONTAS_CACHE.extras || []);
   document.getElementById('contas-lista').innerHTML = linhas.map(function(c){
@@ -4715,9 +4759,13 @@ function renderContas() {
     var est = c.conectado ? { txt:'conectado', cls:'ok' }
             : c.conectando ? { txt:'conectando...', cls:'perto' }
             : { txt:'desconectado', cls:'morto' };
+    var tags = papeisDaConta(c.id).map(function(t){
+      var cor = t.indexOf('fora do ar') >= 0 ? ' style="color:#f87171;border-color:#f87171"' : '';
+      return ' <span class="tag"' + cor + '>' + esc(t) + '</span>';
+    }).join('');
     return '<div class="mon' + (c.conectado ? '' : ' off') + '">'
       + '<div class="mon-top">'
-        + '<span class="mon-nome">' + esc(c.id) + (ehPrinc ? ' <span class="tag">lê e envia</span>' : ' <span class="tag">só envia</span>') + '</span>'
+        + '<span class="mon-nome">' + esc(c.id) + tags + '</span>'
         + '<span class="mon-estado ' + est.cls + '">' + est.txt + '</span>'
       + '</div>'
       + '<div class="mon-linha">'
@@ -4732,6 +4780,65 @@ function renderContas() {
       + '</div>'
     + '</div>';
   }).join('');
+}
+
+// Seletor da leitora do TSP. Escolhe do MESMO pool de numeros pareados; vazio
+// = principal. O estado abaixo mostra configurado x efetivo, que e o que
+// explica "troquei o numero e continua tudo igual".
+function renderLeitores() {
+  var sel = document.getElementById('leitor-tsp');
+  if (!sel) return;
+  var leitorTsp = '';
+  (CONTAS_CACHE.leitores || []).forEach(function(l){ if (l.operacao === 'tsp') leitorTsp = (l.configurada === 'principal' ? '' : l.configurada); });
+  var linhas = (CONTAS_CACHE.extras || []).slice()
+    .sort(function(a,b){ return String(a.id).localeCompare(String(b.id), 'pt-BR'); });
+  var html = '<option value="">Principal (base do sistema)</option>';
+  linhas.forEach(function(ct){
+    html += '<option value="' + esc(ct.id) + '"' + (ct.id === leitorTsp ? ' selected' : '') + '>'
+          + esc(ct.id) + (ct.conectado ? ' (conectado)' : ' (fora do ar)') + '</option>';
+  });
+  if (leitorTsp && !linhas.some(function(ct){ return ct.id === leitorTsp; })) {
+    html += '<option value="' + esc(leitorTsp) + '" selected>' + esc(leitorTsp) + ' (não pareado)</option>';
+  }
+  sel.innerHTML = html;
+
+  var alvo = document.getElementById('leitores-estado');
+  if (!alvo) return;
+  var out = '';
+  (CONTAS_CACHE.leitores || []).forEach(function(l){
+    var rotulo = l.operacao === 'cdv' ? 'Passagens (CDV)' : 'Fontes do TSP';
+    if (l.configurada !== l.efetiva) {
+      out += '<div style="color:#f87171">⚠️ ' + rotulo + ': escolhido “' + esc(l.configurada)
+           + '”, mas quem lê agora é “' + esc(l.efetiva) + '” — o escolhido não está conectado.</div>';
+    } else {
+      out += '<div style="color:var(--muted)">' + rotulo + ': lendo por “' + esc(l.efetiva) + '”'
+           + (l.conectada ? '' : ' <span style="color:#f87171">(fora do ar)</span>') + '.</div>';
+    }
+  });
+  alvo.innerHTML = out;
+}
+
+function salvarLeitorTsp() {
+  var sel = document.getElementById('leitor-tsp');
+  var st  = document.getElementById('leitor-status');
+  var btn = document.getElementById('leitor-btn');
+  var novo = sel.value;
+  if (novo && !confirm('Passar a leitura dos grupos-fonte do TSP para “' + novo + '”.\n\n'
+      + 'Esse número precisa já estar DENTRO dos grupos-fonte — senão eles ficam sem captura.\n\nConfirma?')) return;
+  btn.disabled = true; st.className = 'send-ok'; st.textContent = 'Salvando…';
+  // Merge parcial: mandar so 'leitura' preserva afiliados, rodapes e grupos.
+  fetch(SERVER + '/config-tsp', {
+    method:'POST', headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ leitura: { conta: novo } })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false;
+    if (!d.ok) { st.className='send-ok send-err'; st.textContent = d.erro || 'Falha ao salvar.'; return; }
+    st.textContent = '✓ Leitura salva — já valendo na próxima mensagem.';
+    carregarContas();
+  }).catch(function(e){
+    btn.disabled = false;
+    st.className='send-ok send-err'; st.textContent = 'Falhou: ' + e.message;
+  });
 }
 
 // O apelido vira nome de pasta no servidor, então acento e espaço não passam.
@@ -4772,6 +4879,12 @@ function excluirConta(id) {
       s.textContent = '✓ ' + id + ' removida'
         + (d.desvinculou ? ' e desvinculada do WhatsApp.' : '. O aparelho pode ter ficado na lista de dispositivos conectados — remova pelo celular.')
         + (d.turnosRemovidos ? ' ' + d.turnosRemovidos + ' turno(s) descartado(s).' : '');
+      if (d.papeisLimpos && d.papeisLimpos.length) {
+        // Sem este aviso, o operador exclui a conta e so descobre semanas
+        // depois que a separacao de leitura voltou para o principal.
+        alert('Conta removida.\n\nEla tinha papel ativo: ' + d.papeisLimpos.join(', ')
+          + '.\nIsso voltou para o número principal.');
+      }
       carregarContas();
     })
     .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
