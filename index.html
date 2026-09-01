@@ -1728,6 +1728,35 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <p class="send-ok" id="turnos-status"></p>
   </div>
+
+  <div class="sec-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <span>🎯 Grupos por número</span>
+    <span style="font-weight:600;text-transform:none;letter-spacing:0" id="ng-resumo"></span>
+  </div>
+  <div class="aviso">
+    Cada grupo de destino pode ter um número <b>fixo</b>. Grupo sem número atribuído
+    continua saindo pelo turno da vez (ou pelo principal). O que a atribuição garante é
+    remetente <b>constante dentro do grupo</b> e carga dividida entre os números — que é
+    o que o WhatsApp mede.
+  </div>
+  <div class="card">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <label class="mon-loja" style="display:inline-flex;margin:0" id="ng-ativo-wrap">
+        <input type="checkbox" id="ng-ativo" onchange="renderNumerosGrupo()"/> Atribuição por grupo ligada
+      </label>
+      <label class="mon-loja" style="display:inline-flex;margin:0">
+        <input type="checkbox" id="ng-so-orfaos" onchange="renderNumerosGrupo()"/> Só os órfãos
+      </label>
+    </div>
+    <div id="ng-carga" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div id="ng-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirNumerosGrupo()">🔍 Conferir participação</button>
+      <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="equilibrarNumerosGrupo()">⚖️ Equilibrar órfãos</button>
+      <button class="btn btn-sm" style="margin-top:0" id="ng-btn" onclick="salvarNumerosGrupo()">Salvar atribuição</button>
+    </div>
+    <p class="send-ok" id="ng-status"></p>
+  </div>
 </div>
 
 <!-- ════════ RESULTADOS: COMISSÃO ════════ -->
@@ -4671,6 +4700,7 @@ function carregarContas() {
       document.getElementById('contas-agora').textContent = 'disparando agora: ' + (d.contaAgora || 'principal');
       renderContas();
       renderTurnos();
+      carregarNumerosGrupo(false);
     })
     .catch(function(e){
       document.getElementById('contas-lista').innerHTML =
@@ -4833,6 +4863,184 @@ function salvarTurnos() {
     s.textContent = TURNOS_CACHE.ativo
       ? '✓ Escala ativa — disparando agora por ' + (d.contaAgora || 'principal') + '.'
       : '✓ Escala desligada: tudo sai pelo principal.';
+  })
+  .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não salvou: ' + e.message; })
+  .finally(function(){ btn.disabled = false; });
+}
+
+/* ══════ NUMERO FIXO POR GRUPO DE DESTINO ══════ */
+// A escala de turnos responde "quem dispara agora". Isto responde "quem dispara
+// neste grupo" — que e a conta que o balanceamento precisa: o teto pratico de um
+// numero e quantos GRUPOS ele alimenta.
+var NG_CACHE = { ativo:false, grupos:[], contas:['principal'], conectadas:[], carga:[] };
+
+function carregarNumerosGrupo(conferir) {
+  var s = document.getElementById('ng-status');
+  return fetch(SERVER + '/contas/grupos-numeros' + (conferir ? '?conferir=1&t=' : '?t=') + Date.now(), { cache:'no-cache' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      NG_CACHE = d;
+      document.getElementById('ng-ativo').checked = !!d.ativo;
+      renderNumerosGrupo();
+      if (conferir) {
+        var semGrupo = d.grupos.filter(function(g){ return g.participa === false; });
+        if (semGrupo.length) {
+          s.className = 'send-ok send-err';
+          s.textContent = '⚠️ ' + semGrupo.length + ' grupo(s) com número atribuído que NÃO está lá dentro: '
+            + semGrupo.map(function(g){ return (g.nome || g.jid.split('@')[0]) + ' → ' + g.conta; }).join(', ');
+        } else {
+          s.className = 'send-ok';
+          s.textContent = '✓ Todo número atribuído está dentro do grupo dele.';
+        }
+      }
+      return d;
+    })
+    .catch(function(e){
+      document.getElementById('ng-lista').innerHTML =
+        '<div class="cup-vazio">Não foi possível ler a atribuição.<br>' + esc(e.message) + '</div>';
+    });
+}
+
+function ngLerDaTela() {
+  var mapa = {};
+  [].slice.call(document.querySelectorAll('#ng-lista [data-ng-jid]')).forEach(function(sel){
+    var v = sel.value;
+    if (v) mapa[sel.getAttribute('data-ng-jid')] = v;
+  });
+  return mapa;
+}
+
+// A tela pode estar filtrada por "só os órfãos": ler apenas o que está visível
+// apagaria a atribuição de todo o resto. O mapa em cache é a base; a tela só
+// sobrescreve o que ela mostra.
+function ngMapaAtual() {
+  var base = {};
+  NG_CACHE.grupos.forEach(function(g){ if (g.conta) base[g.jid] = g.conta; });
+  var visiveis = {};
+  [].slice.call(document.querySelectorAll('#ng-lista [data-ng-jid]')).forEach(function(sel){
+    visiveis[sel.getAttribute('data-ng-jid')] = sel.value || null;
+  });
+  Object.keys(visiveis).forEach(function(j){
+    if (visiveis[j]) base[j] = visiveis[j]; else delete base[j];
+  });
+  return base;
+}
+
+function ngSincronizarCache() {
+  var mapa = ngMapaAtual();
+  NG_CACHE.grupos.forEach(function(g){ g.conta = mapa[g.jid] || null; });
+}
+
+function renderNumerosGrupo() {
+  var ativo   = document.getElementById('ng-ativo').checked;
+  var soOrfao = document.getElementById('ng-so-orfaos').checked;
+  var contas  = NG_CACHE.contas || ['principal'];
+  var vivas   = NG_CACHE.conectadas || [];
+  var el      = document.getElementById('ng-lista');
+
+  // Carga: contada sobre o estado atual, não sobre o que veio do servidor —
+  // assim o operador vê o balanceamento mudar enquanto mexe nos seletores.
+  var carga = {}, semNum = 0;
+  NG_CACHE.grupos.forEach(function(g){
+    if (g.conta) carga[g.conta] = (carga[g.conta] || 0) + 1; else semNum++;
+  });
+  var chips = Object.keys(carga).sort(function(a,b){ return carga[b] - carga[a]; }).map(function(k){
+    var viva = vivas.indexOf(k) >= 0;
+    return '<span class="tag" style="' + (viva ? '' : 'opacity:.55;text-decoration:line-through') + '">'
+      + esc(k) + ': ' + carga[k] + ' grupo' + (carga[k] > 1 ? 's' : '') + '</span>';
+  });
+  if (semNum) chips.push('<span class="tag" style="color:#fbbf24">sem número: ' + semNum + '</span>');
+  document.getElementById('ng-carga').innerHTML = chips.join('') || '<span class="tag">nenhum grupo de destino</span>';
+
+  var orfaos = NG_CACHE.grupos.filter(function(g){
+    return ativo && (!g.conta || g.contaExiste === false || g.participa === false);
+  }).length;
+  document.getElementById('ng-resumo').textContent = ativo
+    ? (orfaos ? '⚠️ ' + orfaos + ' grupo(s) órfão(s)' : '✓ nenhum órfão')
+    : 'desligada — tudo segue o turno';
+
+  var lista = soOrfao
+    ? NG_CACHE.grupos.filter(function(g){ return !g.conta || g.contaExiste === false || g.participa === false; })
+    : NG_CACHE.grupos;
+
+  if (!lista.length) {
+    el.innerHTML = '<div class="cup-vazio">' + (soOrfao ? 'Nenhum grupo órfão.' : 'Nenhum grupo de destino cadastrado.') + '</div>';
+    return;
+  }
+
+  el.innerHTML = lista.map(function(g){
+    var problema = !g.conta ? (ativo ? 'sem número' : '')
+      : g.contaExiste === false ? 'número não existe mais'
+      : g.participa === false ? 'número fora do grupo'
+      : (g.conta && vivas.indexOf(g.conta) < 0) ? 'número desconectado' : '';
+    return '<div class="mon' + (problema && ativo ? ' off' : '') + '">'
+      + '<div class="mon-top">'
+        + '<span class="mon-nome">' + esc(g.nome || g.jid.split('@')[0])
+          + (g.soCupons ? ' <span class="tag">só cupons</span>' : '') + '</span>'
+        + (problema
+            ? '<span class="mon-estado ' + (ativo ? 'morto' : 'perto') + '">' + esc(problema) + '</span>'
+            : (g.participa === true ? '<span class="mon-estado ok">confirmado</span>' : ''))
+      + '</div>'
+      + '<div class="mon-linha">'
+        + '<div class="mon-campo"><label>Número que dispara</label>'
+          + '<select data-ng-jid="' + esc(g.jid) + '" onchange="ngSincronizarCache();renderNumerosGrupo()">'
+          + '<option value="">— segue o turno —</option>'
+          + contas.map(function(o){
+              return '<option value="' + esc(o) + '"' + (o === g.conta ? ' selected' : '') + '>'
+                + esc(o) + (vivas.indexOf(o) < 0 ? ' (offline)' : '') + '</option>';
+            }).join('')
+        + '</select></div>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+// Preenche só o que está vazio, em rodízio, do número menos carregado para o
+// mais carregado. Não mexe em atribuição existente: quem já tem dono não muda
+// de remetente por causa de um clique.
+function equilibrarNumerosGrupo() {
+  ngSincronizarCache();
+  var vivas = (NG_CACHE.conectadas || []).slice();
+  if (!vivas.length) { alert('Nenhum número conectado para distribuir.'); return; }
+  var carga = {};
+  vivas.forEach(function(k){ carga[k] = 0; });
+  NG_CACHE.grupos.forEach(function(g){ if (g.conta && carga[g.conta] !== undefined) carga[g.conta]++; });
+  NG_CACHE.grupos.forEach(function(g){
+    if (g.conta) return;
+    var alvo = vivas.slice().sort(function(a,b){ return carga[a] - carga[b]; })[0];
+    g.conta = alvo; carga[alvo]++;
+  });
+  renderNumerosGrupo();
+  var s = document.getElementById('ng-status');
+  s.className = 'send-ok';
+  s.textContent = 'Distribuído na tela. Confira e clique em Salvar atribuição.';
+}
+
+function conferirNumerosGrupo() {
+  var s = document.getElementById('ng-status');
+  s.className = 'send-ok'; s.textContent = 'Conferindo em quais grupos cada número está...';
+  carregarNumerosGrupo(true);
+}
+
+function salvarNumerosGrupo() {
+  ngSincronizarCache();
+  var btn = document.getElementById('ng-btn');
+  var s   = document.getElementById('ng-status');
+  var payload = { ativo: document.getElementById('ng-ativo').checked, mapa: ngMapaAtual() };
+  btn.disabled = true; s.className = 'send-ok'; s.textContent = 'Salvando...';
+  fetch(SERVER + '/contas/grupos-numeros', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var sem = (d.semAtribuicao || []).length;
+    s.textContent = payload.ativo
+      ? '✓ Atribuição ativa — ' + Object.keys(payload.mapa).length + ' grupo(s) com número fixo'
+        + (sem ? ', ' + sem + ' ainda no turno.' : '.')
+      : '✓ Salvo, mas a atribuição está desligada: tudo segue o turno.';
+    return carregarNumerosGrupo(false);
   })
   .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não salvou: ' + e.message; })
   .finally(function(){ btn.disabled = false; });
