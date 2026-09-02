@@ -4785,6 +4785,7 @@ function renderContas() {
         + '<div class="mon-campo" style="justify-content:flex-end"><div style="display:flex;gap:8px;flex-wrap:wrap">'
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
             + urlComToken(SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr')) + '">QR</a>'
+          + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="reparearConta(\'' + esc(c.id) + '\')">Reparear</button>')
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gerenciarGruposConta(\'' + esc(c.id) + '\')">Gerenciar grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="excluirConta(\'' + esc(c.id) + '\')">Excluir</button>')
@@ -4868,6 +4869,25 @@ function conectarContaNova() {
   campo.value = id;
   s.className='send-ok'; s.textContent='Preparando...';
   fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/conectar', { method:'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      window.open(urlComToken(SERVER + '/contas/' + encodeURIComponent(id) + '/qr'), '_blank');
+      s.textContent = '✓ Escaneie o QR na aba que abriu. Depois use Atualizar.';
+      setTimeout(carregarContas, 8000);
+    })
+    .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não deu: ' + e.message; });
+}
+
+// QR preso em "Gerando QR..." = credenciais inválidas no disco (a conta foi
+// deslogada pelo WhatsApp). Apaga só as credenciais e reabre o pareamento,
+// preservando grupos atribuídos, turnos e papéis — tudo o que Excluir levaria
+// junto.
+function reparearConta(id) {
+  if (!confirm('Reparear "' + id + '"?\n\nAs credenciais atuais são apagadas e será preciso escanear o QR de novo. Grupos atribuídos, turnos e papéis de leitura/disparo são preservados.')) return;
+  var s = document.getElementById('contas-status');
+  s.className='send-ok'; s.textContent='Repareando ' + id + '...';
+  fetch(SERVER + '/contas/' + encodeURIComponent(id) + '/reparear', { method:'POST' })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) throw new Error(d.erro || 'falhou');
