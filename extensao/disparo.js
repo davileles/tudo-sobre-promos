@@ -30,7 +30,11 @@ function chaveLoja(nome) {
 function descreveCupom(c) {
   const v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
   const min = c.minimo ? ' · mín. R$ ' + c.minimo : '';
-  return c.codigo + ' — ' + v + min;
+  // 🎯 = cupom restrito: só vale na seleção fechada de produtos combinada com a
+  // loja. Escolher aqui é vinculação explícita e continua permitido — o alerta
+  // existe para o operador não colar o código num item que não está na lista.
+  const res = c.restrito === true ? '🎯 ' : '';
+  return res + c.codigo + ' — ' + v + min + (c.restrito === true ? ' · só produtos específicos' : '');
 }
 
 // ── 1. CADASTRO ───────────────────────────────────────────────────────────────
@@ -76,7 +80,10 @@ async function carregarCupons(loja) {
       .filter(c => c.ativo !== false)
       .filter(c => !c.validadeAte || new Date(c.validadeAte).getTime() > agora)
       .filter(c => chaveLoja(c.loja) === chave)
-      .sort((a, b) => (b.valor || 0) - (a.valor || 0));
+      // Restritos vão para o fim: o topo da lista é o que o operador escolhe no
+      // automático, e cupom de seleção fechada nunca deve ser o padrão visual.
+      .sort((a, b) => ((a.restrito === true) - (b.restrito === true))
+                   || ((b.valor || 0) - (a.valor || 0)));
 
     sel.innerHTML = '';
     if (!daLoja.length) {
@@ -90,7 +97,9 @@ async function carregarCupons(loja) {
       o.textContent = descreveCupom(c);
       sel.appendChild(o);
     }
-    $('hintCupom').textContent = daLoja.length + ' cupom(ns) vigente(s) para ' + loja + '.';
+    const nRes = daLoja.filter(c => c.restrito === true).length;
+    $('hintCupom').textContent = daLoja.length + ' cupom(ns) vigente(s) para ' + loja + '.'
+      + (nRes ? ' ' + nRes + ' restrito(s) 🎯 — confira se este produto está na seleção.' : '');
   } catch (e) {
     sel.innerHTML = '<option value="">falha ao carregar</option>';
     $('hintCupom').textContent = 'Não deu para ler a base de cupons: ' + e.message;
