@@ -4763,6 +4763,20 @@ function papeisDaConta(id) {
   return tags;
 }
 
+// Numero pareado na sessao, vindo do /contas. Sem ele a lista afirmava
+// "conectado" sem dizer de QUEM: abrir "Dispositivos conectados" no aparelho
+// errado passa a impressao de que a conta caiu, quando na verdade a sessao
+// esta viva em outro numero.
+function fmtTelefoneConta(n) {
+  var s = String(n || '').replace(/\D/g, '');
+  if (!s) return '';
+  if (s.length >= 12 && s.slice(0, 2) === '55') {
+    var ddd = s.slice(2, 4), resto = s.slice(4);
+    return '+55 (' + ddd + ') ' + resto.slice(0, resto.length - 4) + '-' + resto.slice(-4);
+  }
+  return '+' + s;
+}
+
 function renderContas() {
   var linhas = [CONTAS_CACHE.principal || { id:'principal' }].concat(CONTAS_CACHE.extras || []);
   document.getElementById('contas-lista').innerHTML = linhas.map(function(c){
@@ -4776,7 +4790,9 @@ function renderContas() {
     }).join('');
     return '<div class="mon' + (c.conectado ? '' : ' off') + '">'
       + '<div class="mon-top">'
-        + '<span class="mon-nome">' + esc(c.id) + tags + '</span>'
+        + '<span class="mon-nome">' + esc(c.id)
+          + (c.numero ? '<span style="color:#8b8b8b;font-weight:400;font-size:12px;margin-left:6px">' + esc(fmtTelefoneConta(c.numero)) + '</span>' : '')
+          + tags + '</span>'
         + '<span class="mon-estado ' + est.cls + '">' + est.txt + '</span>'
       + '</div>'
       + '<div class="mon-linha">'
