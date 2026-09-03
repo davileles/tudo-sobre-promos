@@ -4770,8 +4770,13 @@ function papeisDaConta(id) {
 function fmtTelefoneConta(n) {
   var s = String(n || '').replace(/\D/g, '');
   if (!s) return '';
-  if (s.length >= 12 && s.slice(0, 2) === '55') {
+  if (s.slice(0, 2) === '55' && (s.length === 12 || s.length === 13)) {
     var ddd = s.slice(2, 4), resto = s.slice(4);
+    // O WhatsApp guarda celular brasileiro antigo SEM o nono digito. Exibir
+    // "9008-9250" faria o numero parecer um terceiro numero desconhecido —
+    // exatamente a confusao que este campo existe para acabar. Recompoe o 9
+    // para bater com o que esta na agenda do celular.
+    if (resto.length === 8 && /^[6-9]/.test(resto)) resto = '9' + resto;
     return '+55 (' + ddd + ') ' + resto.slice(0, resto.length - 4) + '-' + resto.slice(-4);
   }
   return '+' + s;
