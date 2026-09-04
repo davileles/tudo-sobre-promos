@@ -8836,6 +8836,15 @@ async function buscarProduto() {
 
     preencherCuponsVinculo(d.cupons || []);
 
+    // Link mascarado (encurtador ou dominio proprio de afiliado) e resolvido no
+    // servidor. Mostrar para onde ele apontava evita o susto de ver a loja e o
+    // produto trocarem sozinhos depois de colar o link.
+    var expandido = '';
+    if (d.expandiu && d.linkExpandido) {
+      expandido = ' · link expandido → '
+        + d.linkExpandido.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 45);
+    }
+
     var avisos = [];
     if (!p.disponivel) avisos.push('produto sem estoque');
     if (!p.precoDe)    avisos.push('sem preço de tabela — preencha o "De:" à mão');
@@ -8843,7 +8852,8 @@ async function buscarProduto() {
     s.textContent = (avisos.length ? '⚠️ ' : '✓ ')
       + (p.titulo || 'Produto').slice(0, 60)
       + ' — R$ ' + fmt(p.preco)
-      + (avisos.length ? ' (' + avisos.join('; ') + ')' : '');
+      + (avisos.length ? ' (' + avisos.join('; ') + ')' : '')
+      + expandido;
   } catch(e) {
     s.className='send-ok send-err'; s.textContent='Sem resposta do servidor.';
   } finally {
