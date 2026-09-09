@@ -2216,7 +2216,7 @@ body.travado > *:not(#login-screen){display:none !important}
         </select></div>
       <div class="field" id="lst-inicio-hora-wrap" style="display:none">
         <label>Horário de início <span class="tag">horário de Brasília</span></label>
-        <input type="time" id="lst-inicio-hora" value="09:00"/></div>
+        <input type="time" id="lst-inicio-hora" value="09:00" onchange="lstPreverFim()"/></div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin:-6px 0 12px;line-height:1.5;display:none" id="lst-inicio-nota">
       O disparo é criado agora e fica <b>aguardando</b> até a hora marcada &mdash; sempre no mesmo dia.
@@ -5576,6 +5576,20 @@ function lstJanelasEscolhidas(){
 }
 function lstHhmmMin(h){ var p = String(h||'').split(':'); return (Number(p[0])||0)*60 + (Number(p[1])||0); }
 
+// Momento em que a fila realmente comeca: a hora escolhida em "Hoje, a partir de
+// um horario" quando ela ainda nao passou, senao agora. O rodape usava sempre
+// Date.now() e mostrava previsao diferente da do confirm para quem monta a lista
+// de madrugada para disparar de manha.
+function lstInicioMs(){
+  var el = document.getElementById('lst-inicio-modo');
+  if (!el || el.value !== 'hora') return Date.now();
+  var h = (document.getElementById('lst-inicio-hora') || {}).value || '';
+  if (!/^\d{2}:\d{2}$/.test(h)) return Date.now();
+  var pp = h.split(':'), dd = new Date();
+  dd.setHours(Number(pp[0]), Number(pp[1]), 0, 0);
+  return dd.getTime() <= Date.now() ? Date.now() : dd.getTime();
+}
+
 // Janelas em vigor no formulario: as escolhidas, ou o padrao do servidor.
 function lstJanelasEfetivas(){
   var j = lstJanelasEscolhidas();
@@ -5588,6 +5602,7 @@ function lstJanelasEfetivas(){
 function lstPrevisaoTermino(qtd, intervaloMin, inicioMs){
   var janelas = lstJanelasEfetivas(), passo = (intervaloMin || 20) * 60000;
   var t = inicioMs || Date.now(), adiados = 0;
+  var primeiroEm = null, adiadoNoInicio = false;
   var total = Math.min(qtd || 0, 2000);
   for (var i = 0; i < total; i++){
     var d = new Date(t), agora = d.getHours()*60 + d.getMinutes(), dentro = false;
@@ -5601,10 +5616,15 @@ function lstPrevisaoTermino(qtd, intervaloMin, inicioMs){
       for (var m = 0; m < inicios.length; m++) if (inicios[m] > agora) { prox = inicios[m]; break; }
       var faltam = prox !== null ? (prox - agora) : (1440 - agora + inicios[0]);
       t += faltam * 60000; adiados++;
+      if (i === 0) adiadoNoInicio = true;
     }
+    if (primeiroEm === null) primeiroEm = t;
     if (i < total - 1) t += passo;
   }
-  return { terminaEm: t, adiados: adiados, cabeNoDia: adiados === 0 };
+  return { terminaEm: t, adiados: adiados, cabeNoDia: adiados === 0,
+           primeiroEm: primeiroEm === null ? t : primeiroEm,
+           adiadoNoInicio: adiadoNoInicio,
+           soInicioFora: adiados === 1 && adiadoNoInicio };
 }
 
 function lstFmtDataHora(ms){
@@ -5614,9 +5634,14 @@ function lstFmtDataHora(ms){
 // Texto colado na contagem de produtos: so avisa quando a fila estoura a janela.
 function lstTextoPrevisao(qtd, intervalo){
   if (qtd < 2) return '';
-  var p = lstPrevisaoTermino(qtd, intervalo, Date.now());
+  var p = lstPrevisaoTermino(qtd, intervalo, lstInicioMs());
   if (p.cabeNoDia) return '';
   var jan = lstJanelasEfetivas().map(function(j){ return j.inicio + '–' + j.fim; }).join(', ');
+  if (p.soInicioFora){
+    return '<br/><span style="color:var(--amber,#f59e0b)">⚠️ o início está fora da janela ' + jan
+         + ' — o primeiro produto sai ' + lstFmtDataHora(p.primeiroEm)
+         + ' e o último ' + lstFmtDataHora(p.terminaEm) + '</span>';
+  }
   return '<br/><span style="color:var(--amber,#f59e0b)">⚠️ não cabe na janela ' + jan
        + ' — a fila pausa e o último produto sai ' + lstFmtDataHora(p.terminaEm) + '</span>';
 }
@@ -5653,6 +5678,7 @@ function lstToggleInicio(){
   document.getElementById('lst-inicio-hora-wrap').style.display = porHora ? 'flex' : 'none';
   document.getElementById('lst-inicio-nota').style.display      = porHora ? 'block' : 'none';
   lstBotaoDisparo();
+  if (typeof LST_SEL !== 'undefined' && LST_SEL.length) renderLstSel();
 }
 
 function lstBotaoDisparo(){
@@ -5855,7 +5881,11 @@ function salvarLista(){
     if (!confirm('Disparar ' + produtos.length + ' produto(s) ' + quando + ', um a cada ' + intervalo
       + ' min — cerca de ' + horas + 'h de fila?\n\nJanela de envio: ' + _janTxt
       + '\nÚltimo produto sai em ' + lstFmtDataHora(_prev.terminaEm)
-      + (_prev.cabeNoDia ? '' : '\n\n⚠️ A fila não cabe na janela de hoje: ela pausa no fechamento e continua na abertura seguinte.')
+      + (_prev.cabeNoDia ? ''
+         : _prev.soInicioFora
+           ? '\n\n⚠️ O início escolhido está fora da janela: o primeiro produto só sai em '
+             + lstFmtDataHora(_prev.primeiroEm) + '.'
+           : '\n\n⚠️ A fila não cabe na janela de hoje: ela pausa no fechamento e continua na abertura seguinte.')
       + lstTextoCobertura(_sc)
       + '\n\nEste envio não fica salvo.')) { lstMsg(''); return; }
     lstMsg(inicioHora && !jaPassou ? 'Agendando a fila…' : 'Abrindo a fila…');
