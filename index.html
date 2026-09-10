@@ -290,6 +290,10 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .field{display:flex;flex-direction:column}
   .field.disabled{opacity:.4;pointer-events:none}
   label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
+  .imp-prontos{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .imp-pronto{font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer;line-height:1.4}
+  .imp-pronto:hover{border-color:var(--accent);color:var(--text)}
+  .imp-pronto.ativo{border-color:var(--accent);color:var(--accent)}
   .tag{font-size:9px;font-weight:700;color:var(--muted2);background:var(--card);border:1px solid var(--border);border-radius:4px;padding:1px 5px;text-transform:uppercase;letter-spacing:.4px;margin-left:4px}
   input[type=text],input[type=number],input[type=datetime-local],input[type=date],input[type=time],
   input[type=password],input[type=url],input[type=email],input[type=search],select,textarea{
@@ -1269,7 +1273,8 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <div class="field" style="margin-top:12px">
       <label>Importante <span class="tag">opcional</span></label>
-      <input type="text" id="c-importante" placeholder="Ex: Válido somente hoje!"/>
+      <input type="text" id="c-importante" placeholder="Ex: Válido somente hoje!" oninput="marcarImportantePronto('c-importante')"/>
+      <div class="imp-prontos" data-alvo="c-importante"></div>
     </div>
   </div>
   <div class="img-upload">
@@ -1366,7 +1371,8 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="sep"></div>
     <div class="field" style="margin-bottom:12px">
       <label>Importante <span class="tag">opcional</span></label>
-      <input type="text" id="o-importante" placeholder="Ex: Estoque limitado!"/>
+      <input type="text" id="o-importante" placeholder="Ex: Estoque limitado!" oninput="marcarImportantePronto('o-importante')"/>
+      <div class="imp-prontos" data-alvo="o-importante"></div>
     </div>
     <div class="g2">
       <div class="field">
@@ -1454,7 +1460,8 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <div class="field" style="margin-bottom:12px">
       <label>Importante <span class="tag">opcional</span></label>
-      <input type="text" id="l-importante" placeholder="Ex: Oferta por tempo limitado!"/>
+      <input type="text" id="l-importante" placeholder="Ex: Oferta por tempo limitado!" oninput="marcarImportantePronto('l-importante')"/>
+      <div class="imp-prontos" data-alvo="l-importante"></div>
     </div>
     <div class="field">
       <label>Link <span class="tag">opcional</span></label>
@@ -12720,6 +12727,52 @@ function mpRenderHistorico() {
   document.getElementById('mp-historico').innerHTML = h;
 }
 
+</script>
+<script>
+// Linha IMPORTANTE — textos prontos. Mesma lista do bot do Telegram
+// (baileys-server/bot-tsp.js, IMPORTANTES_PRONTOS): mudou la, muda aqui.
+// O chip so preenche o campo; o texto continua editavel antes de gerar.
+var IMPORTANTES_PRONTOS = [
+  { rotulo: '🔁 Recorrência',      texto: 'Compre na recorrência para manter este valor.' },
+  { rotulo: '📦 Programe e Poupe', texto: 'Utilize o Programe e Poupe para chegar neste valor.' },
+  { rotulo: '2️⃣ Adicione 2 itens', texto: 'Adicione 2 itens para chegar neste valor.' },
+  { rotulo: '3️⃣ Adicione 3 itens', texto: 'Adicione 3 itens para chegar neste valor.' }
+];
+function marcarImportantePronto(alvoId) {
+  var inp = document.getElementById(alvoId);
+  var box = document.querySelector('.imp-prontos[data-alvo="' + alvoId + '"]');
+  if (!inp || !box) return;
+  var atual = inp.value.trim();
+  box.querySelectorAll('.imp-pronto').forEach(function (b) {
+    b.classList.toggle('ativo', b.getAttribute('data-texto') === atual);
+  });
+}
+function montarImportantesProntos() {
+  document.querySelectorAll('.imp-prontos[data-alvo]').forEach(function (box) {
+    var alvoId = box.getAttribute('data-alvo');
+    box.innerHTML = '';
+    IMPORTANTES_PRONTOS.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'imp-pronto';
+      b.textContent = it.rotulo;
+      b.title = it.texto;
+      b.setAttribute('data-texto', it.texto);
+      b.onclick = function () {
+        var inp = document.getElementById(alvoId);
+        if (!inp) return;
+        // Tocar de novo no chip ativo limpa o campo.
+        inp.value = inp.value.trim() === it.texto ? '' : it.texto;
+        marcarImportantePronto(alvoId);
+        inp.focus();
+      };
+      box.appendChild(b);
+    });
+    marcarImportantePronto(alvoId);
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montarImportantesProntos);
+else montarImportantesProntos();
 </script>
 </body>
 </html>
