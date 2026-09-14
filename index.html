@@ -2124,6 +2124,9 @@ body.travado > *:not(#login-screen){display:none !important}
       não tenha nenhuma palavra reconhecível — e o monitor de preços passa a tratar toda queda
       dele como publicável, sem cota e no intervalo curto. Deixe em branco quando não tiver
       certeza; aí o classificador decide, e o que ele não confirmar sai só no grupo geral.
+      <br>No <b>disparo por lista</b> a curadoria não vale sozinha: quem decide é o campo
+      <b>Destino</b> do formulário de disparo. No padrão (<i>só os grupos gerais</i>) o nicho é
+      ignorado, como sempre foi.
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
     <div id="vit-cad-erros" style="display:none;margin-top:8px;border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:10px 12px;background:rgba(248,113,113,.05)"></div>
@@ -2213,6 +2216,22 @@ body.travado > *:not(#login-screen){display:none !important}
       No modo automático, cada produto recebe o cupom vigente daquela loja que der o
       <b>maior desconto em reais</b> e que realmente atenda o preço do item no momento do envio —
       cupom com mínimo de R$ 40 entra num produto de R$ 50 e é ignorado num de R$ 30.
+    </p>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Destino <span class="tag">usa o nicho curado de cada produto</span></label>
+      <select id="lst-roteamento" onchange="renderLstSel()">
+        <option value="geral">Só os grupos gerais &mdash; ignora o nicho curado</option>
+        <option value="nicho_e_geral">Grupo do nicho + grupos gerais</option>
+        <option value="so_nicho">Só o grupo do nicho</option>
+      </select>
+    </div>
+    <p style="font-size:10.5px;color:var(--muted2);margin:-6px 0 12px;line-height:1.5">
+      O <b>nicho curado</b> da base de produtos só valia para o monitor de preços: no disparo manual
+      a oferta saía sem categoria e por isso caía apenas nas trilhas gerais. Nas duas últimas opções
+      ela passa a carregar o nicho do produto, como se o classificador tivesse confirmado.
+      Produto <b>sem nicho curado</b> é pulado nessas opções, em vez de sair no geral por engano.
+      <b>Só o grupo do nicho</b> exige uma trilha daquela categoria com destino marcado na aba Grupos.
     </p>
 
     <div class="g2" id="lst-inicio-wrap" style="margin-bottom:12px">
@@ -5710,6 +5729,7 @@ function novaLista(){
   document.getElementById('lst-nome').value = '';
   document.getElementById('lst-intervalo').value = 20;
   document.getElementById('lst-cupom-modo').value = 'auto';
+  document.getElementById('lst-roteamento').value = 'geral';
   document.getElementById('lst-inicio-modo').value = 'agora';
   document.getElementById('lst-inicio-hora').value = '09:00';
   document.getElementById('lst-jan-ativo').classList.remove('on');
@@ -5744,6 +5764,7 @@ function editarLista(id){
   document.getElementById('lst-nome').value = l.nome;
   document.getElementById('lst-intervalo').value = l.intervaloMin;
   document.getElementById('lst-cupom-modo').value = l.cupomModo;
+  document.getElementById('lst-roteamento').value = l.roteamento || 'geral';
   var _jan = (l.janelas && l.janelas.length) ? l.janelas[0] : null;
   document.getElementById('lst-jan-ativo').classList.toggle('on', !!_jan);
   document.getElementById('lst-jan-inicio').value = _jan ? _jan.inicio : '08:00';
@@ -5827,6 +5848,9 @@ function renderLstSel(){
       + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
+      + (function(){ var n = lstNichoDoItem(p.asin);
+          return n ? ' <span style="color:#22c55e;font-size:10.5px;font-weight:600">' + esc(rotuloNicho(n)) + '</span>'
+                   : ' <span style="color:var(--muted2);font-size:10.5px">sem nicho</span>'; })()
       + '</span>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',1)" title="Descer">↓</button>'
@@ -5844,7 +5868,27 @@ function renderLstSel(){
          : modoC === 'nenhum' ? 'o modo <b>Sem cupom</b> ignora o vínculo e envia sem cupom nenhum.'
          : 'no automático cada um sai com o cupom vinculado a ele; os demais recebem o melhor cupom da base.')
         + '</div>'
-      : '');
+      : '')
+  + (function(){
+      // Aviso na hora de montar a fila, nao depois do disparo: com o destino em
+      // nicho, item sem curadoria e pulado pelo servidor.
+      var rot = (document.getElementById('lst-roteamento') || {}).value || 'geral';
+      if (rot === 'geral') return '';
+      var sem = LST_SEL.filter(function(p){ return !lstNichoDoItem(p.asin); }).length;
+      if (!sem) return '';
+      return '<div style="font-size:11px;margin-top:4px;color:#fca5a5">\u26a0\ufe0f ' + sem
+        + ' produto(s) sem nicho curado \u2014 nesta op\u00e7\u00e3o eles s\u00e3o pulados. '
+        + 'Marque o nicho na base de produtos antes de disparar.</div>';
+    })();
+}
+
+// Nicho curado do item, lido da base de produtos: LST_SEL so guarda asin e nome.
+// 'geral' e curadoria de "bom produto, mas nao e de nicho" e conta como sem
+// nicho aqui — exatamente como o servidor trata no disparo.
+function lstNichoDoItem(asin){
+  var i = (VIT_CACHE || []).filter(function(x){ return x.asin === asin; })[0];
+  var n = i && i.nicho ? String(i.nicho).trim() : '';
+  return n && n !== 'geral' ? n : '';
 }
 
 function salvarLista(){
@@ -5856,6 +5900,7 @@ function salvarLista(){
   var modo = document.getElementById('lst-cupom-modo').value;
   var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
   var produtos = LST_SEL.map(function(p){ return p.asin; });
+  var roteamento = (document.getElementById('lst-roteamento') || {}).value || 'geral';
   var cupomCodigo = modo === 'fixo' ? document.getElementById('lst-cupom-codigo').value : null;
   if (modo === 'fixo' && !cupomCodigo) return lstMsg('Escolha o cupom fixo ou mude o modo do cupom.', true);
 
@@ -5900,6 +5945,7 @@ function salvarLista(){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ produtos: produtos, intervaloMin: intervalo,
                              cupomModo: modo, cupomCodigo: cupomCodigo,
+                             roteamento: roteamento,
                              iniciarHora: inicioHora,
                              janelas: lstJanelasEscolhidas() })
     })
@@ -5936,6 +5982,7 @@ function salvarLista(){
       intervaloMin: intervalo,
       cupomModo: modo,
       cupomCodigo: cupomCodigo,
+      roteamento: roteamento,
       efemera: false,
       agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
       janelas: lstJanelasEscolhidas(),
