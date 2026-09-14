@@ -6775,13 +6775,21 @@ function cadastrarVitrine(destino){
   var esc0 = lerCupomModo('vit-cupom-modo', 'vit-cupom-novo');
   if (!esc0) { ok.className = 'send-ok send-err'; ok.textContent = 'Escolha qual cupom será aplicado ou troque o modo.'; return; }
   var modoCupom = esc0.modo, cupom = esc0.cupom;
+  var nichoCad = valorCampo('vit-nicho') || '';
+  // Este fluxo repopula o formulario de disparo la na frente, depois de DUAS
+  // idas ao servidor (resolver os links + recarregar a base inteira). Enquanto
+  // isso o formulario ficava na tela aceitando cliques que novaLista() apagava
+  // segundos depois, sem aviso — foi assim que "so o grupo do nicho" e "sem
+  // cupom" viraram os padroes no envio. Esconder aqui fecha essa janela: ele so
+  // reaparece ja populado, no fim de aposCadastroVitrine.
+  if (destino !== 'so') document.getElementById('lst-form').style.display = 'none';
   document.getElementById('vit-cad-erros').style.display = 'none';
   ok.className = 'send-ok';
   ok.textContent = 'Resolvendo ' + texto.split('\n').filter(function(l){ return l.trim(); }).length + ' link(s)…';
 
   fetch(SERVER + '/vitrine', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ texto: texto, cupom: cupom, nicho: valorCampo('vit-nicho') || '' })
+    body: JSON.stringify({ texto: texto, cupom: cupom, nicho: nichoCad })
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
@@ -6812,7 +6820,7 @@ function cadastrarVitrine(destino){
     }
     if (salvos.length) document.getElementById('vit-links').value = '';
 
-    return aposCadastroVitrine(salvos, destino, cupom, modoCupom);
+    return aposCadastroVitrine(salvos, destino, cupom, modoCupom, nichoCad);
   })
   .catch(function(e){ ok.className = 'send-ok send-err'; ok.textContent = 'Erro: ' + e.message; });
 }
@@ -6821,7 +6829,7 @@ function cadastrarVitrine(destino){
 // entrou e cai no mesmo formulario de disparo do resto da aba. Vale para o
 // link colado e para o produto vindo do catalogo da Awin — um caminho so para
 // revisar cupom e intervalo.
-function aposCadastroVitrine(salvos, destino, cupom, modoCupom){
+function aposCadastroVitrine(salvos, destino, cupom, modoCupom, nicho){
   return carregarVitrine().then(function(){
     if (destino === 'so' || !salvos.length) return;
     VIT_SEL = {};
@@ -6831,6 +6839,15 @@ function aposCadastroVitrine(salvos, destino, cupom, modoCupom){
     // O tipo ja vem decidido do botao; novaLista() deixa 'unico' como padrao.
     document.getElementById('lst-tipo').value = (destino === 'salva') ? 'salva' : 'unico';
     lstToggleTipo();
+    // A curadoria do cadastro tambem chega inteira no disparo. Sem esta linha o
+    // "estes sao de bebidas" que o operador acabou de declarar morria dois
+    // passos depois: novaLista() deixa o Destino em 'geral' e o produto saia so
+    // nos grupos gerais. Padrao conservador de proposito — soma o grupo do
+    // nicho aos gerais em vez de trocar um pelo outro, porque trocar corta
+    // alcance em silencio. Para sair so no nicho e um clique no formulario, que
+    // agora nao e mais reescrito por baixo.
+    if (nicho && nicho !== 'geral')
+      document.getElementById('lst-roteamento').value = 'nicho_e_geral';
     // A escolha feita no cadastro chega inteira no disparo: quem marcou "sem
     // cupom" nao pode receber um cupom automatico so porque esse e o padrao do
     // formulario.
@@ -6984,6 +7001,8 @@ function cadastrarAwinSel(destino){
   if (!escA) { st.textContent = 'Escolha qual cupom será aplicado ou troque o modo.'; return; }
   var modoCupom = escA.modo, cupom = escA.cupom;
   st.textContent = 'Cadastrando ' + chaves.length + ' produto(s)…';
+  // Mesma janela de edicao fantasma do cadastro por link — ver comentario la.
+  if (destino !== 'so') document.getElementById('lst-form').style.display = 'none';
   fetch(SERVER + '/awin/ofertas/cadastrar', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ chaves: chaves, cupom: cupom })
@@ -6996,7 +7015,8 @@ function cadastrarAwinSel(destino){
     AWC_SEL = {};
     // Recarrega a fila: os escolhidos sairam dela do lado do servidor.
     carregarAwinCand();
-    return aposCadastroVitrine(salvos, destino, cupom, modoCupom);
+    // O catalogo da Awin nao tem campo de nicho curado: segue sem roteamento.
+    return aposCadastroVitrine(salvos, destino, cupom, modoCupom, '');
   })
   .catch(function(e){ st.textContent = 'Erro: ' + e.message; });
 }
