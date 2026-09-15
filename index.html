@@ -2477,6 +2477,9 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="sec-label" style="margin-top:18px">Candidatos a reenvio <span class="tag" style="text-transform:none">mesmo produto ou cupom somado entre envios</span></div>
   <div id="lk-produtos"><div class="fila-loading"><div class="spinner"></div></div></div>
 
+  <div class="sec-label" style="margin-top:26px">Links fixos <span class="tag" style="text-transform:none">mesmo link em toda mensagem — resgate de cupons, Prime…</span></div>
+  <div id="lk-fixos"></div>
+
   <div class="sec-label" style="margin-top:26px">Por grupo</div>
   <div id="lk-grupos"></div>
 
@@ -6331,7 +6334,7 @@ function carregarRastreio(forcar){
 /* ══════ CLIQUES DOS LINKS RASTREADOS ══════
    Fonte: proxy /links-stats (mapa gerado pelo baileys + cliques do redirect).
    Membros por grupo vem do censo do baileys, para normalizar por tamanho. */
-var LK_CACHE = [], LK_MEMBROS = {};
+var LK_CACHE = [], LK_MEMBROS = {}, LK_FIXOS = [];
 
 async function carregarCliquesLinks(){
   var st = document.getElementById('lk-status');
@@ -6344,6 +6347,7 @@ async function carregarCliquesLinks(){
     ]);
     var d = resp[0], c = resp[1] || {};
     if (!d.ok) throw new Error(d.erro || 'falha');
+    LK_FIXOS = d.fixos || [];
     LK_MEMBROS = {};
     (c.grupos || []).forEach(function(g){ if (g && g.jid && typeof g.membros === 'number') LK_MEMBROS[g.jid] = g.membros; });
     LK_CACHE = (d.envios || []).map(function(e){
@@ -6405,6 +6409,7 @@ function renderCliquesLinks(){
     + '<div class="desc-kpi"><span>Nas primeiras 2h</span><b>' + (tot.cliques ? Math.round(tot.primeiras2h * 100 / tot.cliques) : 0) + '%</b></div>';
 
   lkProdutos(itens);
+  lkFixos(loja, termo);
   lkGrupos(itens);
 
   var ord = itens.slice();
@@ -6482,6 +6487,40 @@ function lkProdutos(itens){
         + '</div>';
       }).join('') + '</div>'
     : '<div class="fila-vazia">Ainda sem cliques no período.</div>';
+}
+
+// Link fixo nao tem preco nem produto: o que interessa e quantas mensagens o
+// levaram e quanto cada mensagem rende de clique.
+function lkFixos(loja, termo){
+  var el = document.getElementById('lk-fixos');
+  var lista = LK_FIXOS.filter(function(f){
+    if (loja && f.loja !== loja) return false;
+    if (termo && ((f.rotulo||'') + ' ' + f.url + ' ' + f.codigo + ' ' + (f.loja||'')).toLowerCase().indexOf(termo) < 0) return false;
+    return true;
+  });
+  el.innerHTML = lista.length
+    ? '<div class="card" style="padding:0">' + lista.map(function(f){
+        var grupos = Object.keys(f.grupos || {}).map(function(s){ return { s:s, t:f.grupos[s].t || 0 }; })
+          .sort(function(a,b){ return b.t - a.t; });
+        return '<div class="desc-item' + (f.cliques ? '' : ' rt-mudo') + '">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(f.rotulo || f.url) + '</div>'
+            + '<div class="desc-item-meta">'
+              + '<b>' + esc(f.loja || f.slugLoja || 'Loja') + '</b>'
+              + '<span class="rt-ref">' + esc(f.codigo) + '</span>'
+              + '<span>' + esc(f.url) + '</span>'
+              + grupos.filter(function(g){ return g.t; }).slice(0, 6).map(function(g){ return '<span class="rt-ref">' + esc(g.s) + ' · ' + g.t + '</span>'; }).join('')
+            + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + lkNum(f.usos) + '</b><span>mensagens</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(f.cliques) + '</b><span>cliques</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(f.unicos) + '</b><span>únicos</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(f.usos ? f.cliques / f.usos : 0, 2) + '</b><span>por mensagem</span></div>'
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Nenhum link fixo usado no período.</div>';
 }
 
 function lkGrupos(itens){
