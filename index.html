@@ -1057,6 +1057,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio</button>
+  <button class="main-tab" id="tab-cliques" onclick="switchTab('cliques')">👆 Cliques</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
@@ -2433,6 +2434,56 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="rt-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
+<!-- ════════ CLIQUES DOS LINKS RASTREADOS ════════ -->
+<div class="panel" id="panel-cliques">
+  <div class="aviso">
+    Todo link de loja enviado nos grupos sai como <b>ir.ticapromos.com.br/loja/código-grupo</b>.
+    Aqui estão os cliques de cada envio (ofertas, cupons, mensagens manuais e agendadas), por grupo e por produto.
+    <b>Por mil</b> = cliques a cada 1.000 membros dos grupos que receberam, o que tira a vantagem dos grupos maiores.
+    Os cliques são gravados a cada 5 minutos.
+  </div>
+
+  <div class="card" id="lk-resumo" style="display:none">
+    <div class="desc-cards" id="lk-cards"></div>
+  </div>
+
+  <div class="fila-bar">
+    <span id="lk-status">Carregando...</span>
+    <div class="fila-acoes">
+      <select id="lk-dias" onchange="carregarCliquesLinks()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="1">Hoje</option>
+        <option value="3">3 dias</option>
+        <option value="7" selected>7 dias</option>
+        <option value="15">15 dias</option>
+        <option value="31">31 dias</option>
+      </select>
+      <select id="lk-tipo" onchange="renderCliquesLinks()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="">Todos os tipos</option>
+        <option value="agendamento">Agendamento</option>
+        <option value="cupom">Cupom</option>
+        <option value="manual">Manual</option>
+        <option value="oferta">Oferta</option>
+      </select>
+      <select id="lk-loja" onchange="renderCliquesLinks()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <input type="text" id="lk-busca" class="busca-mini" autocomplete="off" placeholder="Buscar produto, cupom ou código…" oninput="renderCliquesLinks()"/>
+      <select id="lk-ordem" onchange="renderCliquesLinks()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="cliques">Mais cliques</option>
+        <option value="porMil">Mais cliques por mil</option>
+        <option value="recentes">Mais recentes</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sec-label" style="margin-top:18px">Candidatos a reenvio <span class="tag" style="text-transform:none">mesmo produto ou cupom somado entre envios</span></div>
+  <div id="lk-produtos"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="sec-label" style="margin-top:26px">Por grupo</div>
+  <div id="lk-grupos"></div>
+
+  <div class="sec-label" style="margin-top:26px">Envios</div>
+  <div id="lk-lista"></div>
+</div>
+
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
   <div class="cfg-subtabs">
@@ -3107,7 +3158,7 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -3120,6 +3171,7 @@ function switchTab(name) {
   if (name === 'alertas') carregarAlertas();
   if (name === 'descobertas') carregarDescobertas();
   if (name === 'rastreio') { carregarRastreio(); carregarTagsMl(); }
+  if (name === 'cliques') carregarCliquesLinks();
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
@@ -3175,7 +3227,7 @@ var SECOES = [
   { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
   { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
   { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
-  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','descobertas','trafego'] },
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','cliques','descobertas','trafego'] },
   { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','conexao'] },
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
 ];
@@ -3184,7 +3236,7 @@ var ROTULO_ABA = {
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
   livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
-  rastreio: 'Rastreio de links', descobertas: 'Descobertas', trafego: 'Tráfego pago',
+  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago',
   grupos: 'Trilhas', dist: 'Distribuidor', conexao: 'Conexão', config: 'Ajustes'
 };
 var SECAO_ATUAL = 'hoje';
@@ -3314,6 +3366,9 @@ var CABECALHOS = {
     if (!m || !m.totais) return 'Cliques e pedidos atribuidos por produto';
     return _n(m.totais.produtos) + ' produtos · ' + _n(m.totais.cliques) + ' cliques · '
       + _n(m.totais.pedidos) + ' pedidos';
+  } },
+  cliques: { titulo: 'Cliques dos links', acoes: [{ rot: '↻ Atualizar', fn: 'carregarCliquesLinks()' }], sub: function () {
+    return 'Cliques por envio, grupo e produto — ir.ticapromos.com.br';
   } },
   descobertas: { titulo: 'Descobertas', acoes: [{ rot: '↻ Atualizar', fn: 'carregarDescobertas()' }], sub: function () {
     var m = (typeof DESC_META === 'object' && DESC_META) ? DESC_META : null;
@@ -3527,6 +3582,7 @@ function ckIndexar() {
     conexao: 'conexao whatsapp qr contas chip numero',
     comissao: 'comissao ganhos receita plataformas roi',
     rastreio: 'rastreio links etiquetas tags atribuicao pool',
+    cliques: 'cliques links rastreados reenvio grupos por mil',
     descobertas: 'descobertas fora da base venda indireta',
     trafego: 'trafego pago membros anuncio gasto custo',
     config: 'ajustes configuracoes afiliado awin marca categorias',
@@ -6270,6 +6326,196 @@ function carregarRastreio(forcar){
       document.getElementById('rt-lista').innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
       document.getElementById('rt-lojas').innerHTML = '';
     });
+}
+
+/* ══════ CLIQUES DOS LINKS RASTREADOS ══════
+   Fonte: proxy /links-stats (mapa gerado pelo baileys + cliques do redirect).
+   Membros por grupo vem do censo do baileys, para normalizar por tamanho. */
+var LK_CACHE = [], LK_MEMBROS = {};
+
+async function carregarCliquesLinks(){
+  var st = document.getElementById('lk-status');
+  st.textContent = 'Carregando...';
+  var dias = document.getElementById('lk-dias').value || '7';
+  try {
+    var resp = await Promise.all([
+      fetch('https://cdv-proxy-production.up.railway.app/links-stats?dias=' + dias + '&t=' + Date.now(), { cache:'no-cache' }).then(function(r){ return r.json(); }),
+      fetch(SERVER + '/grupos/censo?t=' + Date.now(), { cache:'no-cache' }).then(function(r){ return r.json(); }).catch(function(){ return {}; })
+    ]);
+    var d = resp[0], c = resp[1] || {};
+    if (!d.ok) throw new Error(d.erro || 'falha');
+    LK_MEMBROS = {};
+    (c.grupos || []).forEach(function(g){ if (g && g.jid && typeof g.membros === 'number') LK_MEMBROS[g.jid] = g.membros; });
+    LK_CACHE = (d.envios || []).map(function(e){
+      var alcance = 0;
+      Object.keys(e.grupos || {}).forEach(function(s){ alcance += LK_MEMBROS[e.grupos[s].jid] || 0; });
+      e.alcance = alcance;
+      e.porMil = alcance ? (e.cliques || 0) * 1000 / alcance : 0;
+      return e;
+    });
+    var sel = document.getElementById('lk-loja'), atual = sel.value;
+    var lojas = {};
+    LK_CACHE.forEach(function(e){ if (e.loja) lojas[e.loja] = 1; });
+    sel.innerHTML = '<option value="">Todas as lojas</option>' + Object.keys(lojas).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); })
+      .map(function(l){ return '<option value="' + esc(l) + '"' + (l === atual ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('');
+    renderCliquesLinks();
+  } catch (e) {
+    st.textContent = 'Erro ao carregar: ' + e.message;
+    document.getElementById('lk-produtos').innerHTML = '';
+  }
+}
+
+function lkNum(n, casas){ return (Number(n) || 0).toLocaleString('pt-BR', { maximumFractionDigits: casas || 0, minimumFractionDigits: casas || 0 }); }
+function lkQuando(iso){ return iso ? new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''; }
+function lkTitulo(e){
+  if (e.tipo === 'cupom' && e.cupom) return 'Cupom ' + e.cupom + (e.loja ? ' · ' + e.loja : '');
+  return e.titulo || e.url || e.codigo;
+}
+
+function renderCliquesLinks(){
+  var tipo  = document.getElementById('lk-tipo').value;
+  var loja  = document.getElementById('lk-loja').value;
+  var termo = (document.getElementById('lk-busca').value || '').toLowerCase().trim();
+  var ordem = document.getElementById('lk-ordem').value;
+
+  var itens = LK_CACHE.filter(function(e){
+    if (tipo && (e.tipo || '') !== tipo) return false;
+    if (loja && e.loja !== loja) return false;
+    if (termo) {
+      var alvo = ((e.titulo||'') + ' ' + (e.cupom||'') + ' ' + (e.produto||'') + ' ' + e.codigo + ' ' + (e.loja||'')).toLowerCase();
+      if (alvo.indexOf(termo) < 0) return false;
+    }
+    return true;
+  });
+
+  var tot = itens.reduce(function(t, e){
+    t.cliques += e.cliques || 0; t.unicos += e.unicos || 0;
+    var h = e.porHora || {};
+    t.primeiras2h += (h['0'] || 0) + (h['1'] || 0);
+    return t;
+  }, { cliques:0, unicos:0, primeiras2h:0 });
+
+  document.getElementById('lk-status').textContent = itens.length + ' envio(s) rastreado(s)';
+  document.getElementById('lk-resumo').style.display = itens.length ? '' : 'none';
+  document.getElementById('lk-cards').innerHTML =
+      '<div class="desc-kpi"><span>Envios</span><b>' + itens.length + '</b></div>'
+    + '<div class="desc-kpi"><span>Cliques</span><b>' + lkNum(tot.cliques) + '</b></div>'
+    + '<div class="desc-kpi"><span>Únicos</span><b>' + lkNum(tot.unicos) + '</b></div>'
+    + '<div class="desc-kpi"><span>Média por envio</span><b>' + lkNum(itens.length ? tot.cliques / itens.length : 0, 1) + '</b></div>'
+    + '<div class="desc-kpi"><span>Nas primeiras 2h</span><b>' + (tot.cliques ? Math.round(tot.primeiras2h * 100 / tot.cliques) : 0) + '%</b></div>';
+
+  lkProdutos(itens);
+  lkGrupos(itens);
+
+  var ord = itens.slice();
+  if (ordem === 'recentes') ord.sort(function(a,b){ return String(b.enviadoEm).localeCompare(String(a.enviadoEm)); });
+  else ord.sort(function(a,b){ return (Number(b[ordem])||0) - (Number(a[ordem])||0); });
+
+  document.getElementById('lk-lista').innerHTML = ord.length
+    ? '<div class="card" style="padding:0">' + ord.map(function(e){
+        var grupos = Object.keys(e.grupos || {}).map(function(s){ return { s:s, t:e.grupos[s].t || 0 }; })
+          .sort(function(a,b){ return b.t - a.t; });
+        var preco = e.preco ? (e.precoDe ? '<span>' + rtMoeda(e.precoDe) + ' → <b>' + rtMoeda(e.preco) + '</b></span>' : '<span>' + rtMoeda(e.preco) + '</span>') : '';
+        return '<div class="desc-item' + (e.cliques ? '' : ' rt-mudo') + '">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(lkTitulo(e)) + '</div>'
+            + '<div class="desc-item-meta">'
+              + '<b>' + esc(e.loja || e.slugLoja || 'Loja') + '</b>'
+              + '<span>' + esc(e.tipo || '') + '</span>'
+              + '<span>' + lkQuando(e.enviadoEm) + '</span>'
+              + preco
+              + '<span class="rt-ref">' + esc(e.codigo) + '</span>'
+              + grupos.slice(0, 6).map(function(g){ return '<span class="rt-ref">' + esc(g.s) + ' · ' + g.t + '</span>'; }).join('')
+              + (grupos.length > 6 ? '<span class="rt-ref">+' + (grupos.length - 6) + '</span>' : '')
+            + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + lkNum(e.cliques) + '</b><span>cliques</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(e.unicos) + '</b><span>únicos</span></div>'
+            + '<div class="desc-num"><b>' + (e.alcance ? lkNum(e.porMil, 1) : '—') + '</b><span>por mil</span></div>'
+            + '<div class="desc-num"><b>' + grupos.length + '</b><span>grupos</span></div>'
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Nenhum envio rastreado no período.</div>';
+}
+
+// Soma por produto (ASIN/MLB) ou, sem ele, por cupom+loja / título. Cada linha
+// mostra o preço de cada envio com o clique por mil daquele envio: é o que
+// separa "o produto atrai" de "só atrai abaixo de tal preço".
+function lkProdutos(itens){
+  var por = {};
+  itens.forEach(function(e){
+    var k = e.produto ? 'p:' + e.produto
+          : (e.tipo === 'cupom' && e.cupom) ? 'c:' + (e.loja || '') + ':' + e.cupom
+          : 't:' + (e.titulo || e.url || e.codigo);
+    var p = por[k] = por[k] || { nome: lkTitulo(e), loja: e.loja, envios: [], cliques: 0, alcance: 0 };
+    p.envios.push(e); p.cliques += e.cliques || 0; p.alcance += e.alcance || 0;
+  });
+  var lista = Object.keys(por).map(function(k){
+    var p = por[k];
+    p.porMil = p.alcance ? p.cliques * 1000 / p.alcance : 0;
+    return p;
+  }).filter(function(p){ return p.cliques > 0; })
+    .sort(function(a,b){ return (b.porMil - a.porMil) || (b.cliques - a.cliques); })
+    .slice(0, 30);
+  document.getElementById('lk-produtos').innerHTML = lista.length
+    ? '<div class="card" style="padding:0">' + lista.map(function(p){
+        var envios = p.envios.slice().sort(function(a,b){ return String(a.enviadoEm).localeCompare(String(b.enviadoEm)); });
+        return '<div class="desc-item">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(p.nome) + '</div>'
+            + '<div class="desc-item-meta">'
+              + '<b>' + esc(p.loja || 'Loja') + '</b>'
+              + envios.map(function(e){
+                  return '<span class="rt-ref">' + lkQuando(e.enviadoEm).slice(0, 5)
+                    + (e.preco ? ' · ' + rtMoeda(e.preco) : '')
+                    + ' · ' + (e.alcance ? lkNum(e.porMil, 1) + '/mil' : (e.cliques || 0) + ' cl.') + '</span>';
+                }).join('')
+            + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + envios.length + '</b><span>envios</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(p.cliques) + '</b><span>cliques</span></div>'
+            + '<div class="desc-num"><b>' + (p.alcance ? lkNum(p.porMil, 1) : '—') + '</b><span>por mil</span></div>'
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '<div class="fila-vazia">Ainda sem cliques no período.</div>';
+}
+
+function lkGrupos(itens){
+  var por = {};
+  itens.forEach(function(e){
+    Object.keys(e.grupos || {}).forEach(function(s){
+      var g = e.grupos[s];
+      var x = por[s] = por[s] || { s: s, nome: g.nome, jid: g.jid, envios: 0, cliques: 0 };
+      x.envios++; x.cliques += g.t || 0;
+      if (g.nome) x.nome = g.nome;
+    });
+  });
+  var lista = Object.keys(por).map(function(s){
+    var x = por[s], m = LK_MEMBROS[x.jid] || 0;
+    x.membros = m;
+    x.porMil = (m && x.envios) ? x.cliques * 1000 / (m * x.envios) : 0;
+    return x;
+  }).sort(function(a,b){ return (b.porMil - a.porMil) || (b.cliques - a.cliques); });
+  document.getElementById('lk-grupos').innerHTML = lista.length
+    ? '<div class="card" style="padding:0">' + lista.map(function(x){
+        return '<div class="desc-item">'
+          + '<div class="desc-item-info">'
+            + '<div class="desc-item-nome">' + esc(x.nome || x.s) + '</div>'
+            + '<div class="desc-item-meta"><span class="rt-ref">' + esc(x.s) + '</span>'
+              + (x.membros ? '<span>' + lkNum(x.membros) + ' membros</span>' : '') + '</div>'
+          + '</div>'
+          + '<div class="desc-nums">'
+            + '<div class="desc-num"><b>' + x.envios + '</b><span>envios</span></div>'
+            + '<div class="desc-num"><b>' + lkNum(x.cliques) + '</b><span>cliques</span></div>'
+            + '<div class="desc-num"><b>' + (x.membros ? lkNum(x.porMil, 2) : '—') + '</b><span>por mil/envio</span></div>'
+          + '</div>'
+        + '</div>';
+      }).join('') + '</div>'
+    : '';
 }
 
 function renderRastreio(){

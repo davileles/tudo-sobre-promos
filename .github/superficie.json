@@ -10,6 +10,7 @@
         "async function carregarAprovacao(",
         "async function carregarCenso(",
         "async function carregarCensoHist(",
+        "async function carregarCliquesLinks(",
         "async function carregarDist(",
         "async function carregarFilaEnvio(",
         "async function carregarGrupos(",
@@ -34,6 +35,7 @@
         "function ckIndexar(",
         "function hojePintarAlertas(",
         "function recalcPapeis(",
+        "function renderCliquesLinks(",
         "function renderTrilhas(",
         "function salvarGruposCfg("
       ]
