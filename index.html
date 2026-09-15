@@ -2230,7 +2230,9 @@ body.travado > *:not(#login-screen){display:none !important}
       O <b>nicho curado</b> da base de produtos só valia para o monitor de preços: no disparo manual
       a oferta saía sem categoria e por isso caía apenas nas trilhas gerais. Nas duas últimas opções
       ela passa a carregar o nicho do produto, como se o classificador tivesse confirmado.
-      Produto <b>sem nicho curado</b> é pulado nessas opções, em vez de sair no geral por engano.
+      Cada produto decide o próprio destino: vale o <b>nicho curado</b> (escolha ao lado de cada item);
+      sem curadoria, o <b>classificador</b> decide, como no radar; sem nicho nenhum, o produto sai só nos gerais
+      em “nicho + geral” e é pulado em “só o nicho”.
       <b>Só o grupo do nicho</b> exige uma trilha daquela categoria com destino marcado na aba Grupos.
     </p>
 
@@ -5560,22 +5562,61 @@ function lstToggleItens(id){
 // Destino previsto de UM item, espelhando dispararProdutoDaLista + trilhas do
 // servidor (baileys-server). O nicho e lido agora: curar o produto antes da vez
 // dele muda o destino, e o card mostra isso.
-function lstDestinoPrevisto(rot, asin){
+function lstDestinoPrevisto(rot, it){
+  var asin = it.asin;
   var gerais = {};
   TRILHAS_CFG.forEach(function(t){ if (!t.categoria) (t.destinos || []).forEach(function(j){ gerais[j] = 1; }); });
   var nG = Object.keys(gerais).length;
   var txtG = '📢 Gerais' + (nG ? ' (' + nG + ' grupos)' : '');
   if (!rot || rot === 'geral') return { txt: txtG };
-  var n = lstNichoDoItem(asin);
-  if (!n) return { txt: '⚠️ sem nicho curado — será pulado', erro: true };
+  // nichoPrevisto vem do servidor (curado ou classificador); servidor antigo nao manda.
+  var n = it.nichoPrevisto !== undefined ? (it.nichoPrevisto || '') : lstNichoDoItem(asin);
+  var robo = it.origemNicho === 'classificador' ? '🤖 ' : '';
+  if (!n) return rot === 'so_nicho' ? { txt: '⚠️ sem nicho — será pulado', erro: true }
+                                    : { txt: txtG + ' · sem nicho' };
   var doNicho = TRILHAS_CFG.filter(function(t){ return t.categoria === n && (t.destinos || []).length; });
   var nomes = doNicho.map(function(t){ return t.nome; }).join(', ');
   if (rot === 'so_nicho') {
-    return doNicho.length ? { txt: '🎯 ' + nomes }
+    return doNicho.length ? { txt: '🎯 ' + robo + nomes }
       : { txt: '⚠️ ' + rotuloNicho(n) + ' não tem grupo — vai falhar', erro: true };
   }
-  return doNicho.length ? { txt: '🎯 ' + nomes + ' + ' + txtG }
+  return doNicho.length ? { txt: '🎯 ' + robo + nomes + ' + ' + txtG }
     : { txt: txtG + ' · ' + rotuloNicho(n) + ' ainda não tem grupo próprio' };
+}
+
+// Seletor de nicho de UM produto. Grava na base (o nicho e do produto, nao da
+// lista), entao vale para este e para os proximos disparos dele.
+function lstSelectNicho(asin, atual){
+  if (atual === undefined) {
+    var i = (VIT_CACHE || []).filter(function(x){ return x.asin === asin; })[0];
+    atual = i && i.nicho ? String(i.nicho) : '';
+  }
+  atual = atual || '';
+  var ops = '<option value="">🤖 Classificador decide</option>'
+    + VIT_NICHOS.map(function(n){
+        return '<option value="' + esc(n.id) + '"' + (n.id === atual ? ' selected' : '') + '>'
+          + esc(((n.emoji || '') + ' ' + (n.id === 'geral' ? 'Geral (não é nicho)' : n.nome)).trim()) + '</option>';
+      }).join('');
+  return '<select title="Nicho deste produto" onclick="event.stopPropagation()" '
+    + 'onchange="lstDefinirNicho(\'' + esc(asin) + '\', this.value, this)" '
+    + 'style="font-size:11px;padding:2px 4px;max-width:170px;margin-top:0">' + ops + '</select>';
+}
+
+function lstDefinirNicho(asin, nicho, sel){
+  if (sel) sel.disabled = true;
+  fetch(SERVER + '/vitrine/nicho', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins:[asin], nicho: nicho })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    (VIT_CACHE || []).forEach(function(x){ if (x.asin === asin) x.nicho = nicho || null; });
+    if (document.getElementById('lst-form').style.display !== 'none') renderLstSel();
+    return carregarListas();
+  })
+  .catch(function(e){ alert('Não deu para salvar o nicho: ' + e.message); })
+  .then(function(){ if (sel) sel.disabled = false; });
 }
 
 function lstItensHtml(l){
@@ -5589,6 +5630,9 @@ function lstItensHtml(l){
         var st = '';
         if (ex) {
           if (env[it.asin])      st = '<span style="color:var(--green)">✅ enviado ' + hora(env[it.asin].em)
+                                   + (env[it.asin].grupos ? ' · ' + env[it.asin].grupos + ' grupo(s)' : '')
+                                   + (env[it.asin].nicho ? ' · ' + (env[it.asin].origemNicho === 'classificador' ? '🤖 ' : '')
+                                       + esc(rotuloNicho(env[it.asin].nicho)) : '')
                                    + (env[it.asin].cupom ? ' · 🎟️ ' + esc(env[it.asin].cupom) : '') + '</span>';
           else if (fal[it.asin]) st = '<span style="color:var(--red)">❌ falha: ' + esc(fal[it.asin].erro || '') + '</span>';
           else if (pul[it.asin]) st = '<span style="color:#fbbf24">⏭️ pulado: ' + esc(pul[it.asin].motivo || '') + '</span>';
@@ -5596,7 +5640,7 @@ function lstItensHtml(l){
           else if (i > ex.indice) st = '⏳ na fila';
         }
         var d = it.sumiu ? { txt: '⚠️ fora da vitrine — será pulado', erro: true }
-              : semTrilhas ? { txt: 'carregando destino…' } : lstDestinoPrevisto(l.roteamento, it.asin);
+              : semTrilhas ? { txt: 'carregando destino…' } : lstDestinoPrevisto(l.roteamento, it);
         var jaFoi = ex && (env[it.asin] || fal[it.asin] || pul[it.asin]);
         return '<div class="grp-chip" style="flex-direction:column;align-items:stretch;gap:3px;font-weight:500">'
           + '<div style="display:flex;gap:8px;align-items:baseline">'
@@ -5607,6 +5651,7 @@ function lstItensHtml(l){
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;padding-left:26px;color:var(--muted)">'
           +   (st ? '<span>' + st + '</span>' : '')
           +   (jaFoi ? '' : '<span style="color:' + (d.erro ? '#fca5a5' : 'var(--muted)') + '">' + esc(d.txt) + '</span>')
+          +   (jaFoi || it.sumiu ? '' : lstSelectNicho(it.asin, it.nicho))
           + '</div>'
           + '</div>';
       }).join('')
@@ -5921,10 +5966,8 @@ function renderLstSel(){
       + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
-      + (function(){ var n = lstNichoDoItem(p.asin);
-          return n ? ' <span style="color:#22c55e;font-size:10.5px;font-weight:600">' + esc(rotuloNicho(n)) + '</span>'
-                   : ' <span style="color:var(--muted2);font-size:10.5px">sem nicho</span>'; })()
       + '</span>'
+      + lstSelectNicho(p.asin)
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',1)" title="Descer">↓</button>'
       + '<button onclick="lstRemover(\'' + esc(p.asin) + '\')" title="Remover">✕</button>'
@@ -5949,9 +5992,11 @@ function renderLstSel(){
       if (rot === 'geral') return '';
       var sem = LST_SEL.filter(function(p){ return !lstNichoDoItem(p.asin); }).length;
       if (!sem) return '';
-      return '<div style="font-size:11px;margin-top:4px;color:#fca5a5">\u26a0\ufe0f ' + sem
-        + ' produto(s) sem nicho curado \u2014 nesta op\u00e7\u00e3o eles s\u00e3o pulados. '
-        + 'Marque o nicho na base de produtos antes de disparar.</div>';
+      return '<div style="font-size:11px;margin-top:4px;color:' + (rot === 'so_nicho' ? '#fca5a5' : 'var(--muted2)') + '">'
+        + (rot === 'so_nicho' ? '\u26a0\ufe0f ' : '\u2139\ufe0f ') + sem
+        + ' produto(s) sem nicho curado \u2014 o classificador decide no envio; se n\u00e3o reconhecer, '
+        + (rot === 'so_nicho' ? 'o produto \u00e9 pulado.' : 'sai s\u00f3 nos grupos gerais.')
+        + ' Para garantir, escolha o nicho ao lado de cada produto.</div>';
     })();
 }
 
