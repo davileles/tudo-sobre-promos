@@ -5894,6 +5894,7 @@ function lstBotaoDisparo(){
 
 function abrirFormLista(){
   document.getElementById('lst-form').style.display = 'block';
+  atualizarBarraVitrine();
   lstToggleTipo(); lstToggleCupom(); renderLstSel(); lstMsg('');
   document.getElementById('lst-form').scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -5958,6 +5959,7 @@ function cancelarFormLista(){
   document.getElementById('lst-form').style.display = 'none';
   document.getElementById('lst-tipo').disabled = false;
   LST_EDIT = null;
+  atualizarBarraVitrine();
 }
 
 function lstSugerir(){
@@ -7141,7 +7143,10 @@ function marcarTodosVitrine(v){
 
 function atualizarBarraVitrine(){
   var n = Object.keys(VIT_SEL).length;
-  document.getElementById('vit-barra').style.display = n ? 'flex' : 'none';
+  // Com o formulario de disparo aberto a barra some: o botao que vale e o do
+  // formulario. A selecao continua guardada e a barra volta ao cancelar.
+  var formAberto = document.getElementById('lst-form').style.display === 'block';
+  document.getElementById('vit-barra').style.display = (n && !formAberto) ? 'flex' : 'none';
   var bx = document.getElementById('vit-btn-excluir');
   if (bx) {
     bx.disabled = !n;
