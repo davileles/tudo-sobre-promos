@@ -5430,6 +5430,7 @@ var LST_SEL   = [];      // produtos do formulario: [{asin, nome}]
 var LST_EDIT  = null;    // id em edicao (null = nova)
 var LST_TIMER = null;
 var DIAS_SEM  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+var LST_ABERTAS = {};   // id da lista -> true quando o card mostra os produtos
 
 function lstMsg(txt, erro){
   var el = document.getElementById('lst-ok');
@@ -5504,14 +5505,16 @@ function renderListas(){
 
     // Envio unico so aceita acompanhar e cancelar: editar ou reagendar algo que
     // vai deixar de existir daqui a pouco nao faz sentido.
-    var acoes = ex
+    var btnItens = '<button class="btn btn-copy btn-sm" onclick="lstToggleItens(\'' + l.id + '\')">'
+      + (LST_ABERTAS[l.id] ? '▴ Ocultar produtos' : '▾ Ver produtos (' + l.produtos.length + ')') + '</button>';
+    var acoes = btnItens + (ex
       ? (ex.pausada
           ? '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'retomar\')">▶ Retomar</button>'
           : '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'pausar\')">⏸ Pausar</button>')
         + '<button class="btn btn-rej btn-sm" onclick="acaoLista(\'' + l.id + '\',\'cancelar\')">⏹ Cancelar</button>'
       : '<button class="btn btn-sm" style="margin-top:0" onclick="dispararLista(\'' + l.id + '\')">🚀 Disparar agora</button>'
         + '<button class="btn btn-copy btn-sm" onclick="editarLista(\'' + l.id + '\')">✏️ Editar</button>'
-        + '<button class="btn btn-rej btn-sm" onclick="excluirLista(\'' + l.id + '\')">🗑️ Excluir</button>';
+        + '<button class="btn btn-rej btn-sm" onclick="excluirLista(\'' + l.id + '\')">🗑️ Excluir</button>');
 
     var duracao = l.produtos.length > 1
       ? Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10 + 'h de duração'
@@ -5535,9 +5538,79 @@ function renderListas(){
           + new Date(l.ultimoDisparo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
       + (sumiram ? '<div class="mon-aviso">⚠️ ' + sumiram + ' produto(s) não estão mais na vitrine e serão pulados.</div>' : '')
       + progresso
+      + (LST_ABERTAS[l.id] ? lstItensHtml(l) : '')
       + '<div class="btn-row" style="margin-top:12px">' + acoes + '</div>'
       + '</div>';
   }).join('');
+}
+
+/* ── Produtos do disparo (expandir card) ── */
+// Trilhas e nichos sao carregados sob demanda: o card abre na hora com o que ja
+// esta em cache e repinta quando chegam.
+function lstToggleItens(id){
+  LST_ABERTAS[id] = !LST_ABERTAS[id];
+  renderListas();
+  if (!LST_ABERTAS[id]) return;
+  var esperas = [trilhasCarregar()];
+  if (!VIT_NICHOS.length) esperas.push(carregarNichosVitrine());
+  if (!VIT_CACHE.length) esperas.push(carregarVitrine());
+  Promise.all(esperas).then(function(){ renderListas(); }, function(){ renderListas(); });
+}
+
+// Destino previsto de UM item, espelhando dispararProdutoDaLista + trilhas do
+// servidor (baileys-server). O nicho e lido agora: curar o produto antes da vez
+// dele muda o destino, e o card mostra isso.
+function lstDestinoPrevisto(rot, asin){
+  var gerais = {};
+  TRILHAS_CFG.forEach(function(t){ if (!t.categoria) (t.destinos || []).forEach(function(j){ gerais[j] = 1; }); });
+  var nG = Object.keys(gerais).length;
+  var txtG = '📢 Gerais' + (nG ? ' (' + nG + ' grupos)' : '');
+  if (!rot || rot === 'geral') return { txt: txtG };
+  var n = lstNichoDoItem(asin);
+  if (!n) return { txt: '⚠️ sem nicho curado — será pulado', erro: true };
+  var doNicho = TRILHAS_CFG.filter(function(t){ return t.categoria === n && (t.destinos || []).length; });
+  var nomes = doNicho.map(function(t){ return t.nome; }).join(', ');
+  if (rot === 'so_nicho') {
+    return doNicho.length ? { txt: '🎯 ' + nomes }
+      : { txt: '⚠️ ' + rotuloNicho(n) + ' não tem grupo — vai falhar', erro: true };
+  }
+  return doNicho.length ? { txt: '🎯 ' + nomes + ' + ' + txtG }
+    : { txt: txtG + ' · ' + rotuloNicho(n) + ' ainda não tem grupo próprio' };
+}
+
+function lstItensHtml(l){
+  var ex = l.execucao;
+  var porAsin = function(arr){ var m = {}; (arr || []).forEach(function(x){ m[x.asin] = x; }); return m; };
+  var env = porAsin(ex && ex.enviados), pul = porAsin(ex && ex.pulados), fal = porAsin(ex && ex.falhas);
+  var hora = function(v){ return new Date(v).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); };
+  var semTrilhas = !TRILHAS_CFG.length;
+  return '<div style="margin:10px 0 2px;border-top:1px solid var(--border);padding-top:6px">'
+    + (l.itens || []).map(function(it, i){
+        var st = '';
+        if (ex) {
+          if (env[it.asin])      st = '<span style="color:var(--green)">✅ enviado ' + hora(env[it.asin].em)
+                                   + (env[it.asin].cupom ? ' · 🎟️ ' + esc(env[it.asin].cupom) : '') + '</span>';
+          else if (fal[it.asin]) st = '<span style="color:var(--red)">❌ falha: ' + esc(fal[it.asin].erro || '') + '</span>';
+          else if (pul[it.asin]) st = '<span style="color:#fbbf24">⏭️ pulado: ' + esc(pul[it.asin].motivo || '') + '</span>';
+          else if (i === ex.indice) st = ex.pausada ? '⏸️ próximo (pausado)' : '▶️ próximo · ' + hora(Math.max(ex.proximoEm, Date.now()));
+          else if (i > ex.indice) st = '⏳ na fila';
+        }
+        var d = it.sumiu ? { txt: '⚠️ fora da vitrine — será pulado', erro: true }
+              : semTrilhas ? { txt: 'carregando destino…' } : lstDestinoPrevisto(l.roteamento, it.asin);
+        var jaFoi = ex && (env[it.asin] || fal[it.asin] || pul[it.asin]);
+        return '<div class="grp-chip" style="flex-direction:column;align-items:stretch;gap:3px;font-weight:500">'
+          + '<div style="display:flex;gap:8px;align-items:baseline">'
+          +   '<span style="color:var(--muted2);min-width:18px">' + (i + 1) + '.</span>'
+          +   '<span style="flex:1">' + esc(it.nome) + ' <span style="color:var(--muted2);font-size:10.5px">'
+          +     esc(it.loja || '') + '</span></span>'
+          + '</div>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;padding-left:26px;color:var(--muted)">'
+          +   (st ? '<span>' + st + '</span>' : '')
+          +   (jaFoi ? '' : '<span style="color:' + (d.erro ? '#fca5a5' : 'var(--muted)') + '">' + esc(d.txt) + '</span>')
+          + '</div>'
+          + '</div>';
+      }).join('')
+    + '</div>';
 }
 
 /* ── Formulário ── */
