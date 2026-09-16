@@ -1062,6 +1062,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
+  <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Ajustes</button>
 </div>
@@ -1719,6 +1720,15 @@ body.travado > *:not(#login-screen){display:none !important}
 </div>
 
 <!-- ════════ CONEXÃO ════════ -->
+<div class="panel" id="panel-admgrupos">
+  <div class="aviso">
+    Incluir e excluir número, tornar e tirar admin, trocar nome e descrição dos grupos do TSP. As ações saem pelos
+    números conectados que são admin de cada grupo, uma por vez e com pausa. Para <b>incluir</b>, a pessoa precisa
+    ter salvo o número e mandado uma mensagem antes — o servidor recusa sem isso.
+  </div>
+  <div class="card"><div id="gg-tsp" style="font-size:12.5px;opacity:.75">Carregando…</div></div>
+</div>
+
 <div class="panel" id="panel-conexao">
   <div class="aviso">
     Cada operação escolhe <b>quem lê</b> os grupos dela — pode ser o principal ou qualquer número pareado aqui.
@@ -3161,7 +3171,25 @@ function alternarTema(){
 })();
 
 /* ══════ TABS ══════ */
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+// Administracao de grupos: a tela e servida pelo baileys-server e e a mesma do
+// gestor-cdv — uma implementacao so. Carrega na primeira abertura da aba.
+function ggAbrir() {
+  var el = document.getElementById('gg-tsp');
+  if (!el) return;
+  if (window.GG) { window.GG.montar(el, { server: SERVER, operacao: 'tsp' }); return; }
+  if (document.getElementById('gg-script')) return;
+  var s = document.createElement('script');
+  s.id = 'gg-script';
+  s.src = SERVER + '/grupos-gestao/ui.js?t=' + Date.now();
+  s.onload = function() { window.GG.montar(el, { server: SERVER, operacao: 'tsp' }); };
+  s.onerror = function() {
+    s.remove();
+    el.innerHTML = 'Não consegui carregar a tela de grupos do servidor. <button class="btn" onclick="ggAbrir()">Tentar de novo</button>';
+  };
+  document.head.appendChild(s);
+}
+
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -3184,6 +3212,7 @@ function switchTab(name) {
   if (name === 'dist') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarDist(); carregarCenso(); carregarCensoHist(); }
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
+  if (name === 'admgrupos') ggAbrir();
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
   // O bloco "Cupom adicional" da Oferta escolhe da base: sem o cache o select
   // abriria vazio na primeira visita da aba.
@@ -3231,7 +3260,7 @@ var SECOES = [
   { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
   { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
   { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','cliques','descobertas','trafego'] },
-  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','conexao'] },
+  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','conexao'] },
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
 ];
 var ROTULO_ABA = {
@@ -3240,7 +3269,7 @@ var ROTULO_ABA = {
   livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
   rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago',
-  grupos: 'Trilhas', dist: 'Distribuidor', conexao: 'Conexão', config: 'Ajustes'
+  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão', config: 'Ajustes'
 };
 var SECAO_ATUAL = 'hoje';
 
