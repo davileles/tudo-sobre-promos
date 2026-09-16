@@ -9828,12 +9828,18 @@ function verificarServidor() {
   fetch(SERVER+'/status', { signal: AbortSignal.timeout(2000) })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      wsConectado = d.conectado;
-      document.getElementById('ws-dot').className = 'ws-dot '+(d.conectado?'on':'off');
+      // `conectado` e so a conta principal. O envio sai por qualquer conta de
+      // disparo (ticos), que o servidor informa em `disparoDisponivel` — com a
+      // principal fora, as ticas seguem enviando e o painel nao pode travar.
+      var podeDisparar = (typeof d.disparoDisponivel === 'boolean') ? d.disparoDisponivel : !!d.conectado;
+      wsConectado = podeDisparar;
+      document.getElementById('ws-dot').className = 'ws-dot '+(podeDisparar?'on':'off');
       document.getElementById('ws-label').textContent = d.conectado
         ? 'WhatsApp conectado — envio automático ativo'
-        : 'Servidor encontrado mas WhatsApp não conectado';
-      pintarSeloWA(d.conectado, d.conectado ? 'WhatsApp ok' : 'WhatsApp fora');
+        : (podeDisparar
+            ? 'Conta principal fora — envio pelas contas de disparo ativo'
+            : 'Servidor encontrado mas nenhuma conta de WhatsApp conectada');
+      pintarSeloWA(podeDisparar, d.conectado ? 'WhatsApp ok' : (podeDisparar ? 'Disparo ok' : 'WhatsApp fora'));
       var btnR = document.getElementById('btn-reconectar');
       if (btnR) btnR.style.display = (!d.conectado || !d.sockAtivo) ? 'inline-block' : 'none';
     })
