@@ -273,6 +273,8 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .cup-copy{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-copy:hover{color:var(--accent)}
   .cup-copy.ok{color:#34d399}
+  .cup-reativar{background:transparent;border:none;color:#f0a742;font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
+  .cup-reativar:hover{color:#ffc46b}
   .cup-cod{cursor:pointer}
   .cup-cod:hover{color:var(--accent)}
   .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
@@ -8111,9 +8113,11 @@ function cardCupom(c) {
                             : 'Vale em ofertas em geral — clique para restringir a produtos específicos') + '">🎯</button>'
         + '<button class="cup-copy" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)" title="Copiar código">📋</button>'
         + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
+        + (venceu ? '<button class="cup-reativar" data-chave="' + ch + '" onclick="reativarCupom(this)" '
+                    + 'title="Reativar com nova validade">♻️</button>' : '')
         + '<button class="sw ' + (on ? 'on' : '') + '" data-chave="' + ch + '" onclick="alternarCupom(this)"'
         + (venceu ? ' disabled' : '')
-        + ' title="' + (venceu ? 'Expirado — estenda a validade antes de ativar'
+        + ' title="' + (venceu ? 'Expirado — use ♻️ para reativar com nova validade'
                                 : (on ? 'Desativar' : 'Ativar')) + '"></button>'
       + '</span>'
     + '</div>'
@@ -8203,7 +8207,7 @@ function alternarCupom(btn) {
   // mas barrar aqui explica o caminho certo em vez de mostrar um erro cru.
   if (novo && expirouCupom(c)) {
     alert('O cupom ' + c.codigo + ' está expirado e não pode ser ativado.\n\n'
-      + 'Se ele voltou a valer, exclua e cadastre de novo em "Criar cupom à mão" com a nova validade.');
+      + 'Se ele voltou a valer, use o botão ♻️ do card para reativar com uma nova validade.');
     return;
   }
 
@@ -8219,6 +8223,75 @@ function alternarCupom(btn) {
     renderCupons();
   })
   .catch(function(e){ alert('Nao foi possivel alterar o cupom: ' + e.message); btn.disabled = false; });
+}
+
+/**
+ * Converte o que o operador digitou em uma validade ISO.
+ * Aceita horas puras ("24", "48"), data BR ("20/09/2026" ou "20/09/2026 18:00")
+ * e ISO ("2026-09-20T18:00"). Data BR sem hora vale ate o fim do dia.
+ */
+function validadeDoTexto(txt) {
+  var s = String(txt == null ? '' : txt).trim().replace(',', '.');
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    var h = parseFloat(s);
+    if (!isFinite(h) || h <= 0) return null;
+    return new Date(Date.now() + h * 3600000).toISOString();
+  }
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2}))?$/);
+  if (m) {
+    var ano = Number(m[3]); if (ano < 100) ano += 2000;
+    var temHora = m[4] !== undefined;
+    var d = new Date(ano, Number(m[2]) - 1, Number(m[1]),
+                     temHora ? Number(m[4]) : 23, temHora ? Number(m[5]) : 59, 59);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  var iso = new Date(s);
+  return isNaN(iso.getTime()) ? null : iso.toISOString();
+}
+
+/**
+ * Reativa um cupom vencido com uma validade nova.
+ *
+ * O servidor so aceita ativo:true junto de uma validadeAte no futuro (regra de
+ * atualizarCupomBase), entao os dois campos vao na MESMA requisicao. Antes
+ * disto o unico caminho era excluir e recadastrar a mao — o que jogava fora
+ * observacao, idCampanhaLoja, restrito, confirmadoNoMl e a data de captura.
+ */
+function reativarCupom(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  if (!c) return;
+
+  var resp = prompt('Reativar ' + c.codigo + (c.loja ? ' (' + c.loja + ')' : '') + ' por quanto tempo?\n\n'
+    + 'Digite as horas (ex.: 24, 48) ou a nova validade em DD/MM/AAAA HH:MM.', '24');
+  if (resp === null) return;
+
+  var nova = validadeDoTexto(resp);
+  if (!nova) {
+    alert('Não entendi "' + resp + '".\n\nUse horas (ex.: 24) ou DD/MM/AAAA HH:MM.');
+    return;
+  }
+  if (new Date(nova).getTime() <= Date.now()) {
+    alert('Essa validade já passou. Informe uma data ou um prazo no futuro.');
+    return;
+  }
+
+  btn.disabled = true;
+  fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ validadeAte: nova, ativo: true })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    // Espelha o registro que o servidor devolveu, nao um palpite local: a
+    // validade pode ter sido normalizada la dentro.
+    if (d.cupom) Object.keys(d.cupom).forEach(function(k){ c[k] = d.cupom[k]; });
+    else { c.validadeAte = nova; c.ativo = true; }
+    renderCupons();
+  })
+  .catch(function(e){ alert('Não foi possível reativar: ' + e.message); btn.disabled = false; });
 }
 
 function excluirCupom(btn) {
