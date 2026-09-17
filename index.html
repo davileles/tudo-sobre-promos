@@ -402,6 +402,9 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .desc-item:last-child{border-bottom:none}
   .desc-item-info{flex:1;min-width:0}
   .desc-item-nome{font-size:13px;font-weight:600;color:var(--text);line-height:1.35}
+  .desc-item-nome a.lk-link{color:inherit;text-decoration:none}
+  .desc-item-nome a.lk-link:hover{text-decoration:underline;color:var(--accent,inherit)}
+  .desc-item-nome a.lk-link .lk-seta{font-size:11px;opacity:.55;margin-left:4px}
   .desc-item-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .desc-nums{display:flex;gap:16px;text-align:right;flex-wrap:wrap;justify-content:flex-end}
   .desc-num b{display:block;font-size:14px;font-weight:800;color:var(--text)}
@@ -6402,6 +6405,21 @@ async function carregarCliquesLinks(){
 
 function lkNum(n, casas){ return (Number(n) || 0).toLocaleString('pt-BR', { maximumFractionDigits: casas || 0, minimumFractionDigits: casas || 0 }); }
 function lkQuando(iso){ return iso ? new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : ''; }
+// Link do produto para abrir direto do painel. Amazon e Shopee (com loja+item)
+// viram URL limpa, sem tag de afiliado, para não inflar os cliques da loja;
+// o resto (Mercado Livre, cupons) usa a URL enviada na mensagem.
+function lkUrlProduto(e){
+  var p = String(e.produto || '');
+  if (/^B0[A-Z0-9]{8}$/.test(p) || (e.slugLoja === 'amazon' && /^[A-Z0-9]{10}$/.test(p))) return 'https://www.amazon.com.br/dp/' + p;
+  var sh = p.match(/^SHOPEE-(\d+)-(\d+)$/);
+  if (sh) return 'https://shopee.com.br/product/' + sh[1] + '/' + sh[2];
+  return /^https?:\/\//i.test(e.url || '') ? e.url : '';
+}
+function lkNomeLink(nome, url){
+  if (!url) return esc(nome);
+  return '<a class="lk-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" title="Abrir produto">'
+    + esc(nome) + '<span class="lk-seta">↗</span></a>';
+}
 function lkTitulo(e){
   if (e.tipo === 'cupom' && e.cupom) return 'Cupom ' + e.cupom + (e.loja ? ' · ' + e.loja : '');
   return e.titulo || e.url || e.codigo;
@@ -6454,7 +6472,7 @@ function renderCliquesLinks(){
         var preco = e.preco ? (e.precoDe ? '<span>' + rtMoeda(e.precoDe) + ' → <b>' + rtMoeda(e.preco) + '</b></span>' : '<span>' + rtMoeda(e.preco) + '</span>') : '';
         return '<div class="desc-item' + (e.cliques ? '' : ' rt-mudo') + '">'
           + '<div class="desc-item-info">'
-            + '<div class="desc-item-nome">' + esc(lkTitulo(e)) + '</div>'
+            + '<div class="desc-item-nome">' + lkNomeLink(lkTitulo(e), lkUrlProduto(e)) + '</div>'
             + '<div class="desc-item-meta">'
               + '<b>' + esc(e.loja || e.slugLoja || 'Loja') + '</b>'
               + '<span>' + esc(e.tipo || '') + '</span>'
@@ -6487,6 +6505,8 @@ function lkProdutos(itens){
           : 't:' + (e.titulo || e.url || e.codigo);
     var p = por[k] = por[k] || { nome: lkTitulo(e), loja: e.loja, envios: [], cliques: 0, alcance: 0 };
     p.envios.push(e); p.cliques += e.cliques || 0; p.alcance += e.alcance || 0;
+    var u = lkUrlProduto(e);
+    if (u && (!p.url || String(e.enviadoEm) > String(p.urlEm))) { p.url = u; p.urlEm = e.enviadoEm; }
   });
   var lista = Object.keys(por).map(function(k){
     var p = por[k];
@@ -6500,7 +6520,7 @@ function lkProdutos(itens){
         var envios = p.envios.slice().sort(function(a,b){ return String(a.enviadoEm).localeCompare(String(b.enviadoEm)); });
         return '<div class="desc-item">'
           + '<div class="desc-item-info">'
-            + '<div class="desc-item-nome">' + esc(p.nome) + '</div>'
+            + '<div class="desc-item-nome">' + lkNomeLink(p.nome, p.url) + '</div>'
             + '<div class="desc-item-meta">'
               + '<b>' + esc(p.loja || 'Loja') + '</b>'
               + envios.map(function(e){
