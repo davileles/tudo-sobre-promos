@@ -1690,8 +1690,9 @@ body.travado > *:not(#login-screen){display:none !important}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <span class="card-title" style="flex:1">📈 Evolução de membros</span>
       <select id="censo-gr-modo" onchange="renderCensoGrafico()" style="max-width:150px">
-        <option value="total">Total somado</option>
         <option value="grupos">Por grupo</option>
+        <option value="nichos">Por nicho</option>
+        <option value="total" selected>Total somado</option>
       </select>
       <select id="censo-gr-dias" onchange="carregarCensoHist()" style="max-width:120px">
         <option value="30">30 dias</option>
@@ -1699,7 +1700,8 @@ body.travado > *:not(#login-screen){display:none !important}
         <option value="365">1 ano</option>
       </select>
     </div>
-    <div style="position:relative;height:230px"><canvas id="censo-chart"></canvas></div>
+    <div id="censo-chart-box" style="position:relative;height:230px"><canvas id="censo-chart"></canvas></div>
+    <div id="censo-nichos" style="display:none;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px"></div>
     <div id="censo-gr-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
   </div>
 
@@ -4504,15 +4506,93 @@ async function carregarCensoHist(){
   } catch(e){ card.style.display = 'none'; }
 }
 
+/* ── Evolução por nicho ──
+   Um mini-gráfico por nicho, cada um com a PRÓPRIA escala: o geral tem
+   milhares de membros e um nicho tem dezenas — num eixo só as linhas dos
+   nichos virariam uma reta no chão. */
+var CENSO_NICHO_CHARTS = [];
+var CENSO_NICHO_CORES = { _cupons: '#eab308' };
+
+function renderCensoNichos(labels, escuro, grade, texto){
+  var box = document.getElementById('censo-nichos');
+  CENSO_NICHO_CHARTS.forEach(function(ch){ ch.destroy(); });
+  CENSO_NICHO_CHARTS = [];
+  var nichos = CENSO_HIST.nichos || [];
+  var serie  = CENSO_HIST.serie || [];
+  if (!nichos.length){
+    box.innerHTML = '<div style="font-size:12px;color:var(--muted2)">Nenhum nicho encontrado — o servidor ainda não devolve a quebra por nicho.</div>';
+    return;
+  }
+  box.innerHTML = nichos.map(function(n, i){
+    var vals = serie.map(function(p){ return p.nichos ? p.nichos[n.id] : null; });
+    var med  = vals.filter(function(v){ return typeof v === 'number'; });
+    var atual = med.length ? med[med.length - 1] : null;
+    var ini   = med.length ? med[0] : null;
+    var delta = (atual != null && ini != null) ? atual - ini : null;
+    var pct   = (delta != null && ini > 0) ? (delta / ini * 100) : null;
+    var cor   = delta > 0 ? 'var(--green)' : (delta < 0 ? 'var(--red)' : 'var(--muted)');
+    var var_  = delta == null || med.length < 2 ? '<span style="color:var(--muted2)">sem série ainda</span>'
+      : '<span style="color:' + cor + '">' + (delta > 0 ? '+' : '') + delta.toLocaleString('pt-BR')
+        + (pct != null ? ' (' + (pct > 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '%)' : '')
+        + '</span> no período';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+      + '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">'
+      +   '<span style="font-size:12.5px;font-weight:600;flex:1">' + esc(n.nome) + '</span>'
+      +   '<span style="font-size:15px;font-weight:700">' + (atual != null ? atual.toLocaleString('pt-BR') : '—') + '</span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted2);margin-bottom:6px">'
+      +   n.grupos + ' grupo(s) · ' + var_ + '</div>'
+      + '<div style="position:relative;height:110px"><canvas id="censo-nicho-' + i + '"></canvas></div>'
+      + '</div>';
+  }).join('');
+
+  nichos.forEach(function(n, i){
+    var cor  = CENSO_NICHO_CORES[n.id] || CENSO_CORES[i % CENSO_CORES.length];
+    var vals = serie.map(function(p){ return p.nichos ? p.nichos[n.id] : null; });
+    CENSO_NICHO_CHARTS.push(new Chart(document.getElementById('censo-nicho-' + i), {
+      type:'line',
+      data:{ labels: labels, datasets: [{ label: n.nome, data: vals, borderColor: cor,
+        backgroundColor: cor + '22', fill:true, tension:.3, pointRadius:0, pointHitRadius:8,
+        borderWidth:2, spanGaps:true }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false },
+          tooltip:{ callbacks:{ label:function(it){
+            return it.parsed.y == null ? '—' : it.parsed.y.toLocaleString('pt-BR') + ' membros';
+          } } } },
+        scales:{
+          x:{ grid:{ display:false }, ticks:{ color:texto, maxTicksLimit:4, font:{ size:9 } } },
+          y:{ grid:{ color:grade }, ticks:{ color:texto, maxTicksLimit:4, font:{ size:9 } } }
+        }
+      }
+    }));
+  });
+}
+
 function renderCensoGrafico(){
   if (!CENSO_HIST || typeof Chart === 'undefined') return;
   var modo   = document.getElementById('censo-gr-modo').value;
+  var porNicho = modo === 'nichos';
+  document.getElementById('censo-chart-box').style.display = porNicho ? 'none' : 'block';
+  document.getElementById('censo-nichos').style.display = porNicho ? 'grid' : 'none';
   var serie  = CENSO_HIST.serie || [];
   var labels = serie.map(function(p){ return p.dia.slice(8,10) + '/' + p.dia.slice(5,7); });
   var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
   var grade  = escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)';
   var texto  = escuro ? '#9aa0aa' : '#6b7280';
   var ds;
+
+  if (porNicho){
+    if (CENSO_CHART){ CENSO_CHART.destroy(); CENSO_CHART = null; }
+    renderCensoNichos(labels, escuro, grade, texto);
+    var nAgrN = serie.filter(function(p){ return p.agregado; }).length;
+    document.getElementById('censo-gr-aviso').textContent = 'Cada nicho tem a própria escala · variação = última medição − primeira do período'
+      + (nAgrN ? ' · ' + nAgrN + ' ponto(s) do histórico importado não têm quebra por nicho' : '');
+    return;
+  }
+  CENSO_NICHO_CHARTS.forEach(function(ch){ ch.destroy(); });
+  CENSO_NICHO_CHARTS = [];
 
   if (modo === 'total'){
     ds = [{ label:'Total', data: serie.map(function(p){ return p.total; }),
