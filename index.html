@@ -6061,6 +6061,7 @@ function renderLstSel(){
       + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
+      + lstLinhaComparativo(p.asin)
       + '</span>'
       + lstSelectNicho(p.asin)
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
@@ -6092,7 +6093,108 @@ function renderLstSel(){
         + ' produto(s) sem nicho curado \u2014 o classificador decide no envio; se n\u00e3o reconhecer, '
         + (rot === 'so_nicho' ? 'o produto \u00e9 pulado.' : 'sai s\u00f3 nos grupos gerais.')
         + ' Para garantir, escolha o nicho ao lado de cada produto.</div>';
-    })();
+    })()
+  + lstResumoComparativo();
+  lstCarregarComparativo();
+}
+
+// ── COMPARATIVO DE PRECO NA MONTAGEM ─────────────────────────────────────────
+// Para cada produto da lista: ultimo envio (historico) x preco atual (monitor).
+// Busca so o que ainda nao esta em cache; o render nao espera a resposta.
+var LST_COMP = {}, LST_COMP_PEND = {}, LST_COMP_TTL = 10 * 60000;
+
+function lstCarregarComparativo(){
+  var agora = Date.now();
+  var faltam = LST_SEL.map(function(p){ return p.asin; }).filter(function(a){
+    var c = LST_COMP[a];
+    return !LST_COMP_PEND[a] && (!c || agora - c._em > LST_COMP_TTL);
+  });
+  if (!faltam.length) return;
+  faltam.forEach(function(a){ LST_COMP_PEND[a] = true; });
+  fetch(SERVER + '/vitrine/comparativo', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins: faltam })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      faltam.forEach(function(a){
+        var c = (d.itens || {})[a] || { veredito:'erro' };
+        c._em = Date.now(); LST_COMP[a] = c;
+      });
+    })
+    .catch(function(e){
+      faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _em: Date.now() - LST_COMP_TTL + 60000 }; });
+    })
+    .then(function(){
+      faltam.forEach(function(a){ delete LST_COMP_PEND[a]; });
+      if (document.getElementById('lst-form').style.display === 'block') renderLstSel();
+    });
+}
+
+function lstFmtDiaCurto(iso){
+  if (!iso) return '';
+  var d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+}
+
+function lstLinhaComparativo(asin){
+  var c = LST_COMP[asin];
+  var st = 'font-size:10.5px;margin-top:3px;line-height:1.45;';
+  if (!c) return '<div style="' + st + 'color:var(--muted2)">comparando preço…</div>';
+  if (c.veredito === 'erro') return '<div style="' + st + 'color:var(--muted2)">comparativo indisponível</div>';
+
+  var a = c.atual, u = c.ultimoEnvio;
+  var agoraTxt = a
+    ? 'agora R$ ' + fmtBRL(a.preco)
+      + (a.fonte === 'cadastro' ? ' <span title="Loja sem leitura de preço: valor do cadastro">(cadastro)</span>'
+         : a.velho ? ' <span title="Última leitura do monitor tem mais de 6h">(lido ' + lstFmtDiaCurto(a.em) + ')</span>' : '')
+      + (a.disponivel === false ? ' <b style="color:#fca5a5">indisponível</b>' : '')
+    : 'sem preço atual';
+  var extra = [];
+  if (c.min90 != null) extra.push('mín. 90d R$ ' + fmtBRL(c.min90));
+  if (c.menorEnviado && u && c.menorEnviado.preco < u.preco)
+    extra.push('menor enviado R$ ' + fmtBRL(c.menorEnviado.preco) + ' em ' + lstFmtDiaCurto(c.menorEnviado.em));
+  var extraTxt = extra.length ? ' · ' + extra.join(' · ') : '';
+
+  if (c.veredito === 'inedito')
+    return '<div style="' + st + 'color:var(--muted2)">🆕 inédito · ' + agoraTxt + extraTxt + '</div>';
+
+  var cor = { melhor:'#22c55e', igual:'#eab308', pior:'#f87171' }[c.veredito] || 'var(--muted2)';
+  var ico = { melhor:'🟢', igual:'🟡', pior:'🔴' }[c.veredito] || '⚪';
+  var var_ = c.variacaoPct == null ? ''
+    : ' <b style="color:' + cor + '">(' + (c.variacaoPct > 0 ? '+' : '') + String(c.variacaoPct).replace('.', ',') + '%)</b>';
+  return '<div style="' + st + 'color:var(--muted2)">' + ico + ' último envio ' + lstFmtDiaCurto(u.em)
+    + (c.viaGrupo ? ' <span title="Mesmo produto enviado por outra loja do grupo">(pela ' + esc(u.loja || 'outra loja') + ')</span>' : '')
+    + ' · R$ ' + fmtBRL(u.preco)
+    + (u.precoFinal && u.precoFinal < u.preco ? ' <span title="Preço final com cupom ' + esc(u.cupom || '') + '">(R$ ' + fmtBRL(u.precoFinal) + ' c/ cupom)</span>' : '')
+    + ' → ' + agoraTxt + var_
+    + (c.envios90d > 1 ? ' · ' + c.envios90d + '× em 90d' : '')
+    + extraTxt + '</div>';
+}
+
+function lstResumoComparativo(){
+  var n = { melhor:0, igual:0, pior:0, inedito:0 };
+  LST_SEL.forEach(function(p){ var c = LST_COMP[p.asin]; if (c && n[c.veredito] != null) n[c.veredito]++; });
+  var partes = [];
+  if (n.melhor)  partes.push('🟢 ' + n.melhor + ' mais barato(s)');
+  if (n.igual)   partes.push('🟡 ' + n.igual + ' igual(is)');
+  if (n.pior)    partes.push('🔴 ' + n.pior + ' mais caro(s)');
+  if (n.inedito) partes.push('🆕 ' + n.inedito + ' inédito(s)');
+  if (!partes.length) return '';
+  return '<div style="font-size:11px;margin-top:6px;color:var(--muted2);display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+    + '<span>Contra o último envio: ' + partes.join(' · ') + '</span>'
+    + (n.pior ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverPiores()">Remover os 🔴 (' + n.pior + ')</button>' : '')
+    + '</div>';
+}
+
+function lstRemoverPiores(){
+  var piores = LST_SEL.filter(function(p){ var c = LST_COMP[p.asin]; return c && c.veredito === 'pior'; });
+  if (!piores.length) return;
+  if (!confirm('Remover ' + piores.length + ' produto(s) mais caro(s) que no último envio?')) return;
+  var fora = {}; piores.forEach(function(p){ fora[p.asin] = true; });
+  LST_SEL = LST_SEL.filter(function(p){ return !fora[p.asin]; });
+  renderLstSel();
 }
 
 // Nicho curado do item, lido da base de produtos: LST_SEL so guarda asin e nome.
