@@ -10,7 +10,12 @@
    identidade lembrada do último login neste navegador. */
 html.visao-operador #grp-resultados,
 html.visao-operador #tab-comissao,
-html.visao-operador #tab-trafego { display: none !important; }
+html.visao-operador #tab-trafego,
+html.visao-operador #tab-ltv { display: none !important; }
+#panel-ltv .ltv-tab{width:100%;border-collapse:collapse;font-size:12px}
+#panel-ltv .ltv-tab th{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border)}
+#panel-ltv .ltv-tab td{text-align:right;padding:6px 10px;border-top:1px solid var(--border)}
+#panel-ltv .ltv-tab th:first-child,#panel-ltv .ltv-tab td:first-child{text-align:left}
 </style>
 <script>
 try {
@@ -1065,6 +1070,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cliques" onclick="switchTab('cliques')">👆 Cliques</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
+  <button class="main-tab" id="tab-ltv" onclick="switchTab('ltv')">♾️ LTV</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
@@ -2343,6 +2349,73 @@ body.travado > *:not(#login-screen){display:none !important}
 
 <!-- ════════ TEMPLATES ════════ -->
 <!-- ════════ DESCOBERTAS ════════ -->
+<!-- ════════ RESULTADOS: LTV DOS MEMBROS ════════ -->
+<div class="panel res-scope" id="panel-ltv">
+<div class="page" style="display:block">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+    <label style="font-size:12px;color:var(--muted)">Janela
+      <select id="ltv-janela" onchange="ltvRender()" style="margin-left:6px">
+        <option value="30">30 dias</option>
+        <option value="60">60 dias</option>
+        <option value="90">90 dias</option>
+      </select>
+    </label>
+    <button class="refresh-btn" onclick="ltvCarregar(true)">↻ Atualizar</button>
+    <span id="ltv-status" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+
+  <div class="section-title">Valor do membro</div>
+  <div class="grid-auto">
+    <div class="card">
+      <div class="card-label">LTV por membro</div>
+      <div class="card-main" id="ltv-ltv">—</div>
+      <div class="card-sub">ARPU mensal ÷ churn mensal</div>
+      <div class="card-row"><span class="card-row-label">ARPU mensal</span><span class="card-row-val" id="ltv-arpu">—</span></div>
+      <div class="card-row"><span class="card-row-label">Vida média</span><span class="card-row-val" id="ltv-vida">—</span></div>
+      <div class="card-row"><span class="card-row-label">Comissão na janela</span><span class="card-row-val" id="ltv-com">—</span></div>
+      <div class="card-row"><span class="card-row-label">Membros médios (censo)</span><span class="card-row-val" id="ltv-membros">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Churn mensal</div>
+      <div class="card-main" style="color:var(--red)" id="ltv-churn">—</div>
+      <div class="card-sub">Saídas ÷ membros médios, em 30 dias</div>
+      <div class="card-row"><span class="card-row-label">Entradas</span><span class="card-row-val up" id="ltv-entradas">—</span></div>
+      <div class="card-row"><span class="card-row-label">Saídas</span><span class="card-row-val" id="ltv-saidas">—</span></div>
+      <div class="card-row"><span class="card-row-label">Saldo (entradas − saídas)</span><span class="card-row-val" id="ltv-saldo">—</span></div>
+      <div class="card-row"><span class="card-row-label">Dias com registro</span><span class="card-row-val" id="ltv-cobertura">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">LTV ÷ CAC</div>
+      <div class="card-main" id="ltv-razao">—</div>
+      <div class="card-sub">Acima de 3× é saudável</div>
+      <div class="card-row"><span class="card-row-label">CAC misto (anúncio ÷ entradas)</span><span class="card-row-val" id="ltv-cac">—</span></div>
+      <div class="card-row"><span class="card-row-label">CAC com estrategista</span><span class="card-row-val purple" id="ltv-cac2">—</span></div>
+      <div class="card-row"><span class="card-row-label">Custo por membro líquido</span><span class="card-row-val" id="ltv-cac-liq">—</span></div>
+      <div class="card-row"><span class="card-row-label">Payback do CAC</span><span class="card-row-val" id="ltv-payback">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Retenção de quem entra</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">% que ainda está no grupo após…</div>
+      <div class="chart-wrap"><canvas id="ltv-chart-ret"></canvas></div>
+      <div id="ltv-ret-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Entradas e saídas por dia (janela)</div>
+      <div class="chart-wrap"><canvas id="ltv-chart-mov"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Coortes semanais (semana de entrada)</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ltv-tab" id="ltv-coortes"></table>
+  </div>
+  <div id="ltv-notas" style="font-size:11px;color:var(--muted2);margin:12px 0 24px;line-height:1.6"></div>
+</div>
+</div>
+
 <div class="panel" id="panel-descobertas">
   <div class="aviso">
     O que o público comprou <b>além do que disparamos</b>: venda indireta (entrou por um link nosso
@@ -3196,7 +3269,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','ltv','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -3242,6 +3315,7 @@ function switchTab(name) {
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') cfgAbrir();
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
+  if (name === 'ltv') ltvAbrir();
   // Espelha a navegacao de dois niveis: qualquer switchTab (menu, ⌘K, atalho
   // interno) reposiciona a lateral e a faixa de sub-abas.
   SECAO_ATUAL = secaoDaAba(name);
@@ -3266,7 +3340,7 @@ var SECOES = [
   { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
   { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
   { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
-  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','cliques','descobertas','trafego'] },
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','cliques','descobertas','trafego','ltv'] },
   { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','conexao'] },
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
 ];
@@ -3275,7 +3349,7 @@ var ROTULO_ABA = {
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
   livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
-  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago',
+  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago', ltv: 'LTV',
   grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão', config: 'Ajustes'
 };
 var SECAO_ATUAL = 'hoje';
@@ -3416,6 +3490,7 @@ var CABECALHOS = {
   } },
   comissao:  { titulo: 'Comissão',      sub: function () { return 'Ganhos por plataforma e retorno do investimento'; } },
   trafego:   { titulo: 'Tráfego pago',  sub: function () { return 'Crescimento de membros e custo de aquisição'; } },
+  ltv:       { titulo: 'LTV dos membros', acoes: [{ rot: '↻ Atualizar', fn: 'ltvCarregar(true)' }], sub: function () { return 'Receita por membro, retenção e retorno sobre o CAC'; } },
   divulg:    { titulo: 'Divulgações', acoes: [{ rot: '↻ Atualizar', fn: 'carregarDivulgacoes(true)' }],   sub: function () { return 'O que já saiu para os grupos'; } },
   filaenvio: { titulo: 'Fila', acoes: [{ rot: '↻ Atualizar', fn: 'carregarFilaEnvio()' }],          sub: function () { return 'O que vai sair e a que horas'; } },
   agend:     { titulo: 'Agendados', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAgendados()' }],     sub: function () { return 'Publicações com hora marcada'; } },
@@ -3624,6 +3699,7 @@ function ckIndexar() {
     cliques: 'cliques links rastreados reenvio grupos por mil',
     descobertas: 'descobertas fora da base venda indireta',
     trafego: 'trafego pago membros anuncio gasto custo',
+    ltv: 'ltv lifetime value churn retencao cac arpu coorte',
     config: 'ajustes configuracoes afiliado awin marca categorias',
     hoje: 'hoje inicio resumo painel visao geral'
   };
@@ -12730,6 +12806,184 @@ async function loadAll() {
   renderTrafego(STATE);
   renderCharts(STATE);
   document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LTV DOS MEMBROS
+   Receita: coletor diario de comissoes (FOTO, mesmo criterio da aba Comissao).
+   Base de membros: censo diario do baileys. Churn/entradas: ledger de
+   entradas e saidas do baileys. Custo: colunas de gasto da planilha (unica
+   parte dela que ainda e alimentada).
+   ══════════════════════════════════════════════════════════════════════════ */
+var LTV_DADOS = null;
+
+function ltvAbrir() {
+  if (!LTV_DADOS) ltvCarregar(false); else ltvRender();
+}
+
+async function ltvCarregar(forcar) {
+  var st = document.getElementById('ltv-status');
+  st.textContent = 'Carregando…';
+  var pegar = function (u) { return fetch(u + (u.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now(), { cache: 'no-cache' }).then(function (r) { return r.json(); }); };
+  try {
+    var res = await Promise.all([
+      fetchComissoesAPI(),
+      fetchSheet('trafego').catch(function () { return ''; }),
+      fetchCenso(400),
+      pegar(SERVER + '/grupos/membros/resumo?dias=400'),
+      pegar(SERVER + '/grupos/membros/retencao').catch(function () { return null; })
+    ]);
+    var com = {};
+    res[0].forEach(function (r) { var k = dateKey(r.date); com[k] = (com[k] || 0) + r.com; });
+    var gasto = {};
+    var linhas = res[1] ? parseCSV(res[1]) : [];
+    if (linhas.length > 1) {
+      var hdr = linhas[0].map(function (h) { return h.replace(/"/g, '').trim().toLowerCase(); });
+      var iD = hdr.findIndex(function (h) { return h.indexOf('data') >= 0; });
+      var iA = hdr.findIndex(function (h) { return h.indexOf('gasto em an') >= 0 || h.indexOf('gasto anuncio') >= 0; });
+      var iE = hdr.findIndex(function (h) { return h.indexOf('estrateg') >= 0; });
+      for (var i = 1; i < linhas.length; i++) {
+        var d = parseDate(linhas[i][iD]); if (!d) continue;
+        gasto[dateKey(d)] = { anuncio: numVal(linhas[i][iA]), estrat: iE >= 0 ? numVal(linhas[i][iE]) : 0 };
+      }
+    }
+    var mov = {};
+    ((res[3] && res[3].serie) || []).forEach(function (p) { mov[p.dia] = p; });
+    LTV_DADOS = { com: com, gasto: gasto, censo: res[2], mov: mov,
+                  ledgerDesde: res[3] && res[3].ledgerDesde, ret: res[4] };
+    st.textContent = 'Atualizado · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    ltvRender();
+  } catch (e) {
+    console.error('[ltv]', e);
+    st.textContent = 'Erro: ' + e.message;
+  }
+}
+
+function _ltvDiaMenos(k, n) {
+  var d = new Date(k + 'T12:00:00'); d.setDate(d.getDate() - n); return dateKey(d);
+}
+
+function ltvRender() {
+  var D = LTV_DADOS; if (!D) return;
+  var janela = parseInt(document.getElementById('ltv-janela').value, 10) || 30;
+  // Fim da janela: ultimo dia com comissao coletada, limitado a ontem (hoje
+  // ainda esta aberto em todas as fontes).
+  var diasCom = Object.keys(D.com).sort();
+  var ontem = _ltvDiaMenos(dateKey(new Date()), 1);
+  var fim = diasCom.length ? diasCom[diasCom.length - 1] : ontem;
+  if (fim > ontem) fim = ontem;
+  var dias = [];
+  for (var i = janela - 1; i >= 0; i--) dias.push(_ltvDiaMenos(fim, i));
+
+  var somaCom = 0, nCom = 0, somaMem = 0, nMem = 0, ent = 0, sai = 0, nMov = 0, gA = 0, gE = 0;
+  dias.forEach(function (k) {
+    if (k in D.com) { somaCom += D.com[k]; nCom++; }
+    var c = D.censo.get(k); if (c > 0) { somaMem += c; nMem++; }
+    var m = D.mov[k]; if (m) { ent += m.entradas; sai += m.saidas; nMov++; }
+    var g = D.gasto[k]; if (g) { gA += g.anuncio; gE += g.estrat; }
+  });
+  var membros = nMem ? somaMem / nMem : 0;
+  var arpu    = (membros && nCom) ? (somaCom / membros) * (30 / nCom) : 0;
+  var churn   = (membros && nMov) ? (sai / membros) * (30 / nMov) : 0;
+  var ltv     = churn > 0 ? arpu / churn : 0;
+  // CAC so sobre os dias em que o ledger registrou entradas: gasto de dia sem
+  // registro nao teria entradas para dividir.
+  var gAc = 0, gEc = 0;
+  dias.forEach(function (k) { if (D.mov[k] && D.gasto[k]) { gAc += D.gasto[k].anuncio; gEc += D.gasto[k].estrat; } });
+  var cac  = ent ? gAc / ent : 0;
+  var cac2 = ent ? (gAc + gEc) / ent : 0;
+  var cini = D.censo.get(dias[0]), cfim = D.censo.get(dias[dias.length - 1]);
+  var liq  = (cini > 0 && cfim > 0) ? cfim - cini : null;
+
+  set('ltv-ltv', ltv ? R(ltv) : '—');
+  set('ltv-arpu', arpu ? R(arpu) : '—');
+  set('ltv-vida', churn > 0 ? N1(1 / churn) + ' meses' : '—');
+  set('ltv-com', R(somaCom) + ' · ' + nCom + ' d');
+  set('ltv-membros', membros ? N0(membros) : '—');
+  set('ltv-churn', churn ? PCT(churn * 100) : '—');
+  set('ltv-entradas', N0(ent));
+  set('ltv-saidas', N0(sai));
+  set('ltv-saldo', (ent - sai >= 0 ? '+' : '') + N0(ent - sai), ent - sai >= 0 ? 'up' : 'down');
+  set('ltv-cobertura', nMov + ' de ' + janela);
+  var razao = cac2 > 0 ? ltv / cac2 : 0;
+  var el = document.getElementById('ltv-razao');
+  el.textContent = razao ? N1(razao) + '×' : '—';
+  el.style.color = !razao ? '' : razao >= 3 ? 'var(--green)' : razao >= 1 ? 'var(--amber)' : 'var(--red)';
+  set('ltv-cac', cac ? R(cac) : '—');
+  set('ltv-cac2', cac2 ? R(cac2) : '—');
+  set('ltv-cac-liq', (liq && liq > 0) ? R((gA + gE) / liq) : (liq != null ? 'base encolheu' : '—'));
+  set('ltv-payback', (arpu && cac2) ? N1(cac2 / arpu) + ' meses' : '—');
+
+  ltvGraficos(dias);
+  ltvCoortes();
+
+  var notas = [];
+  notas.push('Janela ' + dias[0].split('-').reverse().join('/') + ' → ' + fim.split('-').reverse().join('/') + '. ARPU e churn são anualizados para 30 dias a partir dos dias com dado.');
+  if (nMov < janela) notas.push('O ledger de entradas e saídas não tem registro em ' + (janela - nMov) + ' dia(s) da janela (conta principal fora ou antes de ' + (D.ledgerDesde ? D.ledgerDesde.slice(0, 10).split('-').reverse().join('/') : '—') + '); churn e CAC usam só os dias registrados.');
+  notas.push('CAC misto divide o gasto por todas as entradas, inclusive as orgânicas — o custo real do membro pago é maior.');
+  notas.push('Comissão usada é a FOTO do dia (sem revisões de ML/Shopee), mesmo critério da aba Comissão.');
+  document.getElementById('ltv-notas').innerHTML = notas.map(function (t) { return '• ' + t; }).join('<br>');
+}
+
+function _ltvCores() {
+  var escuro = document.documentElement.getAttribute('data-theme') === 'dark';
+  return { grade: escuro ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.07)', texto: escuro ? '#9aa0aa' : '#6b7280' };
+}
+var LTV_ROT_H = { 1: '1h', 6: '6h', 24: '1 dia', 72: '3 dias', 168: '7 dias', 336: '14 dias', 720: '30 dias' };
+
+function ltvGraficos(dias) {
+  var D = LTV_DADOS, c = _ltvCores();
+  var eixos = { x: { grid: { color: c.grade }, ticks: { color: c.texto, font: { size: 10 } } },
+                y: { grid: { color: c.grade }, ticks: { color: c.texto, font: { size: 10 } } } };
+  var curva = (D.ret && D.ret.curva) || [];
+  mk('ltv-chart-ret', {
+    type: 'line',
+    data: { labels: curva.map(function (p) { return LTV_ROT_H[p.horas] || p.horas + 'h'; }),
+            datasets: [{ label: '% que ficou', data: curva.map(function (p) { return p.pct; }),
+                         borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.15)', fill: true,
+                         tension: .3, pointRadius: 3, borderWidth: 2, spanGaps: true }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (it) {
+        var p = curva[it.dataIndex]; return p.pct == null ? 'sem base' : p.pct + '% · ' + N0(p.ficaram) + ' de ' + N0(p.base);
+      } } } },
+      scales: { x: eixos.x, y: Object.assign({}, eixos.y, { min: 0, max: 100 }) } }
+  });
+  var av = document.getElementById('ltv-ret-aviso');
+  av.textContent = D.ret ? (N0(D.ret.estadias) + ' entradas acompanhadas · ' + N0(D.ret.saidasVistas) + ' saídas vistas'
+    + (D.ret.expulsoes ? ' (' + N0(D.ret.expulsoes) + ' removidos por admin)' : '')
+    + ' · cada ponto só conta quem deu para acompanhar por aquele tempo') : 'Retenção indisponível no servidor.';
+
+  mk('ltv-chart-mov', {
+    type: 'bar',
+    data: { labels: dias.map(function (k) { return k.slice(8, 10) + '/' + k.slice(5, 7); }),
+            datasets: [
+              { label: 'Entradas', data: dias.map(function (k) { return D.mov[k] ? D.mov[k].entradas : null; }), backgroundColor: 'rgba(52,211,153,.7)' },
+              { label: 'Saídas', data: dias.map(function (k) { return D.mov[k] ? -D.mov[k].saidas : null; }), backgroundColor: 'rgba(248,113,113,.7)' }
+            ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: c.texto, boxWidth: 10, font: { size: 10 } } },
+                 tooltip: { callbacks: { label: function (it) { return it.dataset.label + ': ' + N0(Math.abs(it.parsed.y || 0)); } } } },
+      scales: { x: Object.assign({ stacked: true }, eixos.x, { ticks: { color: c.texto, maxTicksLimit: 10, font: { size: 10 } } }),
+                y: Object.assign({ stacked: true }, eixos.y) } }
+  });
+}
+
+function ltvCoortes() {
+  var D = LTV_DADOS, tb = document.getElementById('ltv-coortes');
+  var co = (D.ret && D.ret.coortes) || [];
+  if (!co.length) { tb.innerHTML = '<tr><td style="color:var(--muted)">Sem coortes com entrada identificada ainda.</td></tr>'; return; }
+  var hs = [1, 24, 168, 720];
+  var h = '<tr><th>Semana</th><th>Entradas</th>' + hs.map(function (x) { return '<th>' + LTV_ROT_H[x] + '</th>'; }).join('') + '</tr>';
+  co.slice().reverse().forEach(function (c) {
+    h += '<tr><td>' + c.semana.slice(8, 10) + '/' + c.semana.slice(5, 7) + '</td><td>' + N0(c.entradas) + '</td>';
+    hs.forEach(function (x) {
+      var p = c.curva.find(function (q) { return q.horas === x; });
+      h += '<td>' + (p && p.pct != null ? p.pct + '%' : '<span style="color:var(--muted2)">—</span>') + '</td>';
+    });
+    h += '</tr>';
+  });
+  tb.innerHTML = h;
 }
 
 // ── LOGIN (OTP por e-mail via proxy CDV) ─────────────────────────────────────
