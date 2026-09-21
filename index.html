@@ -1043,7 +1043,7 @@ body.travado > *:not(#login-screen){display:none !important}
 <div class="main-tabs" id="main-tabs">
   <button class="side-sec active" id="sec-hoje" onclick="irSecao('hoje')"><span class="sec-ico">◎</span>Hoje<span class="sec-badge" id="badge-hoje" style="display:none">0</span></button>
   <button class="side-sec" id="sec-publicar" onclick="irSecao('publicar')"><span class="sec-ico">↗</span>Publicar<span class="sec-badge" id="badge-publicar" style="display:none">0</span></button>
-  <button class="side-sec" id="sec-produtos" onclick="irSecao('produtos')"><span class="sec-ico">▦</span>Produtos<span class="sec-badge" id="badge-produtos" style="display:none">0</span></button>
+  <button class="side-sec" id="sec-produtos" onclick="irSecao('produtos')"><span class="sec-ico">▦</span>Catálogo<span class="sec-badge" id="badge-produtos" style="display:none">0</span></button>
   <button class="side-sec" id="sec-resultados" onclick="irSecao('resultados')"><span class="sec-ico">↑</span>Resultados<span class="sec-badge" id="badge-resultados" style="display:none">0</span></button>
   <button class="side-sec" id="sec-grupos" onclick="irSecao('grupos')"><span class="sec-ico">⌸</span>Grupos<span class="sec-badge" id="badge-grupos" style="display:none">0</span></button>
   <button class="side-sec" id="sec-ajustes" onclick="irSecao('ajustes')"><span class="sec-ico">⚙</span>Ajustes<span class="sec-badge" id="badge-ajustes" style="display:none">0</span></button>
@@ -1062,9 +1062,9 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Criar cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Criar oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem livre</button>
-  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Base de produtos</button>
+  <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Produtos</button>
   <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
-  <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Base de cupons</button>
+  <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
   <button class="main-tab" id="tab-rastreio" onclick="switchTab('rastreio')">🎯 Rastreio</button>
@@ -2325,7 +2325,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="lst-lista"></div>
 
   <!-- ─── 3. Base de produtos ─── -->
-  <div class="sec-label" style="margin-top:26px">Base de produtos</div>
+  <div class="sec-label" style="margin-top:26px">Produtos cadastrados</div>
   <div class="fila-bar">
     <span id="vit-status">Carregando...</span>
     <div class="fila-acoes">
@@ -3164,7 +3164,7 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
   <div class="card">
-    <p class="card-title" style="margin-bottom:12px">Criar cupom à mão <span class="tag" style="text-transform:none">entra na base igual a um capturado</span></p>
+    <p class="card-title" style="margin-bottom:12px">Cadastrar cupom na base <span class="tag" style="text-transform:none">entra na base igual a um capturado</span></p>
     <div style="margin-bottom:14px">
       <p class="presets-label">Padrões rápidos <span class="tag" style="text-transform:none">preenchem loja, valor, mínimo e teto — o código fica com você</span></p>
       <div class="presets" id="nc-presets"></div>
@@ -3350,19 +3350,23 @@ function switchTab(name) {
    sozinha a partir deste mapa. */
 var SECOES = [
   { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
-  { id: 'publicar',   label: 'Publicar',   abas: ['filaenvio','agend','aprov','divulg','cupom','oferta','livre'] },
-  { id: 'produtos',   label: 'Produtos',   abas: ['vitrine','monprecos','cupons','templates'] },
-  { id: 'resultados', label: 'Resultados', abas: ['comissao','rastreio','cliques','descobertas','trafego','ltv'] },
-  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','conexao'] },
-  { id: 'ajustes',    label: 'Ajustes',    abas: ['config'] }
+  { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','divulg','cupom','oferta','livre'] },
+  // id 'produtos' mantido (aba lembrada e badges); o rotulo e Catalogo:
+  // material de trabalho — produtos, cupons e o que alimenta a base
+  { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','descobertas'] },
+  // quanto os envios renderam, depois quanto a audiencia custa/vale
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego','ltv'] },
+  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos'] },
+  // como o sistema se comporta: regras, formato das mensagens e contas
+  { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
 ];
 var ROTULO_ABA = {
   hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
-  livre: 'Mensagem livre', vitrine: 'Base de produtos', monprecos: 'Monitor de preços',
+  livre: 'Mensagem livre', vitrine: 'Produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
-  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago', ltv: 'LTV',
-  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão', config: 'Ajustes'
+  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago', ltv: 'LTV dos membros',
+  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão e turnos', config: 'Automação e geral'
 };
 var SECAO_ATUAL = 'hoje';
 
@@ -3454,7 +3458,7 @@ function _n(v) { return (Number(v) || 0).toLocaleString('pt-BR'); }
 function _tam(x) { return x && x.length ? x.length : (x ? Object.keys(x).length : 0); }
 
 var CABECALHOS = {
-  vitrine: { titulo: 'Base de produtos', acoes: [{ rot: '↻ Atualizar', fn: 'carregarVitrine()' }], regras: 'monitor', sub: function () {
+  vitrine: { titulo: 'Produtos', acoes: [{ rot: '↻ Atualizar', fn: 'carregarVitrine()' }], regras: 'monitor', sub: function () {
     var vig = (_mp() || {}).monitorados || 0;
     return _n(_tam(typeof VIT_CACHE !== 'undefined' && VIT_CACHE)) + ' produtos'
       + (vig ? ' · ' + _n(vig) + ' vigiados pelo monitor' : '');
@@ -9684,7 +9688,7 @@ async function montarCombo(loja) {
     mostrar('c-msg','c-result','c-ok', '');
     document.getElementById('c-msg').value =
       'Nenhum cupom vigente da ' + loja + ' na base agora.\n\n'
-      + 'Cadastre em Base de Cupons › Criar cupom à mão, ou espere a próxima captura.';
+      + 'Cadastre em Catálogo › Cupons › Cadastrar cupom na base, ou espere a próxima captura.';
     return;
   }
 
