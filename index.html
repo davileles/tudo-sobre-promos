@@ -1863,7 +1863,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="card-row"><span class="card-row-label">Var. vs. média</span><span class="card-row-val" id="c-total-var2">—</span></div>
     </div>
     <div class="card">
-      <div class="card-label">Comissão por membro — Σ(comissão_dia ÷ membros_dia)</div>
+      <div class="card-label">Comissão por membro — Σcomissão ÷ Σmembros-dia × 30</div>
       <div class="card-main blue" id="c-cpm-cur">—</div>
       <div class="card-sub" id="c-cpm-sub">Mês atual</div>
       <div class="card-row"><span class="card-row-label">Mês anterior (mesmo dia)</span><span class="card-row-val" id="c-cpm-prev">—</span></div>
@@ -1961,7 +1961,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="chart-wrap"><canvas id="chart-mes-comis-total"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-label">Comissão por membro por mês (R$)</div>
+      <div class="chart-label">Comissão por membro por mês (R$, base 30 dias)</div>
       <div class="chart-wrap"><canvas id="chart-mes-comis-cpm"></canvas></div>
     </div>
   </div>
@@ -11919,8 +11919,9 @@ function parseTrafego(csv, censo) {
     if (!d) continue;
     let membros = numVal(r[iMembros]);
     let imputado = false;
-    // Planilha em branco no dia: usa a medicao do censo do distribuidor.
-    if (membros < 10 && censo && censo.size) {
+    // Censo do distribuidor e a fonte principal de membros; a coluna Membros
+    // da planilha so vale para dias anteriores ao censo (ou sem medicao).
+    if (censo && censo.size) {
       const doCenso = censo.get(dateKey(d));
       if (doCenso > 0) { membros = doCenso; imputado = true; }
     }
@@ -11943,7 +11944,7 @@ function parseTrafego(csv, censo) {
 // ─────────────────────────────────────────────────────────
 //  PROCESS
 // ─────────────────────────────────────────────────────────
-function processAll(comisRaw, trafRows) {
+function processAll(comisRaw, trafRows, censo) {
   // ── Agrupa comissão por data+plataforma ──
   const comisMap = {};
   for (const r of comisRaw) {
@@ -11960,6 +11961,16 @@ function processAll(comisRaw, trafRows) {
   // ── Trafego map ──
   const trafMap = {};
   for (const r of trafRows) trafMap[dateKey(r.date)] = r;
+
+  // Membros do dia para o CPM: censo primeiro, planilha como reserva. Assim um
+  // dia com comissao mas sem linha na aba trafego nao some do calculo.
+  function membrosDia(date) {
+    const k = dateKey(date);
+    const c = censo && censo.get(k);
+    if (c > 0) return c;
+    const t = trafMap[k];
+    return t && t.membros > 0 ? t.membros : 0;
+  }
 
   // ── Referência: último dia com comissão ──
   const refDate   = comisDays[comisDays.length - 1]?.date || new Date();
@@ -11989,20 +12000,29 @@ function processAll(comisRaw, trafRows) {
     return allMonths.map(m => cumComis(m, refDay, field)).reduce((a,b) => a+b, 0) / allMonths.length;
   }
 
-  // ── CPM = Σ(comissão_dia / membros_dia) ──
-  function calcCPM(month, upToDay) {
-    let sum = 0;
-    for (const d of comisDays) {
-      if (d.date.getMonth() !== month || d.date.getDate() > upToDay) continue;
-      const t = trafMap[dateKey(d.date)];
-      if (t && t.membros > 0) sum += d.total / t.membros;
+  // ── CPM = Σcomissão ÷ Σmembros-dia × 30 (mesma fórmula do ARPU da aba LTV) ──
+  // Só entram dias que têm comissão E contagem de membros. Base 30 dias deixa
+  // meses de tamanhos diferentes (e o mês em curso) comparáveis.
+  function cpmDias(dias) {
+    let sc = 0, sm = 0;
+    for (const d of dias) {
+      const m = membrosDia(d.date);
+      if (m > 0) { sc += d.total; sm += m; }
     }
-    return sum;
+    return sm ? sc / sm * 30 : 0;
   }
-  const cpmCur  = calcCPM(curMonth,  refDay);
-  const cpmPrev = calcCPM(prevMonth, refDay);
-  const cpmAvg  = allMonths.length
-    ? allMonths.map(m => calcCPM(m, refDay)).reduce((a,b) => a+b,0) / allMonths.length
+  function calcCPM(month, upToDay, year) {
+    return cpmDias(comisDays.filter(d => d.date.getMonth() === month
+      && (year == null || d.date.getFullYear() === year) && d.date.getDate() <= upToDay));
+  }
+  const curYear  = refDate.getFullYear();
+  const prevYear = curMonth === 0 ? curYear - 1 : curYear;
+  const cpmCur  = calcCPM(curMonth,  refDay, curYear);
+  const cpmPrev = calcCPM(prevMonth, refDay, prevYear);
+  const mesesAnt = [...new Set(comisDays.map(d => d.date.getFullYear() * 12 + d.date.getMonth()))]
+    .filter(k => k !== curYear * 12 + curMonth);
+  const cpmAvg  = mesesAnt.length
+    ? mesesAnt.map(k => calcCPM(k % 12, refDay, Math.floor(k / 12))).reduce((a,b) => a+b,0) / mesesAnt.length
     : 0;
 
   // ── Tráfego: último e penúltimo dia com dados ──
@@ -12128,12 +12148,8 @@ function processAll(comisRaw, trafRows) {
     const diasMes = comisDays.filter(d => d.date.getMonth() === mes && d.date.getFullYear() === ano);
     const totalComis = diasMes.reduce((s,d) => s + d.total, 0);
 
-    // CPM mensal = Σ(comissão_dia / membros_dia)
-    let cpmMes = 0;
-    for (const d of diasMes) {
-      const t = trafMap[dateKey(d.date)];
-      if (t && t.membros > 0) cpmMes += d.total / t.membros;
-    }
+    // CPM mensal = Σcomissão ÷ Σmembros-dia × 30
+    const cpmMes = cpmDias(diasMes);
 
     // Tráfego do mês
     const trafMesRows = trafRows.filter(r => r.date.getMonth() === mes && r.date.getFullYear() === ano)
@@ -12805,7 +12821,7 @@ async function loadAll() {
     if (comisRaw.length < 3)  throw new Error('Comissão insuficiente (' + comisRaw.length + ' linhas)');
     if (trafRows.length < 3)  throw new Error('Tráfego insuficiente (' + trafRows.length + ' linhas)');
 
-    STATE = processAll(comisRaw, trafRows);
+    STATE = processAll(comisRaw, trafRows, censo);
     setStatus('ok', 'Atualizado · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
   } catch (e) {
     console.error('Erro ao carregar:', e.message);
@@ -12951,7 +12967,7 @@ function ltvMetricas(visao, dias) {
   var D = LTV_DADOS, geral = visao === '_geral';
   var M = D.membros[visao] || {}, MV = D.mov[visao] || {}, CV = D.cliques[visao] || {};
   var somaCom = 0, nCom = 0, somaMem = 0, nMem = 0, ent = 0, sai = 0, nMov = 0;
-  var entTot = 0, gA = 0, gE = 0, cliV = 0, cliT = 0, nCli = 0, memCli = 0;
+  var entTot = 0, gA = 0, gE = 0, cliV = 0, cliT = 0, nCli = 0, memCli = 0, memCom = 0;
   dias.forEach(function (k) {
     var mg = D.mov._geral[k];
     if (mg) { entTot += mg.entradas; if (D.gasto[k]) { gA += D.gasto[k].anuncio; gE += D.gasto[k].estrat; } }
@@ -12960,17 +12976,18 @@ function ltvMetricas(visao, dias) {
     if (MV[k]) { ent += MV[k].entradas; sai += MV[k].saidas; nMov++; }
     var ct = D.cliques._geral[k] || 0;
     if (geral) {
-      if (k in D.com) { somaCom += D.com[k]; nCom++; }
+      if ((k in D.com) && M[k] > 0) { somaCom += D.com[k]; nCom++; memCom += M[k]; }
       if (ct) { cliT += ct; nCli++; memCli += M[k] || 0; }
     } else if (ct && (k in D.com)) {
       var cv = CV[k] || 0;
-      somaCom += D.com[k] * cv / ct; nCom++;
+      somaCom += D.com[k] * cv / ct; nCom++; memCom += M[k];
       cliV += cv; cliT += ct; nCli++; memCli += M[k];
     }
   });
   var partCli = geral ? 1 : (cliT ? cliV / cliT : 0);
   var membros = nMem ? somaMem / nMem : 0;
-  var arpu  = (membros && nCom) ? (somaCom / membros) * (30 / nCom) : 0;
+  // Mesma fórmula do card do painel: Σcomissão ÷ Σmembros-dia × 30.
+  var arpu  = memCom ? somaCom / memCom * 30 : 0;
   var churn = (membros && nMov) ? (sai / membros) * (30 / nMov) : 0;
   var ltv   = churn > 0 ? arpu / churn : 0;
   // CAC unico: o gasto nao e separado por trilha, entao divide pelo total de
