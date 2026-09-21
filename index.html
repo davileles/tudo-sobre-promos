@@ -12,11 +12,11 @@ html.visao-operador #grp-resultados,
 html.visao-operador #tab-comissao,
 html.visao-operador #tab-trafego,
 html.visao-operador #tab-ltv { display: none !important; }
-#panel-ltv .ltv-tab{width:100%;border-collapse:collapse;font-size:12px}
-#panel-ltv .ltv-tab th{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border)}
-#panel-ltv .ltv-tab td{text-align:right;padding:6px 10px;border-top:1px solid var(--border);white-space:nowrap}
-#panel-ltv #ltv-trilhas tr:hover td{background:var(--surface2)}
-#panel-ltv .ltv-tab th:first-child,#panel-ltv .ltv-tab td:first-child{text-align:left}
+#ltv-bloco .ltv-tab{width:100%;border-collapse:collapse;font-size:12px}
+#ltv-bloco .ltv-tab th{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border)}
+#ltv-bloco .ltv-tab td{text-align:right;padding:6px 10px;border-top:1px solid var(--border);white-space:nowrap}
+#ltv-bloco #ltv-trilhas tr:hover td{background:var(--surface2)}
+#ltv-bloco .ltv-tab th:first-child,#ltv-bloco .ltv-tab td:first-child{text-align:left}
 </style>
 <script>
 try {
@@ -1062,6 +1062,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Criar cupom</button>
   <button class="main-tab" id="tab-oferta" onclick="switchTab('oferta')">🛍️ Criar oferta</button>
   <button class="main-tab" id="tab-livre" onclick="switchTab('livre')">📢 Mensagem livre</button>
+  <button class="main-tab" id="tab-disparos" onclick="switchTab('disparos')">🚀 Disparos</button>
   <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Produtos</button>
   <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Cupons</button>
@@ -1071,7 +1072,6 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cliques" onclick="switchTab('cliques')">👆 Cliques</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
-  <button class="main-tab" id="tab-ltv" onclick="switchTab('ltv')">♾️ LTV</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
@@ -2090,16 +2090,95 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
 </div>
+<!-- LTV (antes aba propria): depende do CAC que vem do trafego, entao mora aqui -->
+<div id="ltv-bloco">
+  <div class="section-title" style="margin-top:28px;display:flex;align-items:center;gap:10px">LTV dos membros
+    <button class="btn btn-copy btn-sm" style="margin-top:0" onclick="ltvCarregar(true)">↻ Atualizar</button></div>
+<div class="page" style="display:block">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+    <label style="font-size:12px;color:var(--muted)">Visão
+      <select id="ltv-visao" onchange="ltvRender()" style="margin-left:6px">
+        <option value="_geral">Visão geral</option>
+      </select>
+    </label>
+    <label style="font-size:12px;color:var(--muted)">Janela
+      <select id="ltv-janela" onchange="ltvRender()" style="margin-left:6px">
+        <option value="30">30 dias</option>
+        <option value="60">60 dias</option>
+        <option value="90">90 dias</option>
+      </select>
+    </label>
+    <button class="refresh-btn" onclick="ltvCarregar(true)">↻ Atualizar</button>
+    <span id="ltv-status" style="font-size:11px;color:var(--muted)"></span>
+  </div>
+
+  <div class="section-title">Valor do membro</div>
+  <div class="grid-auto">
+    <div class="card">
+      <div class="card-label">LTV por membro</div>
+      <div class="card-main" id="ltv-ltv">—</div>
+      <div class="card-sub">ARPU mensal ÷ churn mensal</div>
+      <div class="card-row"><span class="card-row-label">ARPU mensal</span><span class="card-row-val" id="ltv-arpu">—</span></div>
+      <div class="card-row"><span class="card-row-label">Vida média</span><span class="card-row-val" id="ltv-vida">—</span></div>
+      <div class="card-row"><span class="card-row-label" id="ltv-com-rot">Comissão na janela</span><span class="card-row-val" id="ltv-com">—</span></div>
+      <div class="card-row"><span class="card-row-label">Membros médios (censo)</span><span class="card-row-val" id="ltv-membros">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Churn mensal</div>
+      <div class="card-main" style="color:var(--red)" id="ltv-churn">—</div>
+      <div class="card-sub">Saídas ÷ membros médios, em 30 dias</div>
+      <div class="card-row"><span class="card-row-label">Entradas</span><span class="card-row-val up" id="ltv-entradas">—</span></div>
+      <div class="card-row"><span class="card-row-label">Saídas</span><span class="card-row-val" id="ltv-saidas">—</span></div>
+      <div class="card-row"><span class="card-row-label">Saldo (entradas − saídas)</span><span class="card-row-val" id="ltv-saldo">—</span></div>
+      <div class="card-row"><span class="card-row-label">Dias com registro</span><span class="card-row-val" id="ltv-cobertura">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-label">LTV ÷ CAC</div>
+      <div class="card-main" id="ltv-razao">—</div>
+      <div class="card-sub">Acima de 3× é saudável</div>
+      <div class="card-row"><span class="card-row-label">CAC misto (anúncio ÷ entradas)</span><span class="card-row-val" id="ltv-cac">—</span></div>
+      <div class="card-row"><span class="card-row-label">CAC com estrategista</span><span class="card-row-val purple" id="ltv-cac2">—</span></div>
+      <div class="card-row"><span class="card-row-label">Custo por membro líquido</span><span class="card-row-val" id="ltv-cac-liq">—</span></div>
+      <div class="card-row"><span class="card-row-label">Payback do CAC</span><span class="card-row-val" id="ltv-payback">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Comparativo por trilha</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ltv-tab" id="ltv-trilhas"></table>
+    <div style="font-size:11px;color:var(--muted2);margin-top:8px">Clique numa linha para ver os cards, a retenção e as coortes daquela trilha.</div>
+  </div>
+
+  <div class="section-title">Retenção de quem entra</div>
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-label">% que ainda está no grupo após…</div>
+      <div class="chart-wrap"><canvas id="ltv-chart-ret"></canvas></div>
+      <div id="ltv-ret-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">Entradas e saídas por dia (janela)</div>
+      <div class="chart-wrap"><canvas id="ltv-chart-mov"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Coortes semanais (semana de entrada)</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ltv-tab" id="ltv-coortes"></table>
+  </div>
+  <div id="ltv-notas" style="font-size:11px;color:var(--muted2);margin:12px 0 24px;line-height:1.6"></div>
+</div>
+</div>
 
 </div>
 
 <!-- ════════ VITRINE ════════ -->
 <div class="panel" id="panel-vitrine">
   <div class="aviso">
-    Um lugar só: aqui você cadastra os produtos, monta o disparo e acompanha o envio.
+    Aqui fica o material: você cadastra os produtos e mantém a base.
     Preço, link de afiliado e cupom são resolvidos <b>no instante de cada envio</b> —
-    o que fica salvo é apenas o link. Todo disparo sai <b>um produto por vez</b>,
-    respeitando o intervalo definido; nunca em rajada.
+    o que fica salvo é apenas o link. Os envios de listas ficam em <b>Publicar › Disparos</b>:
+    <b>Disparar agora</b>, <b>Lista salva</b> e <b>Montar disparo</b> abrem o formulário lá.
   </div>
 
   <!-- ─── 1. Cadastro de produtos ─── -->
@@ -2185,7 +2264,7 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin-top:8px;line-height:1.5">
       A lista é a fila que o robô usa para publicar sozinho. Escolher aqui manda o produto para a
-      <b>base de produtos</b> abaixo e o tira da fila automática — daí ele segue o mesmo caminho de
+      <b>base de produtos</b> e o tira da fila automática — daí ele segue o mesmo caminho de
       qualquer outro item: só cadastrar, disparo único ou lista salva.
       <b>A escolha manual passa por cima das cotas</b>; o aviso em vermelho só informa o que o robô
       não faria sozinho hoje.
@@ -2199,8 +2278,40 @@ body.travado > *:not(#login-screen){display:none !important}
     <button class="btn btn-sm" style="margin-top:0" onclick="cadastrarAwinSel('salva')">💾 Cadastrar como lista salva</button>
   </div>
 
-  <!-- ─── 2. Disparos ─── -->
-  <div class="sec-label" style="margin-top:22px">Disparos</div>
+  <!-- ─── 3. Base de produtos ─── -->
+  <div class="sec-label" style="margin-top:26px">Produtos cadastrados</div>
+  <div class="fila-bar">
+    <span id="vit-status">Carregando...</span>
+    <div class="fila-acoes">
+      <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
+      <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
+      <select id="vit-filtro-nicho" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"><option value="">Todos os nichos</option></select>
+      <button class="btn btn-copy btn-sm" onclick="resolverNomesVitrine()" title="Lê na Amazon o título dos itens que ficaram como &quot;Produto ASIN&quot;">✎ Resolver nomes</button>
+      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
+      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
+      <button class="btn btn-copy btn-sm" id="vit-btn-nicho" onclick="marcarNichoSelecionados()" disabled>🏷 Definir nicho dos selecionados</button>
+      <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
+    </div>
+  </div>
+
+  <div id="vit-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="card vit-barra" id="vit-barra" style="display:none">
+    <div style="flex:1;min-width:180px;font-size:12px;color:var(--muted)" id="vit-sel-txt"></div>
+    <button class="btn" id="vit-btn-disparar" style="margin-top:0" onclick="novoDisparoComSelecionados()">🚀 Montar disparo</button>
+  </div>
+</div>
+
+<!-- ════════ DISPAROS DE PRODUTOS (Publicar) ════════ -->
+<!-- Veio de dentro da Base de produtos: o Catalogo guarda o material, o envio
+     mora em Publicar. Os ids (lst-*) nao mudaram, entao todo o JS segue igual. -->
+<div class="panel" id="panel-disparos">
+  <div class="aviso">
+    Listas de produtos da base enviadas <b>um por vez</b>, no intervalo definido &mdash; nunca em rajada.
+    Preço, link de afiliado e cupom são resolvidos no instante de cada envio.
+    Para incluir produtos novos, cadastre antes em <b>Catálogo › Produtos</b>.
+  </div>
+  <!-- ─── Disparos (antes dentro da Base de produtos) ─── -->
   <div class="fila-bar">
     <span id="lst-status">Carregando…</span>
     <div class="fila-acoes">
@@ -2310,7 +2421,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="sug" id="lst-sug"></div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin:-4px 0 10px;line-height:1.5">
-      Só aparecem produtos já cadastrados na base abaixo. Dá para trocar a ordem, tirar um item
+      Só aparecem produtos já cadastrados em <b>Catálogo › Produtos</b>. Dá para trocar a ordem, tirar um item
       e colocar outro no lugar a qualquer momento — inclusive editando uma lista já salva.
     </p>
     <div id="lst-sel"></div>
@@ -2324,110 +2435,11 @@ body.travado > *:not(#login-screen){display:none !important}
 
   <div id="lst-lista"></div>
 
-  <!-- ─── 3. Base de produtos ─── -->
-  <div class="sec-label" style="margin-top:26px">Produtos cadastrados</div>
-  <div class="fila-bar">
-    <span id="vit-status">Carregando...</span>
-    <div class="fila-acoes">
-      <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
-      <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
-      <select id="vit-filtro-nicho" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"><option value="">Todos os nichos</option></select>
-      <button class="btn btn-copy btn-sm" onclick="resolverNomesVitrine()" title="Lê na Amazon o título dos itens que ficaram como &quot;Produto ASIN&quot;">✎ Resolver nomes</button>
-      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
-      <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
-      <button class="btn btn-copy btn-sm" id="vit-btn-nicho" onclick="marcarNichoSelecionados()" disabled>🏷 Definir nicho dos selecionados</button>
-      <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
-    </div>
-  </div>
-
-  <div id="vit-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
-
-  <div class="card vit-barra" id="vit-barra" style="display:none">
-    <div style="flex:1;min-width:180px;font-size:12px;color:var(--muted)" id="vit-sel-txt"></div>
-    <button class="btn" id="vit-btn-disparar" style="margin-top:0" onclick="novoDisparoComSelecionados()">🚀 Montar disparo</button>
-  </div>
 </div>
 
 <!-- ════════ TEMPLATES ════════ -->
 <!-- ════════ DESCOBERTAS ════════ -->
 <!-- ════════ RESULTADOS: LTV DOS MEMBROS ════════ -->
-<div class="panel res-scope" id="panel-ltv">
-<div class="page" style="display:block">
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
-    <label style="font-size:12px;color:var(--muted)">Visão
-      <select id="ltv-visao" onchange="ltvRender()" style="margin-left:6px">
-        <option value="_geral">Visão geral</option>
-      </select>
-    </label>
-    <label style="font-size:12px;color:var(--muted)">Janela
-      <select id="ltv-janela" onchange="ltvRender()" style="margin-left:6px">
-        <option value="30">30 dias</option>
-        <option value="60">60 dias</option>
-        <option value="90">90 dias</option>
-      </select>
-    </label>
-    <button class="refresh-btn" onclick="ltvCarregar(true)">↻ Atualizar</button>
-    <span id="ltv-status" style="font-size:11px;color:var(--muted)"></span>
-  </div>
-
-  <div class="section-title">Valor do membro</div>
-  <div class="grid-auto">
-    <div class="card">
-      <div class="card-label">LTV por membro</div>
-      <div class="card-main" id="ltv-ltv">—</div>
-      <div class="card-sub">ARPU mensal ÷ churn mensal</div>
-      <div class="card-row"><span class="card-row-label">ARPU mensal</span><span class="card-row-val" id="ltv-arpu">—</span></div>
-      <div class="card-row"><span class="card-row-label">Vida média</span><span class="card-row-val" id="ltv-vida">—</span></div>
-      <div class="card-row"><span class="card-row-label" id="ltv-com-rot">Comissão na janela</span><span class="card-row-val" id="ltv-com">—</span></div>
-      <div class="card-row"><span class="card-row-label">Membros médios (censo)</span><span class="card-row-val" id="ltv-membros">—</span></div>
-    </div>
-    <div class="card">
-      <div class="card-label">Churn mensal</div>
-      <div class="card-main" style="color:var(--red)" id="ltv-churn">—</div>
-      <div class="card-sub">Saídas ÷ membros médios, em 30 dias</div>
-      <div class="card-row"><span class="card-row-label">Entradas</span><span class="card-row-val up" id="ltv-entradas">—</span></div>
-      <div class="card-row"><span class="card-row-label">Saídas</span><span class="card-row-val" id="ltv-saidas">—</span></div>
-      <div class="card-row"><span class="card-row-label">Saldo (entradas − saídas)</span><span class="card-row-val" id="ltv-saldo">—</span></div>
-      <div class="card-row"><span class="card-row-label">Dias com registro</span><span class="card-row-val" id="ltv-cobertura">—</span></div>
-    </div>
-    <div class="card">
-      <div class="card-label">LTV ÷ CAC</div>
-      <div class="card-main" id="ltv-razao">—</div>
-      <div class="card-sub">Acima de 3× é saudável</div>
-      <div class="card-row"><span class="card-row-label">CAC misto (anúncio ÷ entradas)</span><span class="card-row-val" id="ltv-cac">—</span></div>
-      <div class="card-row"><span class="card-row-label">CAC com estrategista</span><span class="card-row-val purple" id="ltv-cac2">—</span></div>
-      <div class="card-row"><span class="card-row-label">Custo por membro líquido</span><span class="card-row-val" id="ltv-cac-liq">—</span></div>
-      <div class="card-row"><span class="card-row-label">Payback do CAC</span><span class="card-row-val" id="ltv-payback">—</span></div>
-    </div>
-  </div>
-
-  <div class="section-title">Comparativo por trilha</div>
-  <div class="card" style="overflow-x:auto">
-    <table class="ltv-tab" id="ltv-trilhas"></table>
-    <div style="font-size:11px;color:var(--muted2);margin-top:8px">Clique numa linha para ver os cards, a retenção e as coortes daquela trilha.</div>
-  </div>
-
-  <div class="section-title">Retenção de quem entra</div>
-  <div class="grid-2">
-    <div class="chart-card">
-      <div class="chart-label">% que ainda está no grupo após…</div>
-      <div class="chart-wrap"><canvas id="ltv-chart-ret"></canvas></div>
-      <div id="ltv-ret-aviso" style="font-size:11px;color:var(--muted2);margin-top:8px"></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-label">Entradas e saídas por dia (janela)</div>
-      <div class="chart-wrap"><canvas id="ltv-chart-mov"></canvas></div>
-    </div>
-  </div>
-
-  <div class="section-title">Coortes semanais (semana de entrada)</div>
-  <div class="card" style="overflow-x:auto">
-    <table class="ltv-tab" id="ltv-coortes"></table>
-  </div>
-  <div id="ltv-notas" style="font-size:11px;color:var(--muted2);margin:12px 0 24px;line-height:1.6"></div>
-</div>
-</div>
-
 <div class="panel" id="panel-descobertas">
   <div class="aviso">
     O que o público comprou <b>além do que disparamos</b>: venda indireta (entrou por um link nosso
@@ -2653,6 +2665,26 @@ body.travado > *:not(#login-screen){display:none !important}
       <b>Sombra</b> existe s&#243; para cupom: serve para conferir o que <i>seria</i> enviado antes de confiar no gate.
       Ofertas n&#227;o t&#234;m esse meio-termo &#8212; ou vai, ou espera voc&#234;.
     </p>
+  </div>
+
+  <div class="card">
+    <p class="card-title" style="margin-bottom:12px">🕐 Janela de publicação dos cupons <span class="tag" style="text-transform:none">vale para o auto-envio, horário de Brasília</span></p>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Das</label><input type="time" id="jc-inicio" value="08:00"/></div>
+      <div class="field"><label>Até</label><input type="time" id="jc-fim" value="21:00"/></div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="field"><label>Dias</label>
+        <select id="jc-dias">
+          <option value="todos">Todos os dias</option>
+          <option value="uteis">Segunda a sexta</option>
+        </select>
+      </div>
+      <div class="field"><label>Intervalo mínimo <span class="tag">segundos entre cupons</span></label>
+        <input type="number" id="jc-intervalo" min="0" max="3600" step="5" value="90"/></div>
+    </div>
+    <button class="btn" id="jc-btn" onclick="salvarJanelaCupom()">Salvar janela</button>
+    <p class="send-ok" id="jc-status"></p>
   </div>
 
   <div class="card">
@@ -3144,26 +3176,6 @@ body.travado > *:not(#login-screen){display:none !important}
 <div class="panel" id="panel-cupons">
 
   <div class="card">
-    <p class="card-title" style="margin-bottom:12px">Janela de publicação dos cupons <span class="tag" style="text-transform:none">vale para o auto-envio, horário de Brasília</span></p>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Das</label><input type="time" id="jc-inicio" value="08:00"/></div>
-      <div class="field"><label>Até</label><input type="time" id="jc-fim" value="21:00"/></div>
-    </div>
-    <div class="g2" style="margin-bottom:12px">
-      <div class="field"><label>Dias</label>
-        <select id="jc-dias">
-          <option value="todos">Todos os dias</option>
-          <option value="uteis">Segunda a sexta</option>
-        </select>
-      </div>
-      <div class="field"><label>Intervalo mínimo <span class="tag">segundos entre cupons</span></label>
-        <input type="number" id="jc-intervalo" min="0" max="3600" step="5" value="90"/></div>
-    </div>
-    <button class="btn" id="jc-btn" onclick="salvarJanelaCupom()">Salvar janela</button>
-    <p class="send-ok" id="jc-status"></p>
-  </div>
-
-  <div class="card">
     <p class="card-title" style="margin-bottom:12px">Cadastrar cupom na base <span class="tag" style="text-transform:none">entra na base igual a um capturado</span></p>
     <div style="margin-bottom:14px">
       <p class="presets-label">Padrões rápidos <span class="tag" style="text-transform:none">preenchem loja, valor, mínimo e teto — o código fica com você</span></p>
@@ -3281,8 +3293,9 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','ltv','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
+  if (name === 'ltv') name = 'trafego';   // LTV agora mora dentro do Trafego
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
   if (name === 'trafego' && typeof lerSessao === 'function' && !lerSessao()) name = 'comissao';
@@ -3305,7 +3318,7 @@ function switchTab(name) {
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'admgrupos') ggAbrir();
-  if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); carregarJanelaCupom(); }
+  if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); }
   // O bloco "Cupom adicional" da Oferta escolhe da base: sem o cache o select
   // abriria vazio na primeira visita da aba.
   if (name === 'oferta') {
@@ -3323,11 +3336,20 @@ function switchTab(name) {
       .then(carregarListas)
       .then(carregarAwinCand);
   }
+  if (name === 'disparos') {
+    // Os disparos mostram o nome de cada produto e os selects de cupom: base e
+    // cupons precisam estar em memoria. So busca o que falta — reler a base a
+    // cada abertura apagaria nada, mas custa uma chamada a toa.
+    (VIT_NICHOS.length ? Promise.resolve() : carregarNichosVitrine())
+      .then(function(){ return CUPONS_CACHE.length ? Promise.resolve() : carregarCupons(); })
+      .then(function(){ return VIT_CACHE.length ? null : carregarVitrine(); })
+      .then(carregarListas);
+  }
   if (name === 'monprecos') mpCarregar();
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
-  if (name === 'config') cfgAbrir();
+  if (name === 'config') { cfgAbrir(); carregarJanelaCupom(); }
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
-  if (name === 'ltv') ltvAbrir();
+  if (name === 'trafego' && document.getElementById('panel-trafego').classList.contains('active')) ltvAbrir();
   // Espelha a navegacao de dois niveis: qualquer switchTab (menu, ⌘K, atalho
   // interno) reposiciona a lateral e a faixa de sub-abas.
   SECAO_ATUAL = secaoDaAba(name);
@@ -3350,12 +3372,12 @@ function switchTab(name) {
    sozinha a partir deste mapa. */
 var SECOES = [
   { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
-  { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','divulg','cupom','oferta','livre'] },
+  { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','divulg','cupom','oferta','disparos','livre'] },
   // id 'produtos' mantido (aba lembrada e badges); o rotulo e Catalogo:
   // material de trabalho — produtos, cupons e o que alimenta a base
   { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','descobertas'] },
   // quanto os envios renderam, depois quanto a audiencia custa/vale
-  { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego','ltv'] },
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego'] },
   { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos'] },
   // como o sistema se comporta: regras, formato das mensagens e contas
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
@@ -3363,9 +3385,9 @@ var SECOES = [
 var ROTULO_ABA = {
   hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
-  livre: 'Mensagem livre', vitrine: 'Produtos', monprecos: 'Monitor de preços',
+  livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
-  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego pago', ltv: 'LTV dos membros',
+  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', ltv: 'LTV dos membros',
   grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão e turnos', config: 'Automação e geral'
 };
 var SECAO_ATUAL = 'hoje';
@@ -3505,9 +3527,10 @@ var CABECALHOS = {
     return _n(m.totais.unidades) + ' unidades fora da base';
   } },
   comissao:  { titulo: 'Comissão',      sub: function () { return 'Ganhos por plataforma e retorno do investimento'; } },
-  trafego:   { titulo: 'Tráfego pago',  sub: function () { return 'Crescimento de membros e custo de aquisição'; } },
+  trafego:   { titulo: 'Tráfego e LTV', acoes: [{ rot: '↻ Atualizar LTV', fn: 'ltvCarregar(true)' }], sub: function () { return 'Crescimento, custo de aquisição e quanto cada membro rende'; } },
   ltv:       { titulo: 'LTV dos membros', acoes: [{ rot: '↻ Atualizar', fn: 'ltvCarregar(true)' }], sub: function () { return 'Receita por membro, retenção e retorno sobre o CAC'; } },
   divulg:    { titulo: 'Divulgações', acoes: [{ rot: '↻ Atualizar', fn: 'carregarDivulgacoes(true)' }],   sub: function () { return 'O que já saiu para os grupos'; } },
+  disparos:  { titulo: 'Disparos de produtos', acoes: [{ rot: '+ Novo disparo', fn: 'novaLista()', primario: true }, { rot: '↻ Atualizar', fn: 'carregarListas()' }], sub: function () { return 'Listas da base enviadas um produto por vez'; } },
   filaenvio: { titulo: 'Fila', acoes: [{ rot: '↻ Atualizar', fn: 'carregarFilaEnvio()' }],          sub: function () { return 'O que vai sair e a que horas'; } },
   agend:     { titulo: 'Agendados', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAgendados()' }],     sub: function () { return 'Publicações com hora marcada'; } },
   aprov:     { titulo: 'Aprovação', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAprovacao()' }],     sub: function () { return 'Itens que esperam a sua decisão'; } },
@@ -3580,7 +3603,7 @@ var REGRAS = {
     { nome: 'Deduplicação', estado: function () { return 'janela de 6 h'; },
       ajuda: 'O mesmo cupom chega por várias fontes. Dentro da janela, a repetição é descartada — por isso um cupom capturado agora pode não aparecer como novo.' },
     { nome: 'Auto-envio', estado: function () { return 'controlado em Ajustes'; },
-      ajuda: 'Com o auto-envio ligado, o cupom aprovado vai direto ao grupo sem passar por Aprovação. Loja sem link de afiliado configurado fica fora do auto-envio.' }
+      ajuda: 'Com o auto-envio ligado, o cupom aprovado vai direto ao grupo sem passar por Aprovação. Loja sem link de afiliado configurado fica fora do auto-envio. A janela de horário dos cupons fica em Ajustes, logo abaixo do Auto-envio.' }
   ] },
   trilhas: { tit: 'Regras das trilhas', sub: 'Quem recebe o quê', aba: 'grupos', blocos: [
     { nome: 'Trilha', estado: function () { return _n(_tam(typeof TRILHAS !== 'undefined' && TRILHAS)) + ' configuradas'; },
@@ -3943,6 +3966,7 @@ function restaurarAba() {
   try { nome = localStorage.getItem(ABA_KEY); } catch (e) { nome = null; }
   // Sem aba guardada (ou invalida) abre na Hoje, mas sempre passando pelo
   // switchTab: e ele que monta a faixa de sub-abas e os badges da lateral.
+  if (nome === 'ltv') nome = 'trafego';   // aba antiga, hoje dentro do Trafego
   if (!nome || TABS.indexOf(nome) < 0) { switchTab('hoje'); return; }
   var botao = document.getElementById('tab-' + nome);
   // Aba escondida para este operador (a config decide quais aparecem): cai na
@@ -6099,6 +6123,8 @@ function lstBotaoDisparo(){
 }
 
 function abrirFormLista(){
+  var pd = document.getElementById('panel-disparos');
+  if (pd && !pd.classList.contains('active')) switchTab('disparos');
   document.getElementById('lst-form').style.display = 'block';
   atualizarBarraVitrine();
   lstToggleTipo(); lstToggleCupom(); renderLstSel(); lstMsg('');
