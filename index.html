@@ -14,7 +14,8 @@ html.visao-operador #tab-trafego,
 html.visao-operador #tab-ltv { display: none !important; }
 #panel-ltv .ltv-tab{width:100%;border-collapse:collapse;font-size:12px}
 #panel-ltv .ltv-tab th{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border)}
-#panel-ltv .ltv-tab td{text-align:right;padding:6px 10px;border-top:1px solid var(--border)}
+#panel-ltv .ltv-tab td{text-align:right;padding:6px 10px;border-top:1px solid var(--border);white-space:nowrap}
+#panel-ltv #ltv-trilhas tr:hover td{background:var(--surface2)}
 #panel-ltv .ltv-tab th:first-child,#panel-ltv .ltv-tab td:first-child{text-align:left}
 </style>
 <script>
@@ -2353,6 +2354,11 @@ body.travado > *:not(#login-screen){display:none !important}
 <div class="panel res-scope" id="panel-ltv">
 <div class="page" style="display:block">
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+    <label style="font-size:12px;color:var(--muted)">Visão
+      <select id="ltv-visao" onchange="ltvRender()" style="margin-left:6px">
+        <option value="_geral">Visão geral</option>
+      </select>
+    </label>
     <label style="font-size:12px;color:var(--muted)">Janela
       <select id="ltv-janela" onchange="ltvRender()" style="margin-left:6px">
         <option value="30">30 dias</option>
@@ -2372,7 +2378,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="card-sub">ARPU mensal ÷ churn mensal</div>
       <div class="card-row"><span class="card-row-label">ARPU mensal</span><span class="card-row-val" id="ltv-arpu">—</span></div>
       <div class="card-row"><span class="card-row-label">Vida média</span><span class="card-row-val" id="ltv-vida">—</span></div>
-      <div class="card-row"><span class="card-row-label">Comissão na janela</span><span class="card-row-val" id="ltv-com">—</span></div>
+      <div class="card-row"><span class="card-row-label" id="ltv-com-rot">Comissão na janela</span><span class="card-row-val" id="ltv-com">—</span></div>
       <div class="card-row"><span class="card-row-label">Membros médios (censo)</span><span class="card-row-val" id="ltv-membros">—</span></div>
     </div>
     <div class="card">
@@ -2393,6 +2399,12 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="card-row"><span class="card-row-label">Custo por membro líquido</span><span class="card-row-val" id="ltv-cac-liq">—</span></div>
       <div class="card-row"><span class="card-row-label">Payback do CAC</span><span class="card-row-val" id="ltv-payback">—</span></div>
     </div>
+  </div>
+
+  <div class="section-title">Comparativo por trilha</div>
+  <div class="card" style="overflow-x:auto">
+    <table class="ltv-tab" id="ltv-trilhas"></table>
+    <div style="font-size:11px;color:var(--muted2);margin-top:8px">Clique numa linha para ver os cards, a retenção e as coortes daquela trilha.</div>
   </div>
 
   <div class="section-title">Retenção de quem entra</div>
@@ -12809,11 +12821,12 @@ async function loadAll() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   LTV DOS MEMBROS
+   LTV DOS MEMBROS — visao geral e por trilha
    Receita: coletor diario de comissoes (FOTO, mesmo criterio da aba Comissao).
-   Base de membros: censo diario do baileys. Churn/entradas: ledger de
-   entradas e saidas do baileys. Custo: colunas de gasto da planilha (unica
-   parte dela que ainda e alimentada).
+   Por trilha a comissao nao vem separada: e rateada pela participacao da
+   trilha nos cliques dos links rastreados. Base de membros: censo diario do
+   baileys (total e por nicho). Churn/entradas: ledger de entradas e saidas.
+   Custo: colunas de gasto da planilha — um CAC so, o gasto nao e por trilha.
    ══════════════════════════════════════════════════════════════════════════ */
 var LTV_DADOS = null;
 
@@ -12829,12 +12842,14 @@ async function ltvCarregar(forcar) {
     var res = await Promise.all([
       fetchComissoesAPI(),
       fetchSheet('trafego').catch(function () { return ''; }),
-      fetchCenso(400),
+      pegar(SERVER + '/grupos/censo/historico?dias=400'),
       pegar(SERVER + '/grupos/membros/resumo?dias=400'),
-      pegar(SERVER + '/grupos/membros/retencao').catch(function () { return null; })
+      pegar(SERVER + '/grupos/membros/retencao?porNicho=1').catch(function () { return null; }),
+      pegar('https://cdv-proxy-production.up.railway.app/links-stats?dias=31').catch(function () { return null; })
     ]);
     var com = {};
     res[0].forEach(function (r) { var k = dateKey(r.date); com[k] = (com[k] || 0) + r.com; });
+
     var gasto = {};
     var linhas = res[1] ? parseCSV(res[1]) : [];
     if (linhas.length > 1) {
@@ -12847,10 +12862,52 @@ async function ltvCarregar(forcar) {
         gasto[dateKey(d)] = { anuncio: numVal(linhas[i][iA]), estrat: iE >= 0 ? numVal(linhas[i][iE]) : 0 };
       }
     }
-    var mov = {};
-    ((res[3] && res[3].serie) || []).forEach(function (p) { mov[p.dia] = p; });
-    LTV_DADOS = { com: com, gasto: gasto, censo: res[2], mov: mov,
-                  ledgerDesde: res[3] && res[3].ledgerDesde, ret: res[4] };
+
+    // Trilhas (nichos do censo) e mapa grupo -> trilha.
+    var hist = res[2] || {};
+    var trilhas = (hist.nichos || []).map(function (n) { return { id: n.id, nome: n.nome, geral: n.geral, jids: n.jids || [] }; });
+    var trilhaDoGrupo = {};
+    trilhas.forEach(function (t) { t.jids.forEach(function (j) { trilhaDoGrupo[j] = t.id; }); });
+
+    // Membros por dia: total e por trilha (null = trilha sem medicao no dia).
+    var membros = { _geral: {} };
+    trilhas.forEach(function (t) { membros[t.id] = {}; });
+    (hist.serie || []).forEach(function (p) {
+      if (p.total > 0) membros._geral[p.dia] = p.total;
+      trilhas.forEach(function (t) { var v = p.nichos && p.nichos[t.id]; if (typeof v === 'number' && v > 0) membros[t.id][p.dia] = v; });
+    });
+
+    // Entradas e saidas por dia, total e por trilha.
+    var mov = { _geral: {} };
+    trilhas.forEach(function (t) { mov[t.id] = {}; });
+    ((res[3] && res[3].serie) || []).forEach(function (p) {
+      mov._geral[p.dia] = { entradas: p.entradas, saidas: p.saidas };
+      Object.keys(p.grupos || {}).forEach(function (j) {
+        var t = trilhaDoGrupo[j]; if (!t) return;
+        var m = mov[t][p.dia] || (mov[t][p.dia] = { entradas: 0, saidas: 0 });
+        m.entradas += p.grupos[j].entradas; m.saidas += p.grupos[j].saidas;
+      });
+      // Dia com registro vale para todas as trilhas, mesmo sem movimento nelas.
+      trilhas.forEach(function (t) { if (!mov[t.id][p.dia]) mov[t.id][p.dia] = { entradas: 0, saidas: 0 }; });
+    });
+
+    // Cliques por dia de envio, total e por trilha (so links rastreados).
+    var cliques = { _geral: {} };
+    trilhas.forEach(function (t) { cliques[t.id] = {}; });
+    ((res[5] && res[5].envios) || []).forEach(function (e) {
+      Object.keys(e.grupos || {}).forEach(function (k) {
+        var g = e.grupos[k], n = g.t || 0; if (!n) return;
+        cliques._geral[e.dia] = (cliques._geral[e.dia] || 0) + n;
+        var t = trilhaDoGrupo[g.jid]; if (t) cliques[t][e.dia] = (cliques[t][e.dia] || 0) + n;
+      });
+    });
+
+    var ret = { _geral: res[4] ? { curva: res[4].curva, coortes: res[4].coortes, estadias: res[4].estadias, saidasVistas: res[4].saidasVistas, expulsoes: res[4].expulsoes } : null };
+    ((res[4] && res[4].nichos) || []).forEach(function (n) { ret[n.id] = n; });
+
+    LTV_DADOS = { com: com, gasto: gasto, trilhas: trilhas, membros: membros, mov: mov, cliques: cliques, ret: ret,
+                  ledgerDesde: res[3] && res[3].ledgerDesde };
+    ltvPreencherVisao();
     st.textContent = 'Atualizado · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     ltvRender();
   } catch (e) {
@@ -12859,70 +12916,144 @@ async function ltvCarregar(forcar) {
   }
 }
 
+function _ltvNomeTrilha(t) { return t.id === '_cupons' ? 'Cupons' : t.nome; }
+
+function ltvPreencherVisao() {
+  var sel = document.getElementById('ltv-visao');
+  var atual = sel.value || '_geral';
+  var ts = LTV_DADOS.trilhas.slice().sort(function (a, b) { return _ltvNomeTrilha(a).localeCompare(_ltvNomeTrilha(b), 'pt-BR'); });
+  sel.innerHTML = '<option value="_geral">Visão geral</option>' + ts.map(function (t) {
+    return '<option value="' + t.id + '">' + _ltvNomeTrilha(t) + '</option>';
+  }).join('');
+  sel.value = LTV_DADOS.membros[atual] ? atual : '_geral';
+}
+
 function _ltvDiaMenos(k, n) {
   var d = new Date(k + 'T12:00:00'); d.setDate(d.getDate() - n); return dateKey(d);
 }
 
-function ltvRender() {
-  var D = LTV_DADOS; if (!D) return;
-  var janela = parseInt(document.getElementById('ltv-janela').value, 10) || 30;
-  // Fim da janela: ultimo dia com comissao coletada, limitado a ontem (hoje
-  // ainda esta aberto em todas as fontes).
+function _ltvDiasJanela(janela) {
+  var D = LTV_DADOS;
   var diasCom = Object.keys(D.com).sort();
   var ontem = _ltvDiaMenos(dateKey(new Date()), 1);
   var fim = diasCom.length ? diasCom[diasCom.length - 1] : ontem;
   if (fim > ontem) fim = ontem;
   var dias = [];
   for (var i = janela - 1; i >= 0; i--) dias.push(_ltvDiaMenos(fim, i));
+  return dias;
+}
 
-  var somaCom = 0, nCom = 0, somaMem = 0, nMem = 0, ent = 0, sai = 0, nMov = 0, gA = 0, gE = 0;
+// Metricas de uma visao ('_geral' ou id da trilha) na janela.
+// Trilha: so conta os dias em que ela foi medida pelo censo (trilha nova nao
+// herda os dias em que nao existia), e a comissao e rateada DIA A DIA pela
+// participacao nos cliques — dia sem clique rastreado fica fora do ARPU.
+function ltvMetricas(visao, dias) {
+  var D = LTV_DADOS, geral = visao === '_geral';
+  var M = D.membros[visao] || {}, MV = D.mov[visao] || {}, CV = D.cliques[visao] || {};
+  var somaCom = 0, nCom = 0, somaMem = 0, nMem = 0, ent = 0, sai = 0, nMov = 0;
+  var entTot = 0, gA = 0, gE = 0, cliV = 0, cliT = 0, nCli = 0, memCli = 0;
   dias.forEach(function (k) {
-    if (k in D.com) { somaCom += D.com[k]; nCom++; }
-    var c = D.censo.get(k); if (c > 0) { somaMem += c; nMem++; }
-    var m = D.mov[k]; if (m) { ent += m.entradas; sai += m.saidas; nMov++; }
-    var g = D.gasto[k]; if (g) { gA += g.anuncio; gE += g.estrat; }
+    var mg = D.mov._geral[k];
+    if (mg) { entTot += mg.entradas; if (D.gasto[k]) { gA += D.gasto[k].anuncio; gE += D.gasto[k].estrat; } }
+    if (!geral && !(M[k] > 0)) return;
+    if (M[k] > 0) { somaMem += M[k]; nMem++; }
+    if (MV[k]) { ent += MV[k].entradas; sai += MV[k].saidas; nMov++; }
+    var ct = D.cliques._geral[k] || 0;
+    if (geral) {
+      if (k in D.com) { somaCom += D.com[k]; nCom++; }
+      if (ct) { cliT += ct; nCli++; memCli += M[k] || 0; }
+    } else if (ct && (k in D.com)) {
+      var cv = CV[k] || 0;
+      somaCom += D.com[k] * cv / ct; nCom++;
+      cliV += cv; cliT += ct; nCli++; memCli += M[k];
+    }
   });
+  var partCli = geral ? 1 : (cliT ? cliV / cliT : 0);
   var membros = nMem ? somaMem / nMem : 0;
-  var arpu    = (membros && nCom) ? (somaCom / membros) * (30 / nCom) : 0;
-  var churn   = (membros && nMov) ? (sai / membros) * (30 / nMov) : 0;
-  var ltv     = churn > 0 ? arpu / churn : 0;
-  // CAC so sobre os dias em que o ledger registrou entradas: gasto de dia sem
-  // registro nao teria entradas para dividir.
-  var gAc = 0, gEc = 0;
-  dias.forEach(function (k) { if (D.mov[k] && D.gasto[k]) { gAc += D.gasto[k].anuncio; gEc += D.gasto[k].estrat; } });
-  var cac  = ent ? gAc / ent : 0;
-  var cac2 = ent ? (gAc + gEc) / ent : 0;
-  var cini = D.censo.get(dias[0]), cfim = D.censo.get(dias[dias.length - 1]);
-  var liq  = (cini > 0 && cfim > 0) ? cfim - cini : null;
+  var arpu  = (membros && nCom) ? (somaCom / membros) * (30 / nCom) : 0;
+  var churn = (membros && nMov) ? (sai / membros) * (30 / nMov) : 0;
+  var ltv   = churn > 0 ? arpu / churn : 0;
+  // CAC unico: o gasto nao e separado por trilha, entao divide pelo total de
+  // entradas de todas as trilhas nos dias com registro.
+  var cac  = entTot ? gA / entTot : 0;
+  var cac2 = entTot ? (gA + gE) / entTot : 0;
+  var ini = M[dias[0]], fim = M[dias[dias.length - 1]];
+  var cliques = geral ? cliT : cliV;
+  return {
+    visao: visao, geral: geral, somaCom: somaCom, nCom: nCom, membros: membros, arpu: arpu, churn: churn, ltv: ltv,
+    ent: ent, sai: sai, nMov: nMov, nMem: nMem, cac: cac, cac2: cac2, gA: gA, gE: gE,
+    liq: (ini > 0 && fim > 0) ? fim - ini : null,
+    razao: cac2 > 0 ? ltv / cac2 : 0,
+    partCli: partCli, cliques: cliques, nCli: nCli,
+    porMil: memCli ? cliques / memCli * 1000 : 0
+  };
+}
 
-  set('ltv-ltv', ltv ? R(ltv) : '—');
-  set('ltv-arpu', arpu ? R(arpu) : '—');
-  set('ltv-vida', churn > 0 ? N1(1 / churn) + ' meses' : '—');
-  set('ltv-com', R(somaCom) + ' · ' + nCom + ' d');
-  set('ltv-membros', membros ? N0(membros) : '—');
-  set('ltv-churn', churn ? PCT(churn * 100) : '—');
-  set('ltv-entradas', N0(ent));
-  set('ltv-saidas', N0(sai));
-  set('ltv-saldo', (ent - sai >= 0 ? '+' : '') + N0(ent - sai), ent - sai >= 0 ? 'up' : 'down');
-  set('ltv-cobertura', nMov + ' de ' + janela);
-  var razao = cac2 > 0 ? ltv / cac2 : 0;
+function _ltvCorRazao(r) { return !r ? '' : r >= 3 ? 'var(--green)' : r >= 1 ? 'var(--amber)' : 'var(--red)'; }
+
+function ltvRender() {
+  var D = LTV_DADOS; if (!D) return;
+  var janela = parseInt(document.getElementById('ltv-janela').value, 10) || 30;
+  var visao = document.getElementById('ltv-visao').value || '_geral';
+  var dias = _ltvDiasJanela(janela);
+  var m = ltvMetricas(visao, dias);
+
+  set('ltv-ltv', m.ltv ? R(m.ltv) : '—');
+  set('ltv-arpu', m.arpu ? R(m.arpu) : '—');
+  set('ltv-vida', m.churn > 0 ? N1(1 / m.churn) + ' meses' : '—');
+  set('ltv-com', R(m.somaCom) + ' · ' + m.nCom + ' d');
+  document.getElementById('ltv-com-rot').textContent = m.geral ? 'Comissão na janela' : 'Comissão estimada (' + PCT(m.partCli * 100) + ' dos cliques)';
+  set('ltv-membros', m.membros ? N0(m.membros) : '—');
+  set('ltv-churn', m.churn ? PCT(m.churn * 100) : '—');
+  set('ltv-entradas', N0(m.ent));
+  set('ltv-saidas', N0(m.sai));
+  set('ltv-saldo', (m.ent - m.sai >= 0 ? '+' : '') + N0(m.ent - m.sai), m.ent - m.sai >= 0 ? 'up' : 'down');
+  set('ltv-cobertura', m.nMov + ' de ' + (m.geral ? janela : m.nMem));
   var el = document.getElementById('ltv-razao');
-  el.textContent = razao ? N1(razao) + '×' : '—';
-  el.style.color = !razao ? '' : razao >= 3 ? 'var(--green)' : razao >= 1 ? 'var(--amber)' : 'var(--red)';
-  set('ltv-cac', cac ? R(cac) : '—');
-  set('ltv-cac2', cac2 ? R(cac2) : '—');
-  set('ltv-cac-liq', (liq && liq > 0) ? R((gA + gE) / liq) : (liq != null ? 'base encolheu' : '—'));
-  set('ltv-payback', (arpu && cac2) ? N1(cac2 / arpu) + ' meses' : '—');
+  el.textContent = m.razao ? N1(m.razao) + '×' : '—';
+  el.style.color = _ltvCorRazao(m.razao);
+  set('ltv-cac', m.cac ? R(m.cac) : '—');
+  set('ltv-cac2', m.cac2 ? R(m.cac2) : '—');
+  set('ltv-cac-liq', m.geral ? ((m.liq && m.liq > 0) ? R((m.gA + m.gE) / m.liq) : (m.liq != null ? 'base encolheu' : '—')) : 'só na visão geral');
+  set('ltv-payback', (m.arpu && m.cac2) ? N1(m.cac2 / m.arpu) + ' meses' : '—');
 
-  ltvGraficos(dias);
-  ltvCoortes();
+  ltvGraficos(visao, dias);
+  ltvCoortes(visao);
+  ltvComparativo(dias);
 
   var notas = [];
-  notas.push('Janela ' + dias[0].split('-').reverse().join('/') + ' → ' + fim.split('-').reverse().join('/') + '. ARPU e churn são anualizados para 30 dias a partir dos dias com dado.');
-  if (nMov < janela) notas.push('O ledger de entradas e saídas não tem registro em ' + (janela - nMov) + ' dia(s) da janela (conta principal fora ou antes de ' + (D.ledgerDesde ? D.ledgerDesde.slice(0, 10).split('-').reverse().join('/') : '—') + '); churn e CAC usam só os dias registrados.');
-  notas.push('CAC misto divide o gasto por todas as entradas, inclusive as orgânicas — o custo real do membro pago é maior.');
+  notas.push('Janela ' + dias[0].split('-').reverse().join('/') + ' → ' + dias[dias.length - 1].split('-').reverse().join('/') + '. ARPU e churn são levados a 30 dias a partir dos dias com dado.');
+  notas.push('Por trilha, a comissão é rateada dia a dia pela participação da trilha nos cliques dos links rastreados, só nos dias em que a trilha foi medida pelo censo e teve clique registrado (' + m.nCli + ' dia(s) nesta visão; o histórico de cliques vai até 31 dias). Links fixos não entram no rateio.');
+  notas.push('O CAC é um só para todas as visões: o gasto em anúncio não é separado por trilha, então é dividido pelas entradas de todas as trilhas.');
+  if (m.nMov < janela) notas.push('O ledger de entradas e saídas não tem registro em ' + (janela - m.nMov) + ' dia(s) da janela (antes de ' + (D.ledgerDesde ? D.ledgerDesde.slice(0, 10).split('-').reverse().join('/') : '—') + ' ou conta principal fora); churn e CAC usam só os dias registrados.');
   notas.push('Comissão usada é a FOTO do dia (sem revisões de ML/Shopee), mesmo critério da aba Comissão.');
   document.getElementById('ltv-notas').innerHTML = notas.map(function (t) { return '• ' + t; }).join('<br>');
+}
+
+function ltvComparativo(dias) {
+  var D = LTV_DADOS, tb = document.getElementById('ltv-trilhas');
+  var ts = D.trilhas.slice().sort(function (a, b) { return _ltvNomeTrilha(a).localeCompare(_ltvNomeTrilha(b), 'pt-BR'); });
+  var linhas = [{ id: '_geral', nome: 'Visão geral' }].concat(ts.map(function (t) { return { id: t.id, nome: _ltvNomeTrilha(t) }; }));
+  var ret = function (id, h) {
+    var r = D.ret[id]; if (!r || !r.curva) return '—';
+    var p = r.curva.find(function (q) { return q.horas === h; });
+    return p && p.pct != null ? p.pct + '%' : '—';
+  };
+  var h = '<tr><th>Trilha</th><th>Membros</th><th>Entradas</th><th>Saídas</th><th>Churn/mês</th><th>Cliques/mil/dia</th>'
+        + '<th>Comissão</th><th>ARPU/mês</th><th>LTV</th><th>LTV ÷ CAC</th><th>Ficam 1 dia</th><th>Ficam 7 dias</th></tr>';
+  linhas.forEach(function (l) {
+    var m = ltvMetricas(l.id, dias);
+    h += '<tr style="cursor:pointer' + (l.id === '_geral' ? ';font-weight:700' : '') + '" onclick="document.getElementById(\'ltv-visao\').value=\'' + l.id + '\';ltvRender()">'
+       + '<td>' + l.nome + '</td><td>' + (m.membros ? N0(m.membros) : '—') + '</td>'
+       + '<td>' + N0(m.ent) + '</td><td>' + N0(m.sai) + '</td>'
+       + '<td>' + (m.churn ? PCT(m.churn * 100) : '—') + '</td>'
+       + '<td>' + (m.porMil ? N1(m.porMil) : '—') + '</td>'
+       + '<td>' + R(m.somaCom) + '</td><td>' + (m.arpu ? R(m.arpu) : '—') + '</td>'
+       + '<td>' + (m.ltv ? R(m.ltv) : '—') + '</td>'
+       + '<td style="color:' + _ltvCorRazao(m.razao) + '">' + (m.razao ? N1(m.razao) + '×' : '—') + '</td>'
+       + '<td>' + ret(l.id, 24) + '</td><td>' + ret(l.id, 168) + '</td></tr>';
+  });
+  tb.innerHTML = h;
 }
 
 function _ltvCores() {
@@ -12931,11 +13062,11 @@ function _ltvCores() {
 }
 var LTV_ROT_H = { 1: '1h', 6: '6h', 24: '1 dia', 72: '3 dias', 168: '7 dias', 336: '14 dias', 720: '30 dias' };
 
-function ltvGraficos(dias) {
-  var D = LTV_DADOS, c = _ltvCores();
+function ltvGraficos(visao, dias) {
+  var D = LTV_DADOS, c = _ltvCores(), R_ = D.ret[visao];
   var eixos = { x: { grid: { color: c.grade }, ticks: { color: c.texto, font: { size: 10 } } },
                 y: { grid: { color: c.grade }, ticks: { color: c.texto, font: { size: 10 } } } };
-  var curva = (D.ret && D.ret.curva) || [];
+  var curva = (R_ && R_.curva) || [];
   mk('ltv-chart-ret', {
     type: 'line',
     data: { labels: curva.map(function (p) { return LTV_ROT_H[p.horas] || p.horas + 'h'; }),
@@ -12948,17 +13079,17 @@ function ltvGraficos(dias) {
       } } } },
       scales: { x: eixos.x, y: Object.assign({}, eixos.y, { min: 0, max: 100 }) } }
   });
-  var av = document.getElementById('ltv-ret-aviso');
-  av.textContent = D.ret ? (N0(D.ret.estadias) + ' entradas acompanhadas · ' + N0(D.ret.saidasVistas) + ' saídas vistas'
-    + (D.ret.expulsoes ? ' (' + N0(D.ret.expulsoes) + ' removidos por admin)' : '')
+  document.getElementById('ltv-ret-aviso').textContent = R_ ? (N0(R_.estadias) + ' entradas acompanhadas · ' + N0(R_.saidasVistas) + ' saídas vistas'
+    + (R_.expulsoes ? ' (' + N0(R_.expulsoes) + ' removidos por admin)' : '')
     + ' · cada ponto só conta quem deu para acompanhar por aquele tempo') : 'Retenção indisponível no servidor.';
 
+  var MV = D.mov[visao] || {};
   mk('ltv-chart-mov', {
     type: 'bar',
     data: { labels: dias.map(function (k) { return k.slice(8, 10) + '/' + k.slice(5, 7); }),
             datasets: [
-              { label: 'Entradas', data: dias.map(function (k) { return D.mov[k] ? D.mov[k].entradas : null; }), backgroundColor: 'rgba(52,211,153,.7)' },
-              { label: 'Saídas', data: dias.map(function (k) { return D.mov[k] ? -D.mov[k].saidas : null; }), backgroundColor: 'rgba(248,113,113,.7)' }
+              { label: 'Entradas', data: dias.map(function (k) { return MV[k] ? MV[k].entradas : null; }), backgroundColor: 'rgba(52,211,153,.7)' },
+              { label: 'Saídas', data: dias.map(function (k) { return MV[k] ? -MV[k].saidas : null; }), backgroundColor: 'rgba(248,113,113,.7)' }
             ] },
     options: { responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -12969,9 +13100,9 @@ function ltvGraficos(dias) {
   });
 }
 
-function ltvCoortes() {
+function ltvCoortes(visao) {
   var D = LTV_DADOS, tb = document.getElementById('ltv-coortes');
-  var co = (D.ret && D.ret.coortes) || [];
+  var co = (D.ret[visao] && D.ret[visao].coortes) || [];
   if (!co.length) { tb.innerHTML = '<tr><td style="color:var(--muted)">Sem coortes com entrada identificada ainda.</td></tr>'; return; }
   var hs = [1, 24, 168, 720];
   var h = '<tr><th>Semana</th><th>Entradas</th>' + hs.map(function (x) { return '<th>' + LTV_ROT_H[x] + '</th>'; }).join('') + '</tr>';
