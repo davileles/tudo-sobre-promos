@@ -6238,6 +6238,21 @@ function lstRemover(asin){
   renderLstSel();
 }
 
+// Embaralha a ordem do disparo (Fisher-Yates). Pesquisa por categoria gera
+// blocos seguidos do mesmo tipo (whisky, depois vodka...); isto mescla tudo.
+function lstEmbaralhar(){
+  if (LST_SEL.length < 2) return;
+  var antes = LST_SEL.map(function(p){ return p.asin; }).join('|');
+  for (var tent = 0; tent < 5; tent++){
+    for (var i = LST_SEL.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = LST_SEL[i]; LST_SEL[i] = LST_SEL[j]; LST_SEL[j] = t;
+    }
+    if (LST_SEL.map(function(p){ return p.asin; }).join('|') !== antes) break;
+  }
+  renderLstSel();
+}
+
 // Ordem importa: o disparo percorre a lista de cima para baixo.
 function lstMover(asin, delta){
   var i = LST_SEL.findIndex(function(x){ return x.asin === asin; });
@@ -6264,7 +6279,12 @@ function renderLstSel(){
   var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
   var modoC = (document.getElementById('lst-cupom-modo') || {}).value || 'auto';
   var comVinculo = 0;
-  el.innerHTML = LST_SEL.map(function(p, i){
+  el.innerHTML = (LST_SEL.length > 1
+      ? '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
+        + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstEmbaralhar()" '
+        + 'title="Sorteia uma nova ordem para mesclar as categorias no grupo">🔀 Embaralhar ordem</button></div>'
+      : '')
+  + LST_SEL.map(function(p, i){
     return '<div class="grp-chip">'
       + '<span style="flex:1">' + (i+1) + '. ' + esc(p.nome)
       + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
