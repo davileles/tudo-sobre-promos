@@ -5732,6 +5732,7 @@ var LST_SEL   = [];      // produtos do formulario: [{asin, nome}]
 var LST_EDIT  = null;    // id em edicao (null = nova)
 var LST_TIMER = null;
 var DIAS_SEM  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+var LST_AJUSTE = {};    // id da lista -> { ordem:[asins pendentes], modo, codigo, msg } enquanto o ajuste esta aberto
 var LST_ABERTAS = {};   // id da lista -> true quando o card mostra os produtos
 
 function lstMsg(txt, erro){
@@ -5809,7 +5810,9 @@ function renderListas(){
     // vai deixar de existir daqui a pouco nao faz sentido.
     var btnItens = '<button class="btn btn-copy btn-sm" onclick="lstToggleItens(\'' + l.id + '\')">'
       + (LST_ABERTAS[l.id] ? '▴ Ocultar produtos' : '▾ Ver produtos (' + l.produtos.length + ')') + '</button>';
-    var acoes = btnItens + (ex
+    var btnAjustar = ex ? '<button class="btn btn-copy btn-sm" onclick="lstAjusteAbrir(\'' + l.id + '\')">'
+      + (LST_AJUSTE[l.id] ? '✖ Fechar ajuste' : '🔀 Ajustar fila / cupom') + '</button>' : '';
+    var acoes = btnItens + btnAjustar + (ex
       ? (ex.pausada
           ? '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'retomar\')">▶ Retomar</button>'
           : '<button class="btn btn-copy btn-sm" onclick="acaoLista(\'' + l.id + '\',\'pausar\')">⏸ Pausar</button>')
@@ -5840,7 +5843,7 @@ function renderListas(){
           + new Date(l.ultimoDisparo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
       + (sumiram ? '<div class="mon-aviso">⚠️ ' + sumiram + ' produto(s) não estão mais na vitrine e serão pulados.</div>' : '')
       + progresso
-      + (LST_ABERTAS[l.id] ? lstItensHtml(l) : '')
+      + (LST_AJUSTE[l.id] ? lstAjusteHtml(l) : (LST_ABERTAS[l.id] ? lstItensHtml(l) : ''))
       + '<div class="btn-row" style="margin-top:12px">' + acoes + '</div>'
       + '</div>';
   }).join('');
@@ -5978,6 +5981,139 @@ function lstItensHtml(l){
           + '</div>';
       }).join('')
     + '</div>';
+}
+
+/* ── Ajuste de fila em andamento (ordem dos pendentes + cupom) ── */
+// O estado do ajuste fica em LST_AJUSTE: o card se repinta a cada 20s enquanto a
+// fila roda, e o que o operador ja mexeu nao pode sumir no refresh.
+function lstPendentesAtuais(l){
+  var ex = l.execucao;
+  return l.produtos.slice(ex ? ex.indice : 0);
+}
+
+function lstAjusteAbrir(id){
+  if (LST_AJUSTE[id]) { delete LST_AJUSTE[id]; renderListas(); return; }
+  var l = LST_CACHE.find(function(x){ return x.id === id; });
+  if (!l) return;
+  LST_AJUSTE[id] = { ordem: lstPendentesAtuais(l), modo: l.cupomModo || 'auto', codigo: l.cupomCodigo || '', msg: '' };
+  var esperas = [];
+  if (!VIT_CACHE.length) esperas.push(carregarVitrine());
+  if (typeof CUPONS_CACHE !== 'undefined' && !CUPONS_CACHE.length) esperas.push(carregarCupons());
+  renderListas();
+  if (esperas.length) Promise.all(esperas).then(renderListas, renderListas);
+}
+
+function lstAjusteMover(id, i, delta){
+  var a = LST_AJUSTE[id]; if (!a) return;
+  var j = i + delta;
+  if (j < 0 || j >= a.ordem.length) return;
+  var t = a.ordem[i]; a.ordem[i] = a.ordem[j]; a.ordem[j] = t;
+  renderListas();
+}
+
+// Leva os itens da loja para o topo mantendo a ordem relativa de cada grupo.
+function lstAjusteLojaPrimeiro(id, loja){
+  var a = LST_AJUSTE[id]; if (!a) return;
+  var l = LST_CACHE.find(function(x){ return x.id === id; });
+  var lojaDe = lstLojaDoAsin(l);
+  var da = a.ordem.filter(function(s){ return lojaDe(s) === loja; });
+  var resto = a.ordem.filter(function(s){ return lojaDe(s) !== loja; });
+  a.ordem = da.concat(resto);
+  renderListas();
+}
+
+function lstLojaDoAsin(l){
+  var m = {};
+  (l && l.itens || []).forEach(function(it){ m[it.asin] = it.loja || ''; });
+  return function(asin){ return m[asin] || ''; };
+}
+
+function lstAjusteCupom(id){
+  var a = LST_AJUSTE[id]; if (!a) return;
+  var m = document.getElementById('lstaj-modo-' + id);
+  var c = document.getElementById('lstaj-cod-' + id);
+  if (m) a.modo = m.value;
+  if (c) a.codigo = c.value;
+  renderListas();
+}
+
+function lstAjusteHtml(l){
+  var a = LST_AJUSTE[l.id];
+  var porAsin = {};
+  (l.itens || []).forEach(function(it){ porAsin[it.asin] = it; });
+  var lojaDe = lstLojaDoAsin(l);
+  var lojas = [];
+  a.ordem.forEach(function(s){ var lj = lojaDe(s); if (lj && lojas.indexOf(lj) === -1) lojas.push(lj); });
+
+  var selModo = '<select id="lstaj-modo-' + l.id + '" onchange="lstAjusteCupom(\'' + l.id + '\')" style="max-width:200px">'
+    + [['auto','Cupom automático'],['fixo','Cupom fixo'],['nenhum','Sem cupom']].map(function(o){
+        return '<option value="' + o[0] + '"' + (a.modo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select>';
+  var selCod = '';
+  if (a.modo === 'fixo') {
+    selCod = '<select id="lstaj-cod-' + l.id + '" onchange="lstAjusteCupom(\'' + l.id + '\')" style="flex:1;min-width:220px">'
+      + opcoesCupom() + '</select>';
+    // Codigo atual precisa aparecer selecionado mesmo que o select venha de cache.
+    selCod = selCod.replace('value="' + esc(a.codigo) + '"', 'value="' + esc(a.codigo) + '" selected');
+  }
+
+  var itens = a.ordem.map(function(asin, i){
+    var it = porAsin[asin] || { asin: asin, nome: asin };
+    return '<div class="grp-chip" style="display:flex;gap:8px;align-items:center;font-weight:500">'
+      + '<span style="color:var(--muted2);min-width:18px">' + (i + 1) + '.</span>'
+      + '<span style="flex:1">' + lstNomeComLink(it) + ' <span style="color:var(--muted2);font-size:10.5px">'
+      +   esc(it.loja || '') + '</span></span>'
+      + '<button class="btn btn-copy btn-sm" style="margin:0;padding:2px 8px" ' + (i === 0 ? 'disabled' : '')
+      +   ' onclick="lstAjusteMover(\'' + l.id + '\',' + i + ',-1)" title="Subir">▲</button>'
+      + '<button class="btn btn-copy btn-sm" style="margin:0;padding:2px 8px" ' + (i === a.ordem.length - 1 ? 'disabled' : '')
+      +   ' onclick="lstAjusteMover(\'' + l.id + '\',' + i + ',1)" title="Descer">▼</button>'
+      + '</div>';
+  }).join('');
+
+  return '<div style="margin:10px 0 2px;border-top:1px solid var(--border);padding-top:8px">'
+    + '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Cupom a partir do próximo envio</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px">' + selModo + selCod + '</div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Cupom fixo vale só para os produtos da loja dele; os das outras lojas seguem no automático. '
+    +   'Cupom novo que não aparece aqui precisa ser ativado antes na Base de Cupons.</div>'
+    + '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Ordem dos que ainda não saíram (' + a.ordem.length + ')</div>'
+    + (lojas.length > 1
+        ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' + lojas.map(function(lj){
+            return '<button class="btn btn-copy btn-sm" style="margin:0" onclick="lstAjusteLojaPrimeiro(\'' + l.id + '\',\'' + esc(lj).replace(/'/g, "\\'") + '\')">⬆ ' + esc(lj) + ' primeiro</button>';
+          }).join('') + '</div>'
+        : '')
+    + itens
+    + (a.msg ? '<div class="mon-aviso" style="margin-top:8px">' + esc(a.msg) + '</div>' : '')
+    + '<div class="btn-row" style="margin-top:10px">'
+    +   '<button class="btn btn-sm" style="margin-top:0" onclick="lstAjusteSalvar(\'' + l.id + '\')">💾 Salvar ajuste</button>'
+    + '</div>'
+    + '</div>';
+}
+
+function lstAjusteSalvar(id){
+  var a = LST_AJUSTE[id]; if (!a) return;
+  if (a.modo === 'fixo' && !a.codigo) { a.msg = 'Escolha o cupom fixo.'; renderListas(); return; }
+  fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/ajustar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pendentes: a.ordem, cupomModo: a.modo, cupomCodigo: a.modo === 'fixo' ? a.codigo : null })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      delete LST_AJUSTE[id];
+      LST_ABERTAS[id] = true;
+      return carregarListas();
+    })
+    .catch(function(e){
+      // Fila andou no meio da edicao: recomeca o ajuste com a fila atual,
+      // mantendo o cupom que o operador escolheu.
+      var modo = a.modo, codigo = a.codigo;
+      carregarListas().then(function(){
+        var l = LST_CACHE.find(function(x){ return x.id === id; });
+        if (!l || !l.execucao) { delete LST_AJUSTE[id]; renderListas(); return; }
+        LST_AJUSTE[id] = { ordem: lstPendentesAtuais(l), modo: modo, codigo: codigo, msg: 'Não salvou: ' + e.message };
+        renderListas();
+      });
+    });
 }
 
 /* ── Formulário ── */
