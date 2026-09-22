@@ -395,6 +395,13 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .fila-msg-area{min-height:170px;font-size:12.5px;line-height:1.55;background:var(--card-deep)}
   .fila-img-thumb{max-width:100%;max-height:200px;border-radius:10px;border:1px solid var(--border);display:block}
   .fila-fb{font-size:12px;font-weight:700;text-align:center;min-height:16px;color:var(--muted)}
+  .fila-trilhas{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 16px 12px;font-size:11px;color:var(--muted)}
+  .fila-trilhas .trl-rot{font-weight:700;margin-right:2px}
+  .fila-trilhas .trl-chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+  .fila-trilhas .trl-chip.on{background:rgba(52,211,153,.14);color:var(--green);border-color:rgba(52,211,153,.4)}
+  .fila-trilhas .trl-chip:disabled{opacity:.5;cursor:wait}
+  .fila-trilhas .trl-auto{font-size:11px;background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
+  .fila-trilhas .trl-msg{flex-basis:100%;font-size:11px}
   .fila-fb.ok{color:var(--green)} .fila-fb.err{color:var(--red)}
   .fila-vazia,.fila-loading{text-align:center;padding:56px 20px;color:var(--muted);font-size:13px}
   .desc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
@@ -11035,6 +11042,7 @@ async function carregarAprovacao() {
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
         +imgThumb
+        +(ehMarketplace ? '<div class="fila-trilhas" id="fila-trilhas-'+o.id+'">Carregando trilhas…</div>' : '')
         +'<div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">'
         +'<div style="display:flex;gap:8px">'
         +'<button class="btn" style="margin-top:0;flex:1" onclick="aprovarItem('+o.id+')">'
@@ -11048,12 +11056,71 @@ async function carregarAprovacao() {
         +'</div>';
     }).join('');
 
+    carregarTrilhasAprov(pendentes.filter(function(o){
+      return String(o.tipoConteudo || '').indexOf('oferta_') === 0;
+    }).map(function(o){ return o.id; }));
+
   } catch(e) {
     lista.innerHTML = '<div class="fila-vazia">Servidor indisponível.</div>';
     var bl = document.getElementById('btn-limpar-aprov'); if (bl) bl.disabled = true;
     status.textContent = 'Erro ao conectar';
   }
 }
+
+// ── TRILHAS DO CARD (ofertas de produto) ──
+// Mesmo endpoint do bot do Telegram (/mkt/trilhas/:id). A rota vem de
+// /mkt/oferta/:id, que ja traz as trilhas que entregam hoje e o catalogo todo.
+async function carregarTrilhasAprov(ids) {
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    try {
+      var r = await fetch(SERVER+'/mkt/oferta/'+id+'?t='+Date.now(), { cache:'no-cache', signal: AbortSignal.timeout(8000) });
+      var d = await r.json();
+      if (d && d.ok && d.oferta) renderTrilhasAprov(id, d.oferta.rota);
+      else renderTrilhasAprov(id, null, (d && d.erro) || 'sem rota');
+    } catch(e) { renderTrilhasAprov(id, null, 'não foi possível ler as trilhas'); }
+  }
+}
+
+function renderTrilhasAprov(id, rota, erro) {
+  var box = document.getElementById('fila-trilhas-'+id);
+  if (!box) return;
+  if (!rota) { box.innerHTML = '<span class="trl-msg">Trilhas: '+esc(erro || '—')+'</span>'; return; }
+  var ativas = {};
+  (rota.trilhas || []).forEach(function(t){ if (t.entrega) ativas[t.id] = true; });
+  var cat = rota.categoriaNome || rota.categoria;
+  var html = '<span class="trl-rot">Trilhas:</span>';
+  (rota.todas || []).forEach(function(t){
+    html += '<button class="trl-chip'+(ativas[t.id] ? ' on' : '')+'" '
+      + 'title="'+esc(t.destinos+' grupo(s)')+'" '
+      + 'onclick="alternarTrilhaAprov('+id+',\''+esc(t.id)+'\', this)">'
+      + (ativas[t.id] ? '✓ ' : '') + esc(t.nome) + ' · ' + t.destinos + '</button>';
+  });
+  if (rota.manual) html += '<button class="trl-auto" onclick="trilhaAutoAprov('+id+', this)">voltar ao automático</button>';
+  html += '<span class="trl-msg">'
+    + (rota.manual ? 'Escolha manual · ' : 'Automático · ')
+    + (cat ? 'categoria: '+esc(cat)+(rota.confiavel ? '' : ' (incerta)') : 'sem categoria')
+    + (rota.curadoriaNicho && rota.curadoriaNicho.ok === false ? ' · curadoria do nicho reprovou' : '')
+    + ' · ' + (rota.grupos || 0) + ' grupo(s)</span>';
+  box.innerHTML = html;
+}
+
+async function postTrilhasAprov(id, corpo, btn) {
+  var box = document.getElementById('fila-trilhas-'+id);
+  if (box) box.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
+  try {
+    var r = await fetch(SERVER+'/mkt/trilhas/'+id, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)
+    });
+    var d = await r.json();
+    if (d && d.ok && d.oferta) { renderTrilhasAprov(id, d.oferta.rota); return; }
+    alert(d && d.erro ? d.erro : 'Não foi possível trocar a trilha.');
+  } catch(e) { alert('Servidor indisponível ao trocar a trilha.'); }
+  if (box) box.querySelectorAll('button').forEach(function(b){ b.disabled = false; });
+}
+
+function alternarTrilhaAprov(id, trilha, btn) { postTrilhasAprov(id, { alternar: trilha }, btn); }
+function trilhaAutoAprov(id, btn) { postTrilhasAprov(id, { automatico: true }, btn); }
 
 async function aprovarItem(id) {
   var msg = document.getElementById('fila-msg-'+id).value;
