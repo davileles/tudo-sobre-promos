@@ -1166,6 +1166,10 @@ body.travado > *:not(#login-screen){display:none !important}
       <button class="btn btn-rej btn-sm" id="btn-limpar-aprov" onclick="limparAprovacao()" disabled>🗑️ Limpar lista</button>
     </div>
   </div>
+  <div class="cfg-subtabs" id="aprov-subtabs">
+    <button class="cfg-subtab active" id="aprovsub-cupons" onclick="aprovSub('cupons')">🎟️ Cupons <span class="tab-badge" id="aprovsub-cupons-n" style="display:none">0</span></button>
+    <button class="cfg-subtab" id="aprovsub-produtos" onclick="aprovSub('produtos')">🛍️ Produtos <span class="tab-badge" id="aprovsub-produtos-n" style="display:none">0</span></button>
+  </div>
   <div id="aprov-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
@@ -10809,6 +10813,20 @@ var TIPOS_TSP = ['cupom_tsp','oferta_amazon','oferta_ml','oferta_shopee','oferta
 // 'on' | 'off' — lido do servidor junto com a fila. Sem isso o card nao tem
 // como dizer POR QUE a oferta esta aguardando aprovacao.
 var AUTO_OFERTA_MODO = null;
+// Sub-aba da Aprovacao: 'cupons' | 'produtos'. Estado so em memoria.
+// APROV_SUB_ESCOLHIDA = o operador clicou; ate la a aba abre na que tem item.
+var APROV_SUB = 'cupons';
+var APROV_SUB_ESCOLHIDA = false;
+function aprovSub(qual) {
+  APROV_SUB = qual === 'produtos' ? 'produtos' : 'cupons';
+  APROV_SUB_ESCOLHIDA = true;
+  carregarAprovacao();
+}
+function aprovTiposDaSub() {
+  return APROV_SUB === 'cupons'
+    ? ['cupom_tsp']
+    : TIPOS_TSP.filter(function (t) { return t !== 'cupom_tsp'; });
+}
 // Nomes de grupo vêm do servidor (nunca de storage local) só para exibição.
 var NOMES_GRUPOS_CACHE = {};
 function carregarNomesGrupos(){
@@ -10869,24 +10887,47 @@ async function carregarAprovacao() {
     var d = await r.json();
     if (!d.ok) { lista.innerHTML = '<div class="fila-vazia">Erro ao carregar fila.</div>'; return; }
 
-    var pendentes = (d.ofertas || []).filter(function(o){ return o.status === 'pendente' && ehTSP(o); });
+    var todosPend = (d.ofertas || []).filter(function(o){ return o.status === 'pendente' && ehTSP(o); });
+    var pendCupons = todosPend.filter(ehCupom);
+    var pendProdutos = todosPend.filter(function(o){ return !ehCupom(o); });
 
+    // Badge da aba principal continua com o total (cupons + produtos).
     var badge = document.getElementById('aprov-badge');
-    if (pendentes.length > 0) { badge.textContent = pendentes.length; badge.style.display = 'inline-block'; }
+    if (todosPend.length > 0) { badge.textContent = todosPend.length; badge.style.display = 'inline-block'; }
     else { badge.style.display = 'none'; }
 
+    [['cupons', pendCupons.length], ['produtos', pendProdutos.length]].forEach(function(p){
+      var b = document.getElementById('aprovsub-'+p[0]+'-n');
+      if (b) { b.textContent = p[1]; b.style.display = p[1] > 0 ? 'inline-block' : 'none'; }
+    });
+
+    // Sem escolha do operador, abre na sub-aba que tem item.
+    if (!APROV_SUB_ESCOLHIDA) {
+      if (APROV_SUB === 'cupons' && !pendCupons.length && pendProdutos.length) APROV_SUB = 'produtos';
+      else if (APROV_SUB === 'produtos' && !pendProdutos.length && pendCupons.length) APROV_SUB = 'cupons';
+    }
+    ['cupons','produtos'].forEach(function(s){
+      var bt = document.getElementById('aprovsub-'+s);
+      if (bt) bt.classList.toggle('active', s === APROV_SUB);
+    });
+
+    var pendentes = APROV_SUB === 'cupons' ? pendCupons : pendProdutos;
+    var rotSub = APROV_SUB === 'cupons' ? 'cupom(ns)' : 'produto(s)';
+
     status.textContent = pendentes.length > 0
-      ? pendentes.length+' item(ns) aguardando aprovação'
-      : 'Nenhum item pendente';
+      ? pendentes.length+' '+rotSub+' aguardando aprovação'
+      : (todosPend.length > 0 ? 'Nenhum '+(APROV_SUB === 'cupons' ? 'cupom' : 'produto')+' pendente' : 'Nenhum item pendente');
 
     var btnLimpar = document.getElementById('btn-limpar-aprov');
     if (btnLimpar) {
       btnLimpar.disabled = pendentes.length === 0;
-      btnLimpar.textContent = pendentes.length > 0 ? '🗑️ Limpar fila ('+pendentes.length+')' : '🗑️ Limpar fila';
+      btnLimpar.textContent = pendentes.length > 0
+        ? '🗑️ Limpar '+(APROV_SUB === 'cupons' ? 'cupons' : 'produtos')+' ('+pendentes.length+')'
+        : '🗑️ Limpar '+(APROV_SUB === 'cupons' ? 'cupons' : 'produtos');
     }
 
     if (pendentes.length === 0) {
-      lista.innerHTML = '<div class="fila-vazia">✅ Nada pendente no momento.</div>';
+      lista.innerHTML = '<div class="fila-vazia">✅ Nenhum '+(APROV_SUB === 'cupons' ? 'cupom' : 'produto')+' pendente no momento.</div>';
       return;
     }
 
@@ -11060,15 +11101,16 @@ async function rejeitarItem(id) {
 async function limparAprovacao() {
   var btn = document.getElementById('btn-limpar-aprov');
   var status = document.getElementById('aprov-status');
-  if (!confirm('Limpar a fila?\n\nTodos os itens TSP pendentes serão rejeitados. Esta ação não pode ser desfeita.')) return;
+  var rotLimpar = APROV_SUB === 'cupons' ? 'cupons' : 'produtos';
+  if (!confirm('Limpar '+rotLimpar+'?\n\nTodos os '+rotLimpar+' pendentes serão rejeitados (a outra sub-aba não é afetada). Esta ação não pode ser desfeita.')) return;
   var txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Limpando...';
   try {
     var r = await fetch(SERVER+'/painel/limpar', {
       method: 'POST', headers: { 'Content-Type':'application/json' },
-      // Todos os tipos que a fila exibe — não só cupons. A lista explícita é o
-      // que impede a limpeza de encostar nas emissões CDV.
-      body: JSON.stringify({ confirmar:'sim', tiposConteudo: TIPOS_TSP })
+      // So os tipos da sub-aba aberta (cupons OU produtos). A lista explícita
+      // também é o que impede a limpeza de encostar nas emissões CDV.
+      body: JSON.stringify({ confirmar:'sim', tiposConteudo: aprovTiposDaSub() })
     });
     var d = await r.json();
     if (d.ok) {
