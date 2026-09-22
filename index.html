@@ -5919,6 +5919,28 @@ function lstDefinirNicho(asin, nicho, sel){
   .then(function(){ if (sel) sel.disabled = false; });
 }
 
+// Link da pagina do produto para conferir preco/cupom antes da vez dele.
+// Vem da base (VIT_CACHE); Amazon e ML caem para a URL canonica pelo id.
+function lstUrlProduto(it){
+  var v = null;
+  for (var k = 0; k < VIT_CACHE.length; k++) { if (VIT_CACHE[k].asin === it.asin) { v = VIT_CACHE[k]; break; } }
+  var asin = String(it.asin || '');
+  var loja = String((v && v.loja) || it.loja || '');
+  if (/amazon/i.test(loja) && /^[A-Z0-9]{10}$/.test(asin)) return 'https://www.amazon.com.br/dp/' + asin;
+  var u = v && (v.urlProduto || v.url);
+  if (u && /^https?:\/\//i.test(u)) return u;
+  if (/^MLB\d+$/.test(asin)) return 'https://www.mercadolivre.com.br/p/' + asin;
+  return null;
+}
+
+function lstNomeComLink(it){
+  var u = lstUrlProduto(it);
+  if (!u) return esc(it.nome);
+  return '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"'
+    + ' style="color:inherit;text-decoration:underline;text-decoration-color:var(--muted2);text-underline-offset:2px"'
+    + ' title="Abrir página do produto">' + esc(it.nome) + ' ↗</a>';
+}
+
 function lstItensHtml(l){
   var ex = l.execucao;
   var porAsin = function(arr){ var m = {}; (arr || []).forEach(function(x){ m[x.asin] = x; }); return m; };
@@ -5945,7 +5967,7 @@ function lstItensHtml(l){
         return '<div class="grp-chip" style="flex-direction:column;align-items:stretch;gap:3px;font-weight:500">'
           + '<div style="display:flex;gap:8px;align-items:baseline">'
           +   '<span style="color:var(--muted2);min-width:18px">' + (i + 1) + '.</span>'
-          +   '<span style="flex:1">' + esc(it.nome) + ' <span style="color:var(--muted2);font-size:10.5px">'
+          +   '<span style="flex:1">' + lstNomeComLink(it) + ' <span style="color:var(--muted2);font-size:10.5px">'
           +     esc(it.loja || '') + '</span></span>'
           + '</div>'
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;padding-left:26px;color:var(--muted)">'
