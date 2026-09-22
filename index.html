@@ -6143,7 +6143,7 @@ function abrirFormLista(){
 }
 
 function novaLista(){
-  LST_EDIT = null; LST_SEL = [];
+  LST_EDIT = null; LST_SEL = []; LST_AUTO_PRIOR = false;
   document.getElementById('lst-form-titulo').textContent = 'Novo disparo';
   document.getElementById('lst-tipo').value = 'unico';
   document.getElementById('lst-tipo').disabled = false;
@@ -6170,6 +6170,7 @@ function novoDisparoComSelecionados(){
   if (!marcados.length) return;
   novaLista();
   LST_SEL = marcados.map(function(p){ return { asin:p.asin, nome:p.nome }; });
+  LST_AUTO_PRIOR = true;   // ordena sozinho quando o comparativo de todos chegar
   renderLstSel();
 }
 
@@ -6253,6 +6254,72 @@ function lstEmbaralhar(){
   renderLstSel();
 }
 
+// ── PRIORIDADE E CAPACIDADE DO DIA ───────────────────────────────────────────
+// Ordem: 1) maior desconto contra o ultimo envio (variacaoPct negativa = mais
+// barato); descontos semelhantes (mesma faixa de LST_PRIOR_FAIXA pontos) saem
+// primeiro os enviados ha mais tempo — inedito conta como o mais antigo.
+// Sem comparativo/sem preco vao para o fim; indisponivel por ultimo.
+var LST_AUTO_PRIOR = false, LST_PRIOR_FAIXA = 2;
+
+function lstChavePrior(asin){
+  var c = LST_COMP[asin];
+  if (!c || c.veredito === 'erro' || !c.atual) return { g:2, desc:0, em:0 };
+  if (c.atual.disponivel === false) return { g:3, desc:0, em:0 };
+  var desc = c.variacaoPct == null ? 0 : -Number(c.variacaoPct);
+  var em = (c.ultimoEnvio && c.ultimoEnvio.em) ? (Date.parse(c.ultimoEnvio.em) || 0) : 0;
+  return { g:1, desc:desc, em:em };
+}
+
+function lstOrdenarPrioridade(silencioso){
+  if (LST_SEL.length < 2) return;
+  var k = {};
+  LST_SEL.forEach(function(p){ k[p.asin] = lstChavePrior(p.asin); });
+  LST_SEL.sort(function(a, b){
+    var x = k[a.asin], y = k[b.asin];
+    if (x.g !== y.g) return x.g - y.g;
+    var fx = Math.floor(x.desc / LST_PRIOR_FAIXA), fy = Math.floor(y.desc / LST_PRIOR_FAIXA);
+    if (fx !== fy) return fy - fx;          // maior desconto primeiro
+    if (x.em !== y.em) return x.em - y.em;  // enviado ha mais tempo primeiro
+    return y.desc - x.desc;
+  });
+  if (!silencioso) renderLstSel();
+}
+
+// Quantos itens saem no mesmo dia do primeiro envio, respeitando intervalo e
+// janela (mesma simulacao de lstPrevisaoTermino). O resto viraria amanha.
+function lstCapacidadeDia(intervalo){
+  var total = LST_SEL.length, ini = lstInicioMs(), cap = 0;
+  for (var n = 1; n <= total; n++){
+    var p = lstPrevisaoTermino(n, intervalo, ini);
+    if (p.adiados - (p.adiadoNoInicio ? 1 : 0) > 0) break;
+    cap = n;
+  }
+  return cap;
+}
+
+function lstManterCapacidade(){
+  var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
+  var cap = lstCapacidadeDia(intervalo);
+  if (!cap || cap >= LST_SEL.length) return;
+  var sai = LST_SEL.length - cap;
+  if (!confirm('Manter os ' + cap + ' primeiros e tirar ' + sai + ' deste disparo?\n(Eles continuam na base de produtos.)')) return;
+  LST_SEL = LST_SEL.slice(0, cap);
+  renderLstSel();
+}
+
+function lstLinhaCapacidade(intervalo){
+  if (LST_SEL.length < 2) return '';
+  var cap = lstCapacidadeDia(intervalo);
+  var jan = lstJanelasEfetivas().map(function(j){ return j.inicio + '–' + j.fim; }).join(', ');
+  var st = 'font-size:11px;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;';
+  if (cap >= LST_SEL.length)
+    return '<div style="' + st + 'color:var(--muted2)">📅 Todos os ' + LST_SEL.length
+      + ' cabem no dia (janela ' + jan + ', a cada ' + intervalo + ' min).</div>';
+  return '<div style="' + st + 'color:var(--amber,#f59e0b)">📅 Cabem <b>' + cap + '</b> de ' + LST_SEL.length
+    + ' no dia (janela ' + jan + ', a cada ' + intervalo + ' min). Os que passarem disso ficam para o dia seguinte.'
+    + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstManterCapacidade()">✂️ Manter só os ' + cap + ' primeiros</button></div>';
+}
+
 // Ordem importa: o disparo percorre a lista de cima para baixo.
 function lstMover(asin, delta){
   var i = LST_SEL.findIndex(function(x){ return x.asin === asin; });
@@ -6279,8 +6346,14 @@ function renderLstSel(){
   var intervalo = Number(document.getElementById('lst-intervalo').value) || 20;
   var modoC = (document.getElementById('lst-cupom-modo') || {}).value || 'auto';
   var comVinculo = 0;
+  if (LST_AUTO_PRIOR && LST_SEL.every(function(p){ return LST_COMP[p.asin] && !LST_COMP_PEND[p.asin]; })){
+    LST_AUTO_PRIOR = false;
+    lstOrdenarPrioridade(true);
+  }
   el.innerHTML = (LST_SEL.length > 1
-      ? '<div style="display:flex;justify-content:flex-end;margin-bottom:6px">'
+      ? '<div style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+        + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstOrdenarPrioridade()" '
+        + 'title="Maior desconto contra o último envio primeiro; empate (faixa de ' + LST_PRIOR_FAIXA + ' pontos) vai o enviado há mais tempo">🎯 Ordenar por prioridade</button>'
         + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstEmbaralhar()" '
         + 'title="Sorteia uma nova ordem para mesclar as categorias no grupo">🔀 Embaralhar ordem</button></div>'
       : '')
@@ -6302,6 +6375,7 @@ function renderLstSel(){
   + LST_SEL.length + ' produto(s) · duração estimada '
   + (Math.round((LST_SEL.length - 1) * intervalo / 60 * 10) / 10) + 'h'
   + lstTextoPrevisao(LST_SEL.length, intervalo) + '</div>'
+  + lstLinhaCapacidade(intervalo)
   + (comVinculo
       ? '<div style="font-size:11px;margin-top:4px;color:var(--muted2)">&#127915; ' + comVinculo
         + ' produto(s) com cupom vinculado — '
