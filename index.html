@@ -7665,11 +7665,35 @@ function cadastrarVitrine(destino){
   ok.className = 'send-ok';
   ok.textContent = 'Resolvendo ' + texto.split('\n').filter(function(l){ return l.trim(); }).length + ' link(s)…';
 
-  fetch(SERVER + '/vitrine', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ texto: texto, cupom: cupom, nicho: nichoCad })
-  })
-  .then(function(r){ return r.json(); })
+  // O servidor aceita no maximo 60 linhas por chamada; acima disso respondia
+  // 400 e a tela mostrava "0 cadastrado(s)" sem motivo. Aqui a leva e fatiada
+  // em lotes sequenciais e o resultado somado.
+  var LOTE_VIT = 50;
+  var linhasCad = texto.split('\n').filter(function(l){ return l.trim(); });
+  var lotesCad = [];
+  for (var li = 0; li < linhasCad.length; li += LOTE_VIT) lotesCad.push(linhasCad.slice(li, li + LOTE_VIT).join('\n'));
+  var acum = { salvos: [], erros: [] };
+  var cadeia = Promise.resolve();
+  lotesCad.forEach(function(txt, idx){
+    cadeia = cadeia.then(function(){
+      if (lotesCad.length > 1) ok.textContent = 'Resolvendo lote ' + (idx + 1) + ' de ' + lotesCad.length + '…';
+      return fetch(SERVER + '/vitrine', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ texto: txt, cupom: cupom, nicho: nichoCad })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok === false && d.erro && !d.salvos) {
+          txt.split('\n').forEach(function(l){ acum.erros.push({ linha: l, erro: d.erro }); });
+          return;
+        }
+        acum.salvos = acum.salvos.concat(d.salvos || []);
+        acum.erros  = acum.erros.concat(d.erros || []);
+      });
+    });
+  });
+  cadeia
+  .then(function(){ return acum; })
   .then(function(d){
     var salvos = d.salvos || [];
     var erros  = d.erros || [];
