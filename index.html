@@ -6261,11 +6261,18 @@ function lstEmbaralhar(){
 // Sem comparativo/sem preco vao para o fim; indisponivel por ultimo.
 var LST_AUTO_PRIOR = false, LST_PRIOR_FAIXA = 2;
 
+// Sem envio anterior, a referencia passa a ser a mediana de 30 dias do monitor
+// (a mesma que ele usa para achar queda). Positivo = abaixo da mediana.
+function lstDescMediana(c){
+  if (!c || !c.atual || !(c.mediana30 > 0) || c.atual.fonte !== 'monitor') return null;
+  return Math.round((1 - c.atual.preco / c.mediana30) * 1000) / 10;
+}
+
 function lstChavePrior(asin){
   var c = LST_COMP[asin];
   if (!c || c.veredito === 'erro' || !c.atual) return { g:2, desc:0, em:0 };
   if (c.atual.disponivel === false) return { g:3, desc:0, em:0 };
-  var desc = c.variacaoPct == null ? 0 : -Number(c.variacaoPct);
+  var desc = c.variacaoPct != null ? -Number(c.variacaoPct) : (lstDescMediana(c) || 0);
   var em = (c.ultimoEnvio && c.ultimoEnvio.em) ? (Date.parse(c.ultimoEnvio.em) || 0) : 0;
   return { g:1, desc:desc, em:em };
 }
@@ -6353,7 +6360,7 @@ function renderLstSel(){
   el.innerHTML = (LST_SEL.length > 1
       ? '<div style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
         + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstOrdenarPrioridade()" '
-        + 'title="Maior desconto contra o último envio primeiro; empate (faixa de ' + LST_PRIOR_FAIXA + ' pontos) vai o enviado há mais tempo">🎯 Ordenar por prioridade</button>'
+        + 'title="Maior desconto contra o último envio (inéditos: contra a mediana de 30 dias) primeiro; empate (faixa de ' + LST_PRIOR_FAIXA + ' pontos) vai o enviado há mais tempo">🎯 Ordenar por prioridade</button>'
         + '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="lstEmbaralhar()" '
         + 'title="Sorteia uma nova ordem para mesclar as categorias no grupo">🔀 Embaralhar ordem</button></div>'
       : '')
@@ -6460,8 +6467,15 @@ function lstLinhaComparativo(asin){
     extra.push('menor enviado R$ ' + fmtBRL(c.menorEnviado.preco) + ' em ' + lstFmtDiaCurto(c.menorEnviado.em));
   var extraTxt = extra.length ? ' · ' + extra.join(' · ') : '';
 
-  if (c.veredito === 'inedito')
-    return '<div style="' + st + 'color:var(--muted2)">🆕 inédito · ' + agoraTxt + extraTxt + '</div>';
+  if (c.veredito === 'inedito'){
+    var dm = lstDescMediana(c), medTxt = '';
+    if (dm != null){
+      var corM = dm >= 2 ? '#22c55e' : dm <= -2 ? '#f87171' : '#eab308';
+      medTxt = ' · <b style="color:' + corM + '">' + (dm > 0 ? '-' : dm < 0 ? '+' : '') + String(Math.abs(dm)).replace('.', ',')
+        + '% vs mediana 30d</b> (R$ ' + fmtBRL(c.mediana30) + ')';
+    }
+    return '<div style="' + st + 'color:var(--muted2)">🆕 inédito · ' + agoraTxt + medTxt + extraTxt + '</div>';
+  }
 
   var cor = { melhor:'#22c55e', igual:'#eab308', pior:'#f87171' }[c.veredito] || 'var(--muted2)';
   var ico = { melhor:'🟢', igual:'🟡', pior:'🔴' }[c.veredito] || '⚪';
