@@ -136,6 +136,9 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
                    font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer}
   .al-acoes button:hover{color:var(--text)}
   .al-vazio{color:var(--muted);font-size:12.5px;padding:22px 0;text-align:center}
+  .al-item.sg-ok{border-left-color:#30a46c}
+  .al-pl.sg-amb{border-color:#f5a524;color:#f5a524}
+  .al-pl.sg-amb b{color:#f5a524}
   .main-tab.active{color:var(--accent);background:rgba(250,81,80,.12);border-color:rgba(250,81,80,.45);border-left:3px solid var(--accent);padding-left:9px}
   .tab-badge{background:var(--accent);color:#0f0f0f;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:800;line-height:1.5}
 
@@ -1082,6 +1085,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
+  <button class="main-tab" id="tab-saude" onclick="switchTab('saude')">🩺 Saúde<span class="tab-badge" id="saude-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Ajustes</button>
 </div>
@@ -1752,6 +1756,22 @@ body.travado > *:not(#login-screen){display:none !important}
     ter salvo o número e mandado uma mensagem antes — o servidor recusa sem isso.
   </div>
   <div class="card"><div id="gg-tsp" style="font-size:12.5px;opacity:.75">Carregando…</div></div>
+</div>
+
+<!-- ════════ SAUDE DOS GRUPOS — grupo caido, numero removido, queda de membros ════════ -->
+<div class="panel" id="panel-saude">
+  <div class="aviso">
+    O servidor confere os grupos de destino a cada ~2h (8h–22h) e na hora em que um envio falha ou um número nosso é removido.
+    Grupo que some só é marcado como <b>inacessível</b> depois de uma segunda leitura, 4 min depois. Os alertas também chegam
+    no grupo do operador, no Telegram e por e-mail.
+  </div>
+  <div class="al-filtros">
+    <button class="al-f active" data-sg="0" onclick="sgFiltrar(false)">Todos</button>
+    <button class="al-f" data-sg="1" onclick="sgFiltrar(true)">Só com problema</button>
+    <span id="sg-status" style="font-size:11.5px;color:var(--muted)"></span>
+  </div>
+  <div id="sg-resumo" class="al-pulso"></div>
+  <div id="sg-lista" class="al-lista"><div class="al-vazio">Carregando...</div></div>
 </div>
 
 <div class="panel" id="panel-conexao">
@@ -3304,7 +3324,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   if (name === 'ltv') name = 'trafego';   // LTV agora mora dentro do Trafego
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
@@ -3329,6 +3349,7 @@ function switchTab(name) {
   // Conferir grupos precisa dos nomes: sem o cache, o aviso sai com JID cru.
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'admgrupos') ggAbrir();
+  if (name === 'saude') sgCarregar();
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); }
   // O bloco "Cupom adicional" da Oferta escolhe da base: sem o cache o select
   // abriria vazio na primeira visita da aba.
@@ -3389,7 +3410,7 @@ var SECOES = [
   { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','descobertas'] },
   // quanto os envios renderam, depois quanto a audiencia custa/vale
   { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego'] },
-  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos'] },
+  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','saude'] },
   // como o sistema se comporta: regras, formato das mensagens e contas
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
 ];
@@ -3399,7 +3420,7 @@ var ROTULO_ABA = {
   livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
   rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', ltv: 'LTV dos membros',
-  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', conexao: 'Conexão e turnos', config: 'Automação e geral'
+  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', saude: 'Saúde dos grupos', conexao: 'Conexão e turnos', config: 'Automação e geral'
 };
 var SECAO_ATUAL = 'hoje';
 
@@ -3514,6 +3535,11 @@ var CABECALHOS = {
   } },
   dist: { titulo: 'Distribuidor', acoes: [{ rot: '🔄 Sincronizar contagens', fn: 'distSincronizar()', primario: true }, { rot: '↻ Atualizar', fn: 'carregarDist()' }], sub: function () {
     return _n(_tam(typeof DIST_CACHE !== 'undefined' && DIST_CACHE)) + ' links';
+  } },
+  saude: { titulo: 'Saúde dos grupos', acoes: [{ rot: '🩺 Verificar agora', fn: 'sgVerificar()', primario: true }, { rot: '↻ Atualizar', fn: 'sgCarregar()' }], sub: function () {
+    if (!SG_DADOS) return 'Grupos de destino do Tica Promos e do CDV';
+    var n = (SG_DADOS.grupos || []).filter(function (g) { return sgProblema(g); }).length;
+    return _n((SG_DADOS.grupos || []).length) + ' grupos · ' + (n ? _n(n) + ' com problema' : 'todos saudáveis');
   } },
   conexao: { titulo: 'Conexão', sub: function () { return 'Contas de WhatsApp e status do envio'; } },
   alertas: { titulo: 'Alertas', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAlertas()' }], sub: function () {
@@ -10361,6 +10387,134 @@ var AL_NAO_LIDOS = null;
 var _alTimer = null;
 
 var AL_ROTULO = { critico: 'Operação parada', atencao: 'Dinheiro na mesa', info: 'Registro' };
+
+/* ══════ SAUDE DOS GRUPOS ══════
+   Le o estado que a sentinela do baileys-server mantem (GET /grupos/saude).
+   So le JSON do servidor — nenhuma consulta ao WhatsApp sai daqui. O botao
+   "Verificar agora" pede uma leitura, que o servidor limita a 1 a cada 10 min. */
+var SG_DADOS = null;
+var SG_SO_PROBLEMAS = false;
+
+function sgProblema(g) {
+  if (g.estado === 'sumido') return 'sumido';
+  if (g.contaFixa && g.contas && g.contas.length && g.contas.indexOf(g.contaFixa) < 0) return 'fora';
+  if ((g.queda24h || 0) >= 0.2) return 'queda';
+  if (g.estado === 'desconhecido' || g.estado === 'novo') return 'semleitura';
+  return null;
+}
+
+function sgQuando(iso) {
+  if (!iso) return '—';
+  var min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return 'há ' + min + ' min';
+  var h = Math.round(min / 60);
+  if (h < 48) return 'há ' + h + 'h';
+  return 'há ' + Math.round(h / 24) + ' dias';
+}
+
+async function sgCarregar(silencioso) {
+  var alvo = document.getElementById('sg-lista');
+  try {
+    var r = await fetch(SERVER + '/grupos/saude?t=' + Date.now(), { cache: 'no-cache' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+    SG_DADOS = d;
+    sgPintarBadge();
+    if (!silencioso || document.getElementById('panel-saude').classList.contains('active')) sgPintar();
+  } catch (e) {
+    if (alvo && !silencioso) alvo.innerHTML = '<div class="al-vazio">Não consegui carregar a saúde dos grupos: ' + alEsc(e.message) + '</div>';
+  }
+}
+
+function sgPintarBadge() {
+  var b = document.getElementById('saude-badge');
+  if (!b || !SG_DADOS) return;
+  var n = (SG_DADOS.grupos || []).filter(function (g) {
+    var p = sgProblema(g); return p === 'sumido' || p === 'fora' || p === 'queda';
+  }).length;
+  b.textContent = n;
+  b.style.display = n ? '' : 'none';
+}
+
+function sgFiltrar(so) {
+  SG_SO_PROBLEMAS = !!so;
+  var bs = document.querySelectorAll('#panel-saude .al-f[data-sg]');
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-sg') === (so ? '1' : '0'));
+  sgPintar();
+}
+
+function sgPintar() {
+  var alvo = document.getElementById('sg-lista');
+  var topo = document.getElementById('sg-resumo');
+  if (!alvo || !SG_DADOS) return;
+  var gs = SG_DADOS.grupos || [];
+  var cont = { sumido: 0, fora: 0, queda: 0, semleitura: 0, ok: 0 };
+  gs.forEach(function (g) { cont[sgProblema(g) || 'ok']++; });
+  topo.innerHTML =
+      '<div class="al-pl' + (cont.sumido ? ' parada' : '') + '">Inacessíveis <b>' + cont.sumido + '</b></div>'
+    + '<div class="al-pl' + (cont.fora ? ' sg-amb' : '') + '">Número fora <b>' + cont.fora + '</b></div>'
+    + '<div class="al-pl' + (cont.queda ? ' sg-amb' : '') + '">Queda 24h <b>' + cont.queda + '</b></div>'
+    + '<div class="al-pl">Sem leitura <b>' + cont.semleitura + '</b></div>'
+    + '<div class="al-pl">Saudáveis <b>' + cont.ok + '</b> de ' + gs.length + '</div>'
+    + '<div class="al-pl">Última varredura <b>' + sgQuando(SG_DADOS.ultimaVarreduraEm) + '</b>'
+    + (SG_DADOS.proximaVarreduraEm ? ' · próxima ' + new Date(SG_DADOS.proximaVarreduraEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') + '</div>';
+
+  var peso = { sumido: 0, fora: 1, queda: 2, semleitura: 3 };
+  var lista = gs.slice().sort(function (a, b) {
+    var pa = peso[sgProblema(a)], pb = peso[sgProblema(b)];
+    pa = pa == null ? 9 : pa; pb = pb == null ? 9 : pb;
+    return pa - pb || String(a.nome).localeCompare(String(b.nome), 'pt-BR');
+  });
+  if (SG_SO_PROBLEMAS) lista = lista.filter(function (g) { return sgProblema(g); });
+  if (!lista.length) {
+    alvo.innerHTML = '<div class="al-vazio">' + (SG_SO_PROBLEMAS ? 'Nenhum grupo com problema. 🎉' : 'Nenhum grupo de destino cadastrado.') + '</div>';
+    return;
+  }
+  var ROT = { sumido: 'Inacessível', fora: 'Número fora', queda: 'Queda de membros', semleitura: 'Sem leitura' };
+  var COR = { sumido: 'critico', fora: 'atencao', queda: 'atencao', semleitura: 'info' };
+  alvo.innerHTML = lista.map(function (g) {
+    var p = sgProblema(g);
+    var linhas = [];
+    if (g.membros != null) linhas.push(g.membros.toLocaleString('pt-BR') + ' membros'
+      + ((g.queda24h || 0) > 0 ? ' (−' + Math.round(g.queda24h * 100) + '% em 24h)' : ''));
+    linhas.push('números no grupo: ' + (g.contas && g.contas.length ? g.contas.join(', ') : '—'));
+    if (g.contaFixa) linhas.push('número fixo: ' + g.contaFixa);
+    linhas.push('visto ' + sgQuando(g.ultimoVistoEm));
+    if (p === 'sumido' && g.desde) linhas.push('fora desde ' + new Date(g.desde).toLocaleString('pt-BR'));
+    return '<div class="al-item ' + (p ? COR[p] : 'sg-ok') + '">'
+      + '<div class="al-cab">'
+      +   '<span class="al-tag">' + (p ? ROT[p] : 'OK') + '</span>'
+      +   '<span class="al-tit">' + alEsc(g.nome || g.jid) + '</span>'
+      +   '<span class="al-meta"><span>' + alEsc(g.operacao || '') + '</span></span>'
+      + '</div>'
+      + '<div class="al-corpo">' + alEsc(linhas.join(' · ')) + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function sgVerificar() {
+  var st = document.getElementById('sg-status');
+  try {
+    var r = await fetch(SERVER + '/grupos/saude/verificar', { method: 'POST' });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    var h = new Date(d.agendadaPara).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (st) st.textContent = 'Verificação agendada para ' + h + ' (o servidor limita a 1 a cada 10 min). Se algo sumir, a confirmação sai 4 min depois.';
+    setTimeout(function () { sgCarregar(true); }, Math.max(15000, new Date(d.agendadaPara).getTime() - Date.now() + 20000));
+  } catch (e) {
+    if (st) st.textContent = 'Não consegui pedir a verificação: ' + e.message;
+  }
+}
+
+// Badge da secao Grupos sempre em dia: so le o JSON do servidor, a cada 10 min.
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () { sgCarregar(true); }, 4000);
+  setInterval(function () {
+    if (document.body.classList.contains('travado')) return;
+    sgCarregar(true);
+  }, 10 * 60 * 1000);
+});
 
 function alEsc(s) {
   return String(s == null ? '' : s)
