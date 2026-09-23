@@ -2265,6 +2265,7 @@ body.travado > *:not(#login-screen){display:none !important}
     </p>
     <p class="send-ok" id="vit-cad-ok"></p>
     <div id="vit-cad-erros" style="display:none;margin-top:8px;border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:10px 12px;background:rgba(248,113,113,.05)"></div>
+    <div id="vit-cad-repetidos" style="display:none;margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(245,185,66,.06);border:1px solid rgba(245,185,66,.25)"></div>
   </div>
 
   <!-- ─── 1b. Catalogo da Awin ─── -->
@@ -7830,6 +7831,30 @@ function reporFalhasVitrine(){
 // destino: 'so' = fica so na base | 'unico' = abre o form em envio unico |
 // 'salva' = abre o mesmo form no modo lista salva. A decisao e tomada aqui em
 // cima, junto com os links, e nao depois de ja ter cadastrado.
+// Resumo "novos x ja estavam na base". O servidor nunca duplica (a chave e o
+// ASIN/MLB/Shopee), mas devolve jaExistia — sem mostrar isso o operador nao
+// sabia que estava redisparando um produto que ja tinha divulgado.
+function resumoRepetidosVitrine(salvos){
+  var rep = (salvos || []).filter(function(s){ return s && s.jaExistia; });
+  var novos = (salvos || []).length - rep.length;
+  var texto = novos + ' novo(s)' + (rep.length ? ' · ' + rep.length + ' já estava(m) na base' : '');
+  var html = '';
+  if (rep.length) {
+    html = '<div style="font-size:11px;font-weight:700;color:var(--amber, #f5b942);margin-bottom:6px">'
+      + rep.length + ' produto(s) já estavam na base — registro atualizado, sem duplicar</div>'
+      + rep.map(function(s){
+          var ult = s.divulgadoEm || s.ultimoDisparo;
+          var quando = ult ? 'última divulgação ' + new Date(ult).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+                           : 'nunca divulgado';
+          return '<div style="font-size:11px;line-height:1.55;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)">'
+            + '<div>' + esc(s.nome || s.asin) + ' <span style="color:var(--muted)">(' + esc(s.loja || '') + ')</span></div>'
+            + '<div style="color:var(--muted)">↳ ' + esc(quando) + '</div>'
+          + '</div>';
+        }).join('');
+  }
+  return { texto: texto, html: html, repetidos: rep.length };
+}
+
 function cadastrarVitrine(destino){
   var texto = document.getElementById('vit-links').value.trim();
   var ok = document.getElementById('vit-cad-ok');
@@ -7846,6 +7871,8 @@ function cadastrarVitrine(destino){
   // reaparece ja populado, no fim de aposCadastroVitrine.
   if (destino !== 'so') document.getElementById('lst-form').style.display = 'none';
   document.getElementById('vit-cad-erros').style.display = 'none';
+  var boxRep0 = document.getElementById('vit-cad-repetidos');
+  if (boxRep0) boxRep0.style.display = 'none';
   ok.className = 'send-ok';
   ok.textContent = 'Resolvendo ' + texto.split('\n').filter(function(l){ return l.trim(); }).length + ' link(s)…';
 
@@ -7863,7 +7890,7 @@ function cadastrarVitrine(destino){
       if (lotesCad.length > 1) ok.textContent = 'Resolvendo lote ' + (idx + 1) + ' de ' + lotesCad.length + '…';
       return fetch(SERVER + '/vitrine', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ texto: txt, cupom: cupom, nicho: nichoCad })
+        body: JSON.stringify({ texto: txt, cupom: cupom, cupomModo: modoCupom, nicho: nichoCad })
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -7882,8 +7909,11 @@ function cadastrarVitrine(destino){
     var salvos = d.salvos || [];
     var erros  = d.erros || [];
     ok.className = erros.length ? 'send-ok send-err' : 'send-ok';
-    ok.textContent = salvos.length + ' cadastrado(s)'
+    var rsm = resumoRepetidosVitrine(salvos);
+    ok.textContent = rsm.texto
       + (erros.length ? ' · ' + erros.length + ' com problema (detalhe abaixo)' : '');
+    var boxRep = document.getElementById('vit-cad-repetidos');
+    if (boxRep) { boxRep.innerHTML = rsm.html; boxRep.style.display = rsm.repetidos ? 'block' : 'none'; }
 
     // Motivo colado ao link que falhou. Juntar tudo num paragrafo so escondia
     // qual dos 18 links era o problema.
@@ -8091,13 +8121,13 @@ function cadastrarAwinSel(destino){
   if (destino !== 'so') document.getElementById('lst-form').style.display = 'none';
   fetch(SERVER + '/awin/ofertas/cadastrar', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ chaves: chaves, cupom: cupom })
+    body: JSON.stringify({ chaves: chaves, cupom: cupom, cupomModo: modoCupom })
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (!d.ok) throw new Error(d.erro || 'falhou');
     var salvos = d.salvos || [];
-    st.textContent = salvos.length + ' produto(s) na base · ' + d.naFila + ' ainda na fila da Awin';
+    st.textContent = resumoRepetidosVitrine(salvos).texto + ' · ' + d.naFila + ' ainda na fila da Awin';
     AWC_SEL = {};
     // Recarrega a fila: os escolhidos sairam dela do lado do servidor.
     carregarAwinCand();
