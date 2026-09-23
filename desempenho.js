@@ -388,6 +388,8 @@ const CAT_MAX_PAGINAS = 6;
 // proxima: com o cache, cada ASIN e lido uma unica vez na vida.
 const CAT_MAX_LEITURAS = 40;
 const CAT_PAUSA_LEITURA = 800;
+// Abaixo disso a pagina do produto e o toco que a Amazon serve a IP de datacenter.
+const CAT_TOCO_BYTES = 20000;
 
 /**
  * Categoria pelo breadcrumb da propria pagina do produto — fonte primaria.
@@ -405,11 +407,13 @@ const CAT_PAUSA_LEITURA = 800;
  * "o que o publico compra", subcategoria fragmentaria demais.
  */
 async function categoriaDaPagina(asin) {
-  // O IP do runner do Actions e datacenter: sem sessao, a Amazon devolve 200
-  // com uma pagina-toco de ~3,9 KB e nenhum conteudo (comprovado em rodada
-  // real). Reaproveitamos o AMAZON_COOKIE da coleta — os cookies de sessao sao
-  // de dominio .amazon.com.br, entao valem tambem na vitrine — e mandamos o
-  // conjunto de cabecalhos que um navegador manda numa navegacao de topo.
+  // O IP do runner do Actions e datacenter: sem sessao, a Amazon pode devolver
+  // 200 com uma pagina-toco de ~3,9 KB e nenhum conteudo. Ainda assim NAO
+  // mandamos o AMAZON_COOKIE aqui: a sessao de Associados raspando a vitrine a
+  // partir de IP de servidor derrubava o cookie (22/09/2026 durou menos de 7h).
+  // A sessao fica restrita a associados.amazon.com.br; se a vitrine devolver
+  // toco, a categoria fica com o relatorio (fonte secundaria) e a leitura por
+  // pagina para na hora, sem gastar requisicoes.
   const r = await req('https://www.amazon.com.br/dp/' + asin, {
     headers: {
       'User-Agent': UA,
@@ -421,7 +425,6 @@ async function categoriaDaPagina(asin) {
       'Sec-Fetch-Site': 'none',
       'Sec-Fetch-User': '?1',
       'Cache-Control': 'no-cache',
-      ...(AMAZON_COOKIE ? { Cookie: AMAZON_COOKIE } : {}),
     },
     redirect: 'follow',
   }, 20000);
@@ -435,6 +438,9 @@ async function categoriaDaPagina(asin) {
     const t = (html.match(/<title>([\s\S]{0,200}?)<\/title>/) || [, ''])[1].trim();
     const dep = (t.match(/Amazon\.com\.br\s*:\s*([^:|]{3,60})\s*$/) || [])[1];
     if (dep) return { categoria: dep.trim(), caminho: dep.trim() };
+    // Pagina-toco (sem sessao, IP de datacenter): nenhuma das proximas vai
+    // abrir, entao sinaliza para o chamador parar a varredura.
+    if (html.length < CAT_TOCO_BYTES) return { toco: true, bytes: html.length };
     // Sem breadcrumb nem departamento no title = captcha, ASIN morto ou layout
     // novo. Nos tres casos nao ha o que inventar: o relatorio decide.
     console.log(`[desempenho] Amazon: pagina ${asin} sem categoria — ${html.length} bytes, `
@@ -460,6 +466,12 @@ async function categoriasPorPagina(asins) {
   for (const asin of asins.slice(0, CAT_MAX_LEITURAS)) {
     try {
       const achado = await categoriaDaPagina(asin);
+      if (achado && achado.toco) {
+        console.log(`[desempenho] Amazon: vitrine devolveu pagina-toco (${achado.bytes} bytes) `
+          + 'sem sessao — leitura por pagina interrompida, categoria fica com o relatorio');
+        falhas++;
+        break;
+      }
       if (achado) mapa.set(asin, achado); else falhas++;
     } catch (e) {
       falhas++;
