@@ -4,6 +4,7 @@
 // escolhe cupom e modo de disparo. A extensao so evita o copia-e-cola.
 
 const FILA = 'fila';
+const ULTIMO_LOTE = 'ultimoLote';
 
 async function lerFila() {
   const s = await chrome.storage.local.get({ [FILA]: [] });
@@ -345,6 +346,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((msg, _remetente, responder) => {
   if (msg?.tipo === 'fila') { lerFila().then(responder); return true; }
   if (msg?.tipo === 'limpar') { gravarFila([]).then(() => responder({ ok: true })); return true; }
+  // Esvaziar a fila ao inserir no painel perdia tudo se a pagina fosse
+  // recarregada antes do cadastro: os links so existiam no textarea. Agora a
+  // fila despejada vira o "ultimo lote" e fica guardada ate o proximo despejo.
+  if (msg?.tipo === 'despejar') {
+    lerFila().then(async f => {
+      if (f.length) await chrome.storage.local.set({ [ULTIMO_LOTE]: { itens: f, em: Date.now() } });
+      await gravarFila([]);
+      responder({ ok: true });
+    });
+    return true;
+  }
+  if (msg?.tipo === 'ultimoLote') {
+    chrome.storage.local.get({ [ULTIMO_LOTE]: null }).then(s => responder(s[ULTIMO_LOTE]));
+    return true;
+  }
   if (msg?.tipo === 'remover') {
     lerFila().then(f => gravarFila(f.filter(i => i.chave !== msg.chave)).then(() => responder({ ok: true })));
     return true;

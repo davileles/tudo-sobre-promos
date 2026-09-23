@@ -43,7 +43,9 @@ bater com a do `manifest.json` no repositório, a pasta está velha.
    não quer. O número no ícone é quantos estão guardados.
 3. **Cadastrando:** abra `gestao.ticapromos.com.br` → aba 🏬 Vitrine e disparos.
    Abaixo do campo Links aparece **📥 Inserir N produtos capturados**. Clique,
-   e as linhas caem no campo. A fila se esvazia.
+   e as linhas caem no campo. A fila se esvazia, mas o lote fica guardado:
+   se a página for recarregada antes do cadastro, o botão **↩ Reinserir último
+   lote** devolve as linhas ao campo. O lote só é trocado no próximo despejo.
 4. Dali em diante é o painel de sempre: escolhe o cupom, escolhe entre
    *Só cadastrar*, *Cadastrar e disparar agora* ou *Cadastrar como lista salva*.
 
