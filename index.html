@@ -284,6 +284,15 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .cup-copy.ok{color:#34d399}
   .cup-reativar{background:transparent;border:none;color:#f0a742;font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
   .cup-reativar:hover{color:#ffc46b}
+  .cup-edit{background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:1px 3px;line-height:1}
+  .cup-edit:hover{color:var(--accent)}
+  .cup.editando{grid-column:1/-1}
+  .cup-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:8px}
+  .cup-form .field{margin:0}
+  .cup-form .field.full{grid-column:1/-1}
+  .cup-form-acoes{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .cup-form-acoes .btn{width:auto;padding:8px 14px;font-size:12px}
+  .cup-form-acoes .btn.sec{background:transparent;border:1px solid var(--border);color:var(--muted)}
   .cup-cod{cursor:pointer}
   .cup-cod:hover{color:var(--accent)}
   .cup-grupo{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
@@ -8769,6 +8778,7 @@ function cardCupom(c) {
         + 'title="' + (res ? 'Restrito a produtos específicos — clique para liberar para ofertas em geral'
                             : 'Vale em ofertas em geral — clique para restringir a produtos específicos') + '">🎯</button>'
         + '<button class="cup-copy" data-cod="' + esc(c.codigo) + '" onclick="copiarCupom(this)" title="Copiar código">📋</button>'
+        + '<button class="cup-edit" data-chave="' + ch + '" onclick="editarCupom(this)" title="Editar valor, regras, validade e observação">✏️</button>'
         + '<button class="cup-del" data-chave="' + ch + '" onclick="excluirCupom(this)" title="Excluir">🗑</button>'
         + (venceu ? '<button class="cup-reativar" data-chave="' + ch + '" onclick="reativarCupom(this)" '
                     + 'title="Reativar com nova validade">♻️</button>' : '')
@@ -8949,6 +8959,123 @@ function reativarCupom(btn) {
     renderCupons();
   })
   .catch(function(e){ alert('Não foi possível reativar: ' + e.message); btn.disabled = false; });
+}
+
+/**
+ * Converte um ISO em valor de <input type="datetime-local"> no horário de
+ * Brasília — inverso de parseDatetimeAsSP, para o form abrir com a validade
+ * que o operador enxerga no card.
+ */
+function isoParaDatetimeLocalSP(iso) {
+  var ms = Date.parse(iso || '');
+  if (!isFinite(ms)) return '';
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone:'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).format(new Date(ms)).replace(' ', 'T');
+}
+
+/**
+ * Edição inline do cupom. Loja e código ficam de fora: os dois formam a chave
+ * do registro — para trocar o código, exclua e crie de novo. Tudo o mais que
+ * atualizarCupomBase aceita (tipo, valor, mínimo, teto, produto até, validade,
+ * observação, restrito) vai numa única requisição.
+ */
+function editarCupom(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  if (!c) return;
+  var card = document.getElementById('cup-' + chave);
+  if (!card) return;
+  // Só um form aberto por vez: fechar outro que esteja em edição.
+  document.querySelectorAll('.cup.editando').forEach(function(el){ if (el !== card) renderCupons(); });
+
+  var num = function(v){ return v === null || v === undefined ? '' : v; };
+  var pct = c.tipo !== 'reais';
+  card.classList.add('editando');
+  card.innerHTML =
+      '<div class="cup-top">'
+    +   '<div class="cup-cod" title="Loja e código não mudam — para trocar, exclua e crie de novo">' + esc(c.codigo) + '</div>'
+    +   '<div class="cup-val" style="font-size:11px;color:var(--muted)">' + esc(c.loja || 'Outros') + '</div>'
+    + '</div>'
+    + '<div class="cup-form">'
+    +   '<div class="field"><label>Tipo</label><select id="ce-tipo" onchange="toggleLimiteEdicaoCupom()">'
+    +     '<option value="pct"' + (pct ? ' selected' : '') + '>Percentual (%)</option>'
+    +     '<option value="reais"' + (!pct ? ' selected' : '') + '>Valor fixo (R$)</option></select></div>'
+    +   '<div class="field"><label>Valor</label><input type="number" id="ce-valor" min="0" step="0.01" value="' + esc(num(c.valor)) + '"/></div>'
+    +   '<div class="field"><label>Compra mínima (R$)</label><input type="number" id="ce-minimo" min="0" step="0.01" placeholder="vazio = não informado" value="' + esc(num(c.minimo)) + '"/></div>'
+    +   '<div class="field" id="ce-limiteField"><label>Teto do desconto (R$)</label><input type="number" id="ce-limite" min="0" step="0.01" value="' + esc(num(c.limite)) + '"/></div>'
+    +   '<div class="field"><label>Produto até (R$)</label><input type="number" id="ce-maximo" min="0" step="0.01" value="' + esc(num(c.maximo)) + '"/></div>'
+    +   '<div class="field"><label>Vence em <span class="tag">Brasília</span></label><input type="datetime-local" id="ce-validade" value="' + isoParaDatetimeLocalSP(c.validadeAte) + '"/></div>'
+    +   '<div class="field full"><label>Observação</label><input type="text" id="ce-obs" placeholder="Ex: só no app" value="' + esc(c.observacao || '') + '"/></div>'
+    +   '<div class="field full"><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">'
+    +     '<input type="checkbox" id="ce-restrito" style="width:auto;accent-color:var(--accent)"' + (c.restrito === true ? ' checked' : '') + '/> 🎯 Vale só em produtos específicos</label></div>'
+    + '</div>'
+    + '<div class="cup-form-acoes">'
+    +   '<button class="btn" id="ce-btn" data-chave="' + esc(chave) + '" onclick="salvarEdicaoCupom(this)">Salvar</button>'
+    +   '<button class="btn sec" onclick="renderCupons()">Cancelar</button>'
+    +   '<span class="send-ok" id="ce-status" style="margin:0"></span>'
+    + '</div>';
+  toggleLimiteEdicaoCupom();
+  document.getElementById('ce-valor').focus();
+}
+
+function toggleLimiteEdicaoCupom() {
+  var pct = document.getElementById('ce-tipo').value === 'pct';
+  var f = document.getElementById('ce-limiteField');
+  if (!f) return;
+  f.classList.toggle('disabled', !pct);
+  if (!pct) document.getElementById('ce-limite').value = '';
+}
+
+function salvarEdicaoCupom(btn) {
+  var chave = btn.dataset.chave;
+  var c = CUPONS_CACHE.find(function(x){ return x.chave === chave; });
+  var s = document.getElementById('ce-status');
+  if (!c) return;
+
+  var valor = Number(document.getElementById('ce-valor').value);
+  if (!(valor > 0)) { s.className='send-ok send-err'; s.textContent='O valor precisa ser maior que zero.'; return; }
+  var minimoRaw = document.getElementById('ce-minimo').value;
+  var limiteRaw = document.getElementById('ce-limite').value;
+  var maximoRaw = document.getElementById('ce-maximo').value;
+  if (minimoRaw !== '' && maximoRaw !== '' && Number(maximoRaw) < Number(minimoRaw)) {
+    s.className='send-ok send-err'; s.textContent='O teto do produto não pode ser menor que a compra mínima.'; return;
+  }
+  var campos = {
+    tipo: document.getElementById('ce-tipo').value,
+    valor: valor,
+    minimo: minimoRaw === '' ? null : Number(minimoRaw),
+    limite: limiteRaw === '' ? null : Number(limiteRaw),
+    maximo: maximoRaw === '' ? null : Number(maximoRaw),
+    observacao: document.getElementById('ce-obs').value.trim() || null,
+    restrito: document.getElementById('ce-restrito').checked
+  };
+  var venc = document.getElementById('ce-validade').value;
+  if (venc) {
+    var dt = parseDatetimeAsSP(venc);
+    if (!dt || isNaN(dt.getTime())) { s.className='send-ok send-err'; s.textContent='Data de validade inválida.'; return; }
+    // Só manda validade se mudou de fato: reenviar a mesma não faz mal, mas
+    // esticar para o futuro um cupom desligado deve ser decisão explícita.
+    if (dt.toISOString() !== c.validadeAte) campos.validadeAte = dt.toISOString();
+  }
+
+  btn.disabled = true; s.className='send-ok'; s.textContent='Salvando...';
+  fetch(SERVER + '/cupons/base/' + encodeURIComponent(chave), {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(campos)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    // Espelha o que o servidor devolveu: ele pode ter desligado o cupom se a
+    // validade nova já passou.
+    if (d.cupom) Object.keys(d.cupom).forEach(function(k){ c[k] = d.cupom[k]; });
+    else Object.keys(campos).forEach(function(k){ c[k] = campos[k]; });
+    renderCupons();
+    var st = document.getElementById('cupons-status');
+    if (st) { var antes = st.textContent; st.textContent = '✓ ' + c.codigo + ' atualizado.'; setTimeout(function(){ if (st.textContent.indexOf('✓') === 0) st.textContent = antes; }, 3000); }
+  })
+  .catch(function(e){ s.className='send-ok send-err'; s.textContent='Não salvou: ' + e.message; btn.disabled = false; });
 }
 
 function excluirCupom(btn) {
