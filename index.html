@@ -1310,6 +1310,10 @@ body.travado > *:not(#login-screen){display:none !important}
       <input type="text" id="c-cupom" placeholder="Ex: PROMO10"/>
     </div>
     <div class="field" style="margin-top:12px">
+      <label>Link de resgate <span class="tag">opcional — vazio usa o link padrão da loja</span></label>
+      <input type="text" id="c-link" placeholder="Ex: link da lista de produtos do cupom"/>
+    </div>
+    <div class="field" style="margin-top:12px">
       <label>Importante <span class="tag">opcional</span></label>
       <input type="text" id="c-importante" placeholder="Ex: Válido somente hoje!" oninput="marcarImportantePronto('c-importante')"/>
       <div class="imp-prontos" data-alvo="c-importante"></div>
@@ -10136,7 +10140,8 @@ function gerarCupom() {
     limite:  document.getElementById('c-limite').value.trim(),
     codigo:  document.getElementById('c-cupom').value.trim(),
     gatilho: gatilho,
-    aviso:   cImportante
+    aviso:   cImportante,
+    link:    document.getElementById('c-link').value.trim()
   };
   fetch(SERVER + '/cupons/montar', {
     method:'POST', headers:{'Content-Type':'application/json'},
