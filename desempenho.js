@@ -19,6 +19,7 @@ const REPO_DADOS = process.env.REPO_DADOS || 'davileles/cdv-tsp-dados';
 const ARQ_DESEMPENHO = process.env.ARQUIVO_DESEMPENHO || 'tsp/desempenho-produtos.json';
 const ARQ_RASTREIO = process.env.ARQUIVO_RASTREIO || 'tsp/rastreio.json';
 const ARQ_DESCOBERTAS = process.env.ARQUIVO_DESCOBERTAS || 'tsp/vendas-descobertas.json';
+const ARQ_HISTORICO = process.env.ARQUIVO_HISTORICO || 'tsp/vendas-historico.json';
 const ARQ_CATEGORIAS = process.env.ARQUIVO_CATEGORIAS || 'tsp/categorias-amazon.json';
 // Ledger de EPC (ganho por clique) por ASIN. Diferente de desempenho-produtos,
 // que so enxerga o que NOS divulgamos via tag, este cobre TODO produto comprado
@@ -1105,6 +1106,111 @@ const idMlDoLink = (url) => {
   return m ? 'MLB' + m[1] : null;
 };
 
+// ── Historico de vendas (Mercado Livre) ───────────────────────────────────
+//
+// vendas-descobertas.json e uma FOTO da janela de revisao (15 dias) e e
+// reescrito inteiro a cada rodada — serve para "o que saiu agora", nao para
+// separar item recorrente de venda pontual. Este arquivo acumula sem prazo.
+//
+// Formato:
+//   produtos[chave] = { loja, id, nome, categoria, vendedor, link,
+//                       primeiraVenda, ultimaVenda, diasComVenda,
+//                       unidades, vendas, comissao, diretas, indiretas }
+//   dias[AAAA-MM-DD][chave] = { u, v, c, d, i }   (unidades, venda R$,
+//                                                   comissao R$, unid. diretas,
+//                                                   unid. indiretas)
+//
+// O ML revisa vendas (cancelamento, devolucao) dentro da janela. Por isso cada
+// dia da janela e SUBSTITUIDO pelo retrato atual da loja, nunca somado: rodar
+// duas vezes no mesmo dia nao duplica, e venda cancelada some do historico.
+// Dia fora da janela congela. Os totais de produtos[] sao recalculados a
+// partir de dias[] a cada gravacao, entao nunca divergem.
+//
+// So substitui se a paginacao chegou inteira: com retrato parcial, apagar os
+// dias da janela perderia vendas que ja estavam gravadas.
+async function acumularHistoricoMl(linhas, dias, totalMl) {
+  const LOJA = 'Mercado Livre';
+  if (totalMl !== null && linhas.length < totalMl) {
+    console.warn(`[desempenho] historico ML: paginacao incompleta (${linhas.length}/${totalMl}) — rodada ignorada`);
+    return;
+  }
+  const deJanela = new Set(dias);
+
+  // Retrato desta rodada, por dia e produto.
+  const retrato = {};
+  const meta = {};
+  for (const x of linhas) {
+    const m = String(x.date || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const dia = m ? `${m[3]}-${m[2]}-${m[1]}` : String(x.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !deJanela.has(dia)) continue;
+    const id = idMlDoLink(x.link);
+    // Sem id no link: o nome vira a chave, para nao misturar produtos diferentes.
+    const chave = LOJA + '|' + (id || 'nome:' + String(x.productName || '?').toLowerCase().slice(0, 120));
+    const u = Math.max(1, parseInt(x.saleUnits, 10) || 1);
+    const direta = String(x.saleType || '').toUpperCase() === 'DIRECT';
+    const doDia = (retrato[dia] = retrato[dia] || {});
+    const r = doDia[chave] || (doDia[chave] = { u: 0, v: 0, c: 0, d: 0, i: 0 });
+    r.u += u;
+    r.v = num(r.v + (parseFloat(x.saleValue) || 0));
+    r.c = num(r.c + (parseFloat(x.commissionValue) || 0));
+    if (direta) r.d += u; else r.i += u;
+    const mt = meta[chave] || (meta[chave] = { loja: LOJA, id: id || null });
+    if (!mt.nome && x.productName) mt.nome = x.productName;
+    if (!mt.categoria && x.categoryName) mt.categoria = x.categoryName;
+    if (!mt.vendedor && x.storeName) mt.vendedor = x.storeName;
+    if (!mt.link && x.link) mt.link = x.link;
+  }
+
+  const { dados } = await lerJson(ARQ_HISTORICO, null);
+  const hist = dados || { produtos: {}, dias: {} };
+  hist.produtos = hist.produtos || {};
+  hist.dias = hist.dias || {};
+
+  // Substitui os dias da janela (so as chaves desta loja).
+  for (const dia of dias) {
+    const atual = hist.dias[dia] || {};
+    for (const k of Object.keys(atual)) if (k.startsWith(LOJA + '|')) delete atual[k];
+    Object.assign(atual, retrato[dia] || {});
+    if (Object.keys(atual).length) hist.dias[dia] = atual; else delete hist.dias[dia];
+  }
+
+  // Metadados: preenche sem apagar o que ja existia (nome antigo vale ate vir outro).
+  for (const [k, mt] of Object.entries(meta)) {
+    const p = hist.produtos[k] || (hist.produtos[k] = { loja: mt.loja, id: mt.id });
+    for (const campo of ['nome', 'categoria', 'vendedor', 'link']) if (mt[campo]) p[campo] = mt[campo];
+  }
+
+  // Totais recalculados do zero a partir de dias[].
+  for (const p of Object.values(hist.produtos)) {
+    Object.assign(p, { primeiraVenda: null, ultimaVenda: null, diasComVenda: 0,
+      unidades: 0, vendas: 0, comissao: 0, diretas: 0, indiretas: 0 });
+  }
+  for (const dia of Object.keys(hist.dias).sort()) {
+    for (const [k, r] of Object.entries(hist.dias[dia])) {
+      const p = hist.produtos[k] || (hist.produtos[k] = { loja: k.split('|')[0], id: null });
+      if (!p.primeiraVenda) p.primeiraVenda = dia;
+      p.ultimaVenda = dia;
+      p.diasComVenda += 1;
+      p.unidades += r.u;
+      p.vendas = num(p.vendas + r.v);
+      p.comissao = num(p.comissao + r.c);
+      p.diretas += r.d;
+      p.indiretas += r.i;
+    }
+  }
+  // Produto cujas vendas foram todas canceladas nao fica como fantasma.
+  for (const [k, p] of Object.entries(hist.produtos)) if (!p.diasComVenda) delete hist.produtos[k];
+
+  hist.atualizadoEm = new Date().toISOString();
+  const todosDias = Object.keys(hist.dias).sort();
+  hist.periodo = { de: todosDias[0] || null, ate: todosDias[todosDias.length - 1] || null };
+
+  await gravarJson(ARQ_HISTORICO, hist,
+    `chore: historico de vendas ML (${Object.keys(hist.produtos).length} produtos)`);
+  console.log(`[desempenho] historico ML: ${Object.keys(hist.produtos).length} produtos, `
+    + `${todosDias.length} dias (${hist.periodo.de} → ${hist.periodo.ate})`);
+}
+
 async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
   if (!ML_COOKIE) {
     console.log('[desempenho] ML_COOKIE ausente — Mercado Livre ignorado');
@@ -1126,6 +1232,7 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
     + '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
   const linhas = [];
+  let totalMl = null;
   for (let pagina = 1; pagina <= 20; pagina++) {
     const qs = new URLSearchParams({
       filter_time_range: range, items_per_page: '50', order_by: 'ord_date_created',
@@ -1137,11 +1244,17 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
     if (!r.ok) throw new Error(`sales/general: status ${r.status}`);
     const j = await r.json();
     const lote = j.item_list || [];
+    if (typeof j.total_results === 'number') totalMl = j.total_results;
     linhas.push(...lote);
     if (lote.length < 50 || linhas.length >= (j.total_results || 0)) break;
     await new Promise((res) => setTimeout(res, 400));
   }
   marcarColeta?.('Mercado Livre');
+
+  // Historico permanente de TODAS as vendas (diretas, indiretas, dentro e fora
+  // do ledger). Enriquecimento: falha aqui nao pode custar o desempenho.
+  try { await acumularHistoricoMl(linhas, dias, totalMl); }
+  catch (e) { console.warn('[desempenho] historico ML nao gravou —', e.message); }
 
   logarCamposMl(linhas[0]);
 
