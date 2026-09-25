@@ -137,6 +137,19 @@ let _campoSubId = null;
 
 async function descobrirCampoSubId() {
   if (_campoSubId !== null) return _campoSubId;
+  // Sondagem direta primeiro: a introspecao (__schema/__type) nao responde na
+  // Open API da Shopee — voltava vazia sem log e, com campo '', as vendas por
+  // sub_id nunca eram lidas. Pedir o campo com limit:1 e o teste mais barato.
+  const fim = Math.floor(Date.now() / 1000), ini = fim - 7 * 86400;
+  for (const cand of ['utmContent', 'subIds', 'subId']) {
+    try {
+      await shopeeGql(`{ conversionReport(purchaseTimeStart:${ini}, purchaseTimeEnd:${fim}, limit:1)`
+        + `{ nodes { ${cand} } } }`);
+      _campoSubId = cand;
+      console.log('[desempenho] campo de sub_id na Shopee (sondagem): ' + cand);
+      return cand;
+    } catch (e) { /* campo inexistente: tenta o proximo */ }
+  }
   const d = await shopeeGql('{ __schema { queryType { fields { name type { name ofType { name } } } } } }');
   const campos = d?.__schema?.queryType?.fields || [];
   const conv = campos.find((f) => f.name === 'conversionReport');
@@ -315,6 +328,24 @@ const numApi = (v) => {
   return Number.isFinite(f) ? f : 0;
 };
 
+// A API da Amazon responde 200 com uma pagina HTML (login ou verificacao de
+// robo) quando a sessao cai ou quando ha requisicoes demais. Continuar
+// pedindo nesse estado e o jeito mais rapido de a Amazon derrubar o cookie de
+// vez — na recuperacao de 90 dias de 25/09 foram dezenas seguidas. Esse erro
+// e marcado para os lacos pararem na primeira ocorrencia.
+class AmazonBloqueio extends Error {}
+async function jsonAmazon(r) {
+  const txt = await r.text();
+  if (/^\s*</.test(txt)) {
+    throw new AmazonBloqueio('Amazon devolveu HTML em vez de JSON (sessao caiu ou limite de requisicoes) — varredura interrompida');
+  }
+  return JSON.parse(txt);
+}
+// Pausa entre consultas diarias e teto de dias por rodada na Amazon. A rodada
+// normal (15 dias) cabe folgada; a recuperacao longa vai completando por partes.
+const AMZ_PAUSA_MS = Number(process.env.AMZ_PAUSA_MS || 1500);
+const AMZ_MAX_DIAS = Number(process.env.AMZ_MAX_DIAS || 30);
+
 /** Linhas (uma por tag com atividade) do dia `data` (YYYY-MM-DD). */
 async function amazonTagsDoDia(ctx, data) {
   const qs = new URLSearchParams({
@@ -338,7 +369,7 @@ async function amazonTagsDoDia(ctx, data) {
   }
   if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
   if (!r.ok) throw new Error(`reporting/table: status ${r.status}`);
-  const j = await r.json();
+  const j = await jsonAmazon(r);
   return j.records || [];
 }
 
@@ -639,7 +670,7 @@ async function amazonProdutosVinculadosPagina(ctx, de, ate, skip, token) {
     const r = await req('https://associados.amazon.com.br/reporting/table?' + qs.toString(),
       { headers: ctx.headers });
     if (r.status === 401) throw new Error('API recusou o token (401) — renove AMAZON_COOKIE');
-    if (r.ok) return r.json();
+    if (r.ok) return jsonAmazon(r);
     if (![429, 500, 502, 503].includes(r.status) || tent >= VINC_ESPERAS.length) {
       throw new Error(`produtos vinculados: status ${r.status}`);
     }
@@ -792,7 +823,11 @@ async function acumularEpcAmazon(ctx, janela, categoriaDe) {
   for (const dia of faltando) {
     let linhas;
     try { linhas = await amazonProdutosVinculados(ctx, dia, dia); }
-    catch (e) { console.warn(`[desempenho] EPC ${dia}: ${e.message}`); continue; }
+    catch (e) {
+      console.warn(`[desempenho] EPC ${dia}: ${e.message}`);
+      if (e instanceof AmazonBloqueio) break;
+      continue;
+    }
 
     const doDia = {};
     for (const it of linhas) {
@@ -928,10 +963,14 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
   const ctx = await amazonContexto();
 
   let mudou = 0;
-  for (const dia of janela) {
+  for (const dia of [...janela].sort().slice(-AMZ_MAX_DIAS)) {
     let linhas;
     try { linhas = await amazonTagsDoDia(ctx, dia); }
-    catch (e) { console.warn(`[desempenho] Amazon ${dia}: ${e.message}`); continue; }
+    catch (e) {
+      console.warn(`[desempenho] Amazon ${dia}: ${e.message}`);
+      if (e instanceof AmazonBloqueio) throw e;
+      continue;
+    }
 
     for (const l of linhas) {
       const ref = String(l.tag_value || '');
@@ -949,7 +988,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       if (!attr) continue; // tráfego anterior à primeira atribuição desse ref
       mudou += registrar(dia, attr, registro);
     }
-    await new Promise((res) => setTimeout(res, 400));
+    await new Promise((res) => setTimeout(res, AMZ_PAUSA_MS));
   }
 
   // Produtos comprados na janela: o ledger diz quais divulgamos, e o resto e
@@ -958,7 +997,7 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
   // parcela indireta dele nao e desempenho do disparo.
   if (coletarNaoAtribuida) {
     try {
-      const dias = [...janela].sort();
+      const dias = [...janela].sort().slice(-AMZ_MAX_DIAS);
       const doLedger = new Set(atribuicoes
         .filter((a) => /amazon/i.test(String(a.loja || '')))
         .map((a) => String(a.asin || '').toUpperCase()));
@@ -1258,7 +1297,7 @@ async function acumularHistoricoMl(linhas, dias, totalMl) {
 // Amazon: o relatorio de produtos vinculados e agregado pelo intervalo pedido,
 // entao o historico por dia exige uma consulta por dia. Teto configuravel para
 // o backfill nao estourar o tempo do Actions.
-const HIST_AMAZON_MAX_DIAS = Number(process.env.HIST_AMAZON_MAX_DIAS || 120);
+const HIST_AMAZON_MAX_DIAS = Number(process.env.HIST_AMAZON_MAX_DIAS || 30);
 
 async function historicoAmazon(ctx, dias, categoriaDe) {
   const registros = [];
@@ -1266,7 +1305,11 @@ async function historicoAmazon(ctx, dias, categoriaDe) {
   for (const dia of [...dias].sort().slice(-HIST_AMAZON_MAX_DIAS)) {
     let linhas;
     try { linhas = await amazonProdutosVinculados(ctx, dia, dia); }
-    catch (e) { console.warn(`[desempenho] historico Amazon ${dia}: ${e.message}`); continue; }
+    catch (e) {
+      console.warn(`[desempenho] historico Amazon ${dia}: ${e.message}`);
+      if (e instanceof AmazonBloqueio) break;
+      continue;
+    }
     cobertos.push(dia);
     for (const it of linhas) {
       const asin = String(it.linked_product || '').toUpperCase();
@@ -1283,7 +1326,7 @@ async function historicoAmazon(ctx, dias, categoriaDe) {
         i: Math.round(numApi(it.indirect_ordered_items)),
       });
     }
-    await new Promise((res) => setTimeout(res, 500));
+    await new Promise((res) => setTimeout(res, AMZ_PAUSA_MS));
   }
   await acumularHistorico('Amazon', registros, cobertos);
 }
@@ -1418,16 +1461,23 @@ async function desempenhoAwin(janela, atribuicoes, registrar) {
   }
   if (!porRef.size) { console.log('[desempenho] ledger sem refs da Awin'); return 0; }
 
+  // A API de transacoes recusa (400) intervalo acima de 31 dias: a
+  // recuperacao de 90 dias derrubava a Awin inteira. Consulta em blocos de 30.
   const dias = [...janela].sort();
-  const url = `https://api.awin.com/publishers/${AWIN_PUBLISHER_ID}/transactions/`
-    + `?startDate=${encodeURIComponent(dias[0] + 'T00:00:00')}`
-    + `&endDate=${encodeURIComponent(dias[dias.length - 1] + 'T23:59:59')}`
-    + `&timezone=America/Sao_Paulo`;
-  const r = await req(url, { headers: { Authorization: 'Bearer ' + AWIN_TOKEN, accept: 'application/json' } });
-  if (r.status === 401 || r.status === 403) throw new Error('AWIN_TOKEN recusado (' + r.status + ')');
-  if (!r.ok) throw new Error(`transacoes Awin: status ${r.status}`);
-  const trans = await r.json();
-  if (!Array.isArray(trans)) throw new Error('resposta inesperada da API de transacoes');
+  const trans = [];
+  for (let k = 0; k < dias.length; k += 30) {
+    const bloco = dias.slice(k, k + 30);
+    const url = `https://api.awin.com/publishers/${AWIN_PUBLISHER_ID}/transactions/`
+      + `?startDate=${encodeURIComponent(bloco[0] + 'T00:00:00')}`
+      + `&endDate=${encodeURIComponent(bloco[bloco.length - 1] + 'T23:59:59')}`
+      + `&timezone=America/Sao_Paulo`;
+    const r = await req(url, { headers: { Authorization: 'Bearer ' + AWIN_TOKEN, accept: 'application/json' } });
+    if (r.status === 401 || r.status === 403) throw new Error('AWIN_TOKEN recusado (' + r.status + ')');
+    if (!r.ok) throw new Error(`transacoes Awin (${bloco[0]} a ${bloco[bloco.length - 1]}): status ${r.status}`);
+    const lote = await r.json();
+    if (!Array.isArray(lote)) throw new Error('resposta inesperada da API de transacoes');
+    trans.push(...lote);
+  }
 
   // Agrega por (ref, dia). Estornos vem como valores negativos e revisam o
   // dia na rodada seguinte, como nas demais lojas.
@@ -1472,6 +1522,10 @@ function chaveProduto(loja, asin) {
  * do ref, e venda indireta; se nao ha ref nosso, e compra de link antigo ou de
  * outro canal e fica de fora.
  */
+const ITENS_COMPLETOS = 'itemId itemName itemPrice qty actualAmount itemTotalCommission globalCategoryLv1Name shopName';
+const ITENS_MINIMOS = 'itemId itemName itemPrice qty actualAmount itemTotalCommission';
+let _itensMinimos = false;
+
 async function shopeeItensComprados(inicio, fim) {
   const campo = await descobrirCampoSubId();
   if (!campo) return [];
@@ -1480,11 +1534,19 @@ async function shopeeItensComprados(inicio, fim) {
   let scrollId = null, guard = 0;
   do {
     const sc = scrollId ? `, scrollId:"${scrollId}"` : '';
-    const d = await shopeeGql(`{ conversionReport(purchaseTimeStart:${inicio}, `
+    const consulta = (itens) => shopeeGql(`{ conversionReport(purchaseTimeStart:${inicio}, `
       + `purchaseTimeEnd:${fim}, limit:500${sc}){ `
-      + `nodes { ${campo} orders { items { itemId itemName itemPrice qty `
-      + 'actualAmount itemTotalCommission globalCategoryLv1Name shopName } } } '
+      + `nodes { ${campo} orders { items { ${itens} } } } `
       + 'pageInfo { hasNextPage scrollId } } }');
+    let d;
+    if (!_itensMinimos) {
+      try { d = await consulta(ITENS_COMPLETOS); }
+      catch (e) {
+        _itensMinimos = true;
+        console.warn('[desempenho] Shopee: campos opcionais do item recusados, usando o minimo —', e.message);
+      }
+    }
+    if (!d) d = await consulta(ITENS_MINIMOS);
 
     const rep = d?.conversionReport;
     if (!rep) break;
