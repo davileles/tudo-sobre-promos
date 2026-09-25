@@ -2487,9 +2487,25 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ RESULTADOS: LTV DOS MEMBROS ════════ -->
 <div class="panel" id="panel-descobertas">
   <div class="aviso">
-    O que o público comprou <b>além do que disparamos</b>: venda indireta (entrou por um link nosso
-    e levou outro produto) e itens ainda fora da base. Serve para decidir o que divulgar depois —
-    use <b>➕ Enviar para a base</b> para copiar o link e cadastrar na aba Vitrine.
+    O que o público comprou pelos nossos links, em <b>todas as lojas</b>: venda direta (levou o
+    produto divulgado), venda indireta (entrou por um link nosso e levou outro produto) e itens ainda
+    fora da base. Escolha o período para ver curto, médio ou longo prazo — o histórico é acumulado dia
+    a dia e não se perde. Use <b>➕ Enviar para a base</b> para copiar o link e cadastrar na aba Vitrine.
+  </div>
+
+  <div class="fila-bar" style="margin-bottom:10px">
+    <span style="font-size:12px;color:var(--muted)">Período</span>
+    <div class="fila-acoes">
+      <select id="desc-periodo" onchange="carregarDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
+        <option value="7">Últimos 7 dias</option>
+        <option value="15">Últimos 15 dias</option>
+        <option value="30" selected>Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="180">Últimos 180 dias</option>
+        <option value="tudo">Todo o histórico</option>
+        <option value="foto">Foto da última coleta (com link de origem)</option>
+      </select>
+    </div>
   </div>
 
   <div class="card" id="desc-resumo" style="display:none">
@@ -2508,9 +2524,11 @@ body.travado > *:not(#login-screen){display:none !important}
       <select id="desc-loja" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px"></select>
       <select id="desc-tipo" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
         <option value="">Todos os tipos</option>
-        <option value="indireta">Venda indireta</option>
+        <option value="mista">Direta e indireta</option>
         <option value="direta_fora_do_ledger">Direta fora da base</option>
         <option value="nao_divulgado">Não divulgado</option>
+        <option value="direta">Venda direta</option>
+        <option value="indireta">Venda indireta</option>
       </select>
       <select id="desc-origem" onchange="renderDescobertas()" style="width:auto;padding:7px 10px;font-size:12px">
         <option value="">Com e sem origem</option>
@@ -7367,6 +7385,8 @@ function rtGrafico(){
 // servido pelo proxy CDV.
 var DESC_CACHE = [], DESC_META = null;
 var DESC_ROTULO_TIPO = {
+  direta: 'venda direta',
+  mista: 'direta + indireta',
   indireta: 'venda indireta',
   direta_fora_do_ledger: 'direta fora da base',
   nao_divulgado: 'não divulgado'
@@ -7394,10 +7414,30 @@ function descOrigemHtml(x){
     + '</div>';
 }
 
+// Periodo: 'foto' le a foto da ultima coleta (tsp/vendas-descobertas.json, que
+// traz o link de origem da Shopee); os demais leem o historico acumulado dia a
+// dia (tsp/vendas-historico.json) pelo proxy com ?periodo=.
+function descUrl(periodo){
+  return DIST_PROXY + '/afiliados/descobertas?limite=2000'
+    + (periodo && periodo !== 'foto' ? '&periodo=' + encodeURIComponent(periodo) : '')
+    + '&t=' + Date.now();
+}
+
 function carregarDescobertas(){
   document.getElementById('desc-status').textContent = 'Carregando...';
-  return fetch(DIST_PROXY + '/afiliados/descobertas?limite=2000&t=' + Date.now(), { cache:'no-cache' })
+  var selP = document.getElementById('desc-periodo');
+  var periodo = selP ? selP.value : 'foto';
+  return fetch(descUrl(periodo), { cache:'no-cache' })
     .then(function(r){ return r.json(); })
+    .then(function(d){
+      // Historico ainda vazio (antes da primeira coleta nova) ou proxy antigo
+      // sem ?periodo=: cai na foto em vez de mostrar tela vazia.
+      if (periodo !== 'foto' && d && d.ok && (d.fonte !== 'historico' || !(d.itens || []).length)) {
+        return fetch(descUrl('foto'), { cache:'no-cache' }).then(function(r){ return r.json(); })
+          .then(function(f){ if (f && f.ok) f.semHistorico = true; return f; });
+      }
+      return d;
+    })
     .then(function(d){
       if (!d || !d.ok) throw new Error(d && d.erro ? d.erro : 'resposta inválida');
       DESC_CACHE = d.itens || [];
@@ -7459,8 +7499,16 @@ function renderDescobertas(){
     Object.keys(DESC_META.porLoja || {}).forEach(function(l){
       if (DESC_META.porLoja[l] && DESC_META.porLoja[l].defasado) atrasadas.push(l);
     });
+    // Loja cujo historico comeca depois do inicio do periodo: total incompleto.
+    var parciais = [];
+    Object.keys(DESC_META.porLoja || {}).forEach(function(l){
+      var hd = DESC_META.porLoja[l] && DESC_META.porLoja[l].historicoDesde;
+      if (hd) parciais.push(l + ' desde ' + hd.split('-').reverse().join('/'));
+    });
     document.getElementById('desc-janela').textContent =
-      'Janela ' + DESC_META.janela.de + ' a ' + DESC_META.janela.ate
+      (DESC_META.fonte === 'historico' ? 'Histórico de ' : 'Janela ') + DESC_META.janela.de + ' a ' + DESC_META.janela.ate
+      + (DESC_META.semHistorico ? ' · histórico acumulado ainda sem dados para este período — mostrando a foto da última coleta' : '')
+      + (parciais.length ? ' · histórico disponível: ' + parciais.join(', ') : '')
       + (DESC_META.atualizadoEm ? ' · atualizado em ' + new Date(DESC_META.atualizadoEm).toLocaleString('pt-BR') : '')
       + (atrasadas.length ? ' · ' + atrasadas.join(', ') + ' nao respondeu na ultima coleta (numeros da rodada anterior)' : '');
   }
@@ -7506,7 +7554,10 @@ function renderDescobertas(){
                   + 'dado anterior</span>' : '')
               + (x.categoria ? '<span>' + esc(x.categoria) + '</span>' : '')
               + (x.vendedor ? '<span>· ' + esc(x.vendedor) + '</span>' : '')
-              + (x.ocorrencias ? '<span>· ' + x.ocorrencias + ' pedido(s)</span>' : '')
+              + (DESC_META && DESC_META.fonte === 'historico'
+                  ? '<span>· ' + (x.diretas||0) + ' direta(s) · ' + (x.indiretas||0) + ' indireta(s) · '
+                    + (x.diasComVenda||0) + ' dia(s) com venda</span>'
+                  : (x.ocorrencias ? '<span>· ' + x.ocorrencias + ' pedido(s)</span>' : ''))
             + '</div>'
             + descOrigemHtml(x)
           + '</div>'

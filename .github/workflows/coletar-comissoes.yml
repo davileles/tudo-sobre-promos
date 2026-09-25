@@ -13,7 +13,12 @@ on:
     # 23:00 UTC = 20:00 SP — rodada que fecha a Shopee (cliques + comissão).
     # Para Amazon e ML esta rodada só revisa o que já estava gravado.
     - cron: '0 23 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dias_historico:
+        description: 'Recuperar histórico de vendas de quantos dias para trás (vazio = rodada normal de 15; máx. 180)'
+        required: false
+        default: ''
 
 # Duas rodadas simultâneas gravando o mesmo JSON via API produzem lost update.
 concurrency:
@@ -55,4 +60,8 @@ jobs:
           GH_TOKEN_DADOS: ${{ secrets.GH_TOKEN_DADOS }}
           AWIN_TOKEN: ${{ secrets.AWIN_TOKEN }}
           AWIN_PUBLISHER_ID: ${{ secrets.AWIN_PUBLISHER_ID }}
+          # Recuperacao manual: amplia so a etapa de desempenho/historico.
+          DIAS_HISTORICO: ${{ github.event.inputs.dias_historico }}
+          # No backfill o ledger de EPC tambem pode preencher mais dias por rodada.
+          EPC_MAX_DIAS: ${{ github.event.inputs.dias_historico || '8' }}
         run: node coletar-comissoes.js

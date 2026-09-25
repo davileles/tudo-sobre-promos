@@ -49,6 +49,10 @@ const PROXY_URL = process.env.CDV_PROXY_URL || 'https://cdv-proxy-production.up.
 
 const ATIVO = process.env.COLETA_COMISSOES !== 'false';
 const JANELA_REV = Number(process.env.JANELA_REV || 15);
+// Recuperacao de historico (disparo manual com dias_historico): a etapa de
+// desempenho/historico varre mais dias para tras que a janela de revisao das
+// comissoes. So vale quando maior que JANELA_REV; vazio = rodada normal.
+const DIAS_HISTORICO = Math.min(Number(process.env.DIAS_HISTORICO || 0) || 0, 180);
 
 // [rótulo, cookie] — o rótulo só aparece em log e mensagem de erro, para o
 // alerta dizer QUAL sessão caiu. A ordem não importa: tudo é somado.
@@ -434,7 +438,13 @@ async function main() {
   // gravação principal justamente para que uma falha aqui (schema da Shopee
   // mudou, ledger indisponível) não leve junto o número consolidado do dia.
   try {
-    await atualizarDesempenho(janela, inicioDoDia, fimDoDia);
+    const janelaDesempenho = DIAS_HISTORICO > JANELA_REV
+      ? Array.from({ length: DIAS_HISTORICO }, (_, i) => diasAtras(ontem, i)).reverse()
+      : janela;
+    if (janelaDesempenho !== janela) {
+      console.log(`[desempenho] recuperacao de historico: ${janelaDesempenho[0]} → ${ontem} (${DIAS_HISTORICO} dias)`);
+    }
+    await atualizarDesempenho(janelaDesempenho, inicioDoDia, fimDoDia);
   } catch (e) {
     console.warn('[desempenho] falhou:', e.message);
   }

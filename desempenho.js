@@ -52,6 +52,16 @@ async function req(url, opts = {}, ms = 30000) {
 
 const num = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
 
+// A Shopee devolve o sub_id como os cinco slots unidos por hifen: um link
+// gerado com subIds:[ref] aparece no relatorio como "ref----". Comparar o
+// texto cru com o ref do ledger nunca casava — foi por isso que a Shopee nao
+// tinha uma unica linha em desempenho-produtos desde agosto. O disparo so usa
+// o primeiro slot, entao o ref e o primeiro segmento nao vazio.
+function refShopee(bruto) {
+  const s = Array.isArray(bruto) ? String(bruto[0] || '') : String(bruto || '');
+  return s.split('-').map((x) => x.trim()).find(Boolean) || '';
+}
+
 // ── GitHub ────────────────────────────────────────────────────────────────
 
 async function lerJson(caminho, padrao = null) {
@@ -166,7 +176,7 @@ async function shopeeConversaoPorSubId(inicio, fim) {
     if (!rep) break;
     for (const n of rep.nodes || []) {
       const bruto = n[campo];
-      const ref = Array.isArray(bruto) ? String(bruto[0] || '') : String(bruto || '');
+      const ref = refShopee(bruto);
       if (!ref) continue;
       const reg = out[ref] || (out[ref] = { pedidos: 0, vendas: 0, comissao: 0 });
       reg.pedidos += 1;
@@ -216,7 +226,7 @@ async function shopeeCliquesPorSubId(inicio, fim) {
     }
 
     for (const l of linhas) {
-      const ref = String(l[chave] || '');
+      const ref = refShopee(l[chave]);
       if (!ref) continue;
       out[ref] = (out[ref] || 0) + 1;
     }
@@ -670,7 +680,7 @@ async function amazonProdutosVinculados(ctx, de, ate) {
 const EPC_RETENCAO_DIAS = 180;
 // Teto de dias novos por rodada. A primeira rodada tem uma janela inteira em
 // aberto e o Actions tem tempo limitado; o resto entra nas rodadas seguintes.
-const EPC_MAX_DIAS_RODADA = 8;
+const EPC_MAX_DIAS_RODADA = Number(process.env.EPC_MAX_DIAS || 8);
 // Horizonte do EPC publicado. Comportamento de compra de 6 meses atras nao
 // descreve o publico de hoje.
 const EPC_JANELA_DIAS = 90;
@@ -1023,6 +1033,10 @@ async function desempenhoAmazon(janela, atribuicoes, registrar, coletarNaoAtribu
       try { await salvarCategorias(salvas, aplicadas); }
       catch (e) { console.warn('[desempenho] Amazon: cache de categorias nao gravou —', e.message); }
 
+      // Historico permanente por dia (todas as lojas usam o mesmo arquivo).
+      try { await historicoAmazon(ctx, dias, categoriaDe); }
+      catch (e) { console.warn('[desempenho] historico Amazon nao gravou —', e.message); }
+
       // Ledger de EPC: mesma fonte (produtos vinculados), outra pergunta. As
       // descobertas respondem "o que o publico comprou alem do que divulgamos";
       // o EPC responde "quanto cada produto paga por clique gasto". Roda por
@@ -1106,59 +1120,59 @@ const idMlDoLink = (url) => {
   return m ? 'MLB' + m[1] : null;
 };
 
-// ── Historico de vendas (Mercado Livre) ───────────────────────────────────
+// ── Historico de vendas (todas as lojas) ──────────────────────────────────
 //
-// vendas-descobertas.json e uma FOTO da janela de revisao (15 dias) e e
-// reescrito inteiro a cada rodada — serve para "o que saiu agora", nao para
-// separar item recorrente de venda pontual. Este arquivo acumula sem prazo.
+// vendas-descobertas.json e uma FOTO da janela de revisao e e reescrito
+// inteiro a cada rodada — serve para "o que saiu agora", nao para separar item
+// recorrente de venda pontual. Este arquivo acumula sem prazo, para qualquer
+// loja, e e dele que o painel tira as visoes de curto, medio e longo prazo.
 //
 // Formato:
-//   produtos[chave] = { loja, id, nome, categoria, vendedor, link,
-//                       primeiraVenda, ultimaVenda, diasComVenda,
-//                       unidades, vendas, comissao, diretas, indiretas }
-//   dias[AAAA-MM-DD][chave] = { u, v, c, d, i }   (unidades, venda R$,
-//                                                   comissao R$, unid. diretas,
-//                                                   unid. indiretas)
+//   produtos["Loja|id"] = { loja, id, nome, categoria, vendedor, link,
+//                           primeiraVenda, ultimaVenda, diasComVenda,
+//                           unidades, vendas, comissao, diretas, indiretas }
+//   dias[AAAA-MM-DD]["Loja|id"] = { u, v, c, d, i }  (unidades, venda R$,
+//                                                     comissao R$, unid. diretas,
+//                                                     unid. indiretas)
 //
-// O ML revisa vendas (cancelamento, devolucao) dentro da janela. Por isso cada
-// dia da janela e SUBSTITUIDO pelo retrato atual da loja, nunca somado: rodar
-// duas vezes no mesmo dia nao duplica, e venda cancelada some do historico.
-// Dia fora da janela congela. Os totais de produtos[] sao recalculados a
-// partir de dias[] a cada gravacao, entao nunca divergem.
+// As lojas revisam vendas (cancelamento, devolucao) dentro da janela. Por isso
+// cada dia COBERTO nesta rodada e SUBSTITUIDO pelo retrato atual daquela loja,
+// nunca somado: rodar duas vezes nao duplica e venda cancelada some. Dia que a
+// loja nao respondeu (ou fora da janela) fica como estava. Os totais de
+// produtos[] sao recalculados a partir de dias[] a cada gravacao.
 //
-// So substitui se a paginacao chegou inteira: com retrato parcial, apagar os
-// dias da janela perderia vendas que ja estavam gravadas.
-async function acumularHistoricoMl(linhas, dias, totalMl) {
-  const LOJA = 'Mercado Livre';
-  if (totalMl !== null && linhas.length < totalMl) {
-    console.warn(`[desempenho] historico ML: paginacao incompleta (${linhas.length}/${totalMl}) — rodada ignorada`);
-    return;
-  }
-  const deJanela = new Set(dias);
+// Direta x indireta por loja:
+//   ML      — saleType DIRECT/INDIRECT do proprio relatorio.
+//   Shopee  — direta quando o item comprado e o do sub_id; o resto (outro item,
+//             ou compra sem sub_id nosso) entra como indireta.
+//   Amazon  — direct_/indirect_ordered_items da linha do produto vinculado.
+function chaveHistorico(loja, id, nome) {
+  return loja + '|' + (id || 'nome:' + String(nome || '?').toLowerCase().slice(0, 120));
+}
 
-  // Retrato desta rodada, por dia e produto.
+/**
+ * registros: [{ dia, id, nome, categoria, vendedor, link, u, v, c, d, i }]
+ * diasCobertos: dias em que a loja respondeu inteira — so esses sao substituidos.
+ */
+async function acumularHistorico(loja, registros, diasCobertos) {
+  const cobertos = [...new Set(diasCobertos)].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (!cobertos.length) return;
+  const deJanela = new Set(cobertos);
+
   const retrato = {};
   const meta = {};
-  for (const x of linhas) {
-    const m = String(x.date || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    const dia = m ? `${m[3]}-${m[2]}-${m[1]}` : String(x.date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || !deJanela.has(dia)) continue;
-    const id = idMlDoLink(x.link);
-    // Sem id no link: o nome vira a chave, para nao misturar produtos diferentes.
-    const chave = LOJA + '|' + (id || 'nome:' + String(x.productName || '?').toLowerCase().slice(0, 120));
-    const u = Math.max(1, parseInt(x.saleUnits, 10) || 1);
-    const direta = String(x.saleType || '').toUpperCase() === 'DIRECT';
-    const doDia = (retrato[dia] = retrato[dia] || {});
+  for (const x of registros) {
+    if (!deJanela.has(x.dia)) continue;
+    const chave = chaveHistorico(loja, x.id, x.nome);
+    const doDia = (retrato[x.dia] = retrato[x.dia] || {});
     const r = doDia[chave] || (doDia[chave] = { u: 0, v: 0, c: 0, d: 0, i: 0 });
-    r.u += u;
-    r.v = num(r.v + (parseFloat(x.saleValue) || 0));
-    r.c = num(r.c + (parseFloat(x.commissionValue) || 0));
-    if (direta) r.d += u; else r.i += u;
-    const mt = meta[chave] || (meta[chave] = { loja: LOJA, id: id || null });
-    if (!mt.nome && x.productName) mt.nome = x.productName;
-    if (!mt.categoria && x.categoryName) mt.categoria = x.categoryName;
-    if (!mt.vendedor && x.storeName) mt.vendedor = x.storeName;
-    if (!mt.link && x.link) mt.link = x.link;
+    r.u += x.u || 0;
+    r.v = num(r.v + (x.v || 0));
+    r.c = num(r.c + (x.c || 0));
+    r.d += x.d || 0;
+    r.i += x.i || 0;
+    const mt = meta[chave] || (meta[chave] = { loja, id: x.id || null });
+    for (const campo of ['nome', 'categoria', 'vendedor', 'link']) if (!mt[campo] && x[campo]) mt[campo] = x[campo];
   }
 
   const { dados } = await lerJson(ARQ_HISTORICO, null);
@@ -1166,10 +1180,10 @@ async function acumularHistoricoMl(linhas, dias, totalMl) {
   hist.produtos = hist.produtos || {};
   hist.dias = hist.dias || {};
 
-  // Substitui os dias da janela (so as chaves desta loja).
-  for (const dia of dias) {
+  // Substitui os dias cobertos (so as chaves desta loja).
+  for (const dia of cobertos) {
     const atual = hist.dias[dia] || {};
-    for (const k of Object.keys(atual)) if (k.startsWith(LOJA + '|')) delete atual[k];
+    for (const k of Object.keys(atual)) if (k.startsWith(loja + '|')) delete atual[k];
     Object.assign(atual, retrato[dia] || {});
     if (Object.keys(atual).length) hist.dias[dia] = atual; else delete hist.dias[dia];
   }
@@ -1204,11 +1218,74 @@ async function acumularHistoricoMl(linhas, dias, totalMl) {
   hist.atualizadoEm = new Date().toISOString();
   const todosDias = Object.keys(hist.dias).sort();
   hist.periodo = { de: todosDias[0] || null, ate: todosDias[todosDias.length - 1] || null };
+  // Primeiro dia com dado de cada loja: o painel usa para avisar que um
+  // periodo longo ainda nao tem historico completo daquela loja.
+  hist.inicioPorLoja = hist.inicioPorLoja || {};
+  const cobertosOrd = cobertos.sort();
+  if (!hist.inicioPorLoja[loja] || cobertosOrd[0] < hist.inicioPorLoja[loja]) hist.inicioPorLoja[loja] = cobertosOrd[0];
 
+  const daLoja = Object.values(hist.produtos).filter((p) => p.loja === loja).length;
   await gravarJson(ARQ_HISTORICO, hist,
-    `chore: historico de vendas ML (${Object.keys(hist.produtos).length} produtos)`);
-  console.log(`[desempenho] historico ML: ${Object.keys(hist.produtos).length} produtos, `
-    + `${todosDias.length} dias (${hist.periodo.de} → ${hist.periodo.ate})`);
+    `chore: historico de vendas ${loja} (${cobertos.length} dia(s), ${daLoja} produtos)`);
+  console.log(`[desempenho] historico ${loja}: ${cobertos.length} dia(s) coberto(s) `
+    + `(${cobertosOrd[0]} → ${cobertosOrd[cobertosOrd.length - 1]}), ${daLoja} produtos da loja, `
+    + `${todosDias.length} dias no arquivo`);
+}
+
+// ML: so substitui se a paginacao chegou inteira — com retrato parcial, apagar
+// os dias da janela perderia vendas que ja estavam gravadas.
+async function acumularHistoricoMl(linhas, dias, totalMl) {
+  if (totalMl !== null && linhas.length < totalMl) {
+    console.warn(`[desempenho] historico ML: paginacao incompleta (${linhas.length}/${totalMl}) — rodada ignorada`);
+    return;
+  }
+  const registros = [];
+  for (const x of linhas) {
+    const m = String(x.date || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const dia = m ? `${m[3]}-${m[2]}-${m[1]}` : String(x.date || '').slice(0, 10);
+    const u = Math.max(1, parseInt(x.saleUnits, 10) || 1);
+    const direta = String(x.saleType || '').toUpperCase() === 'DIRECT';
+    registros.push({
+      dia, id: idMlDoLink(x.link), nome: x.productName || '', categoria: x.categoryName || '',
+      vendedor: x.storeName || '', link: x.link || '',
+      u, v: parseFloat(x.saleValue) || 0, c: parseFloat(x.commissionValue) || 0,
+      d: direta ? u : 0, i: direta ? 0 : u,
+    });
+  }
+  await acumularHistorico('Mercado Livre', registros, dias);
+}
+
+// Amazon: o relatorio de produtos vinculados e agregado pelo intervalo pedido,
+// entao o historico por dia exige uma consulta por dia. Teto configuravel para
+// o backfill nao estourar o tempo do Actions.
+const HIST_AMAZON_MAX_DIAS = Number(process.env.HIST_AMAZON_MAX_DIAS || 120);
+
+async function historicoAmazon(ctx, dias, categoriaDe) {
+  const registros = [];
+  const cobertos = [];
+  for (const dia of [...dias].sort().slice(-HIST_AMAZON_MAX_DIAS)) {
+    let linhas;
+    try { linhas = await amazonProdutosVinculados(ctx, dia, dia); }
+    catch (e) { console.warn(`[desempenho] historico Amazon ${dia}: ${e.message}`); continue; }
+    cobertos.push(dia);
+    for (const it of linhas) {
+      const asin = String(it.linked_product || '').toUpperCase();
+      if (!/^B[A-Z0-9]{9}$/.test(asin)) continue;
+      const u = Math.round(numApi(it.total_ordered_items));
+      const c = num(numApi(it.total_earnings));
+      if (!u && !c) continue;
+      registros.push({
+        dia, id: asin, nome: it.linked_product_title || '',
+        categoria: categoriaDe ? categoriaDe(asin) : '', vendedor: '',
+        link: 'https://www.amazon.com.br/dp/' + asin,
+        u, v: num(numApi(it.shipped_revenue || it.total_ordered_revenue)), c,
+        d: Math.round(numApi(it.direct_ordered_items)),
+        i: Math.round(numApi(it.indirect_ordered_items)),
+      });
+    }
+    await new Promise((res) => setTimeout(res, 500));
+  }
+  await acumularHistorico('Amazon', registros, cobertos);
 }
 
 async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
@@ -1233,7 +1310,7 @@ async function desempenhoMl(janela, atribuicoes, registrar, coletarNaoAtribuida,
 
   const linhas = [];
   let totalMl = null;
-  for (let pagina = 1; pagina <= 20; pagina++) {
+  for (let pagina = 1; pagina <= 80; pagina++) {
     const qs = new URLSearchParams({
       filter_time_range: range, items_per_page: '50', order_by: 'ord_date_created',
       page: String(pagina), sort: 'desc', type: 'GENERAL',
@@ -1413,7 +1490,7 @@ async function shopeeItensComprados(inicio, fim) {
     if (!rep) break;
     for (const n of rep.nodes || []) {
       const bruto = n[campo];
-      const ref = Array.isArray(bruto) ? String(bruto[0] || '') : String(bruto || '');
+      const ref = refShopee(bruto);
       for (const o of n.orders || []) {
         for (const it of o.items || []) saida.push({ ref, item: it });
       }
@@ -1425,8 +1502,8 @@ async function shopeeItensComprados(inicio, fim) {
 }
 
 async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, registrar, coletarNaoAtribuida, marcarColeta) {
-  if (!SHOPEE_COOKIE || !SHOPEE_APP_ID || !SHOPEE_SECRET) {
-    console.log('[desempenho] credenciais da Shopee ausentes — Shopee ignorada');
+  if (!SHOPEE_APP_ID || !SHOPEE_SECRET) {
+    console.log('[desempenho] SHOPEE_APP_ID/SHOPEE_SECRET ausentes — Shopee ignorada');
     return 0;
   }
 
@@ -1447,52 +1524,72 @@ async function desempenhoShopee(janela, inicioDoDia, fimDoDia, atribuicoes, regi
   if (!porRef.size) { console.log('[desempenho] ledger sem refs da Shopee'); return 0; }
 
   let mudou = 0;
+  // Cliques vem do painel (SHOPEE_COOKIE); vendas vem da Open API (APP_ID +
+  // SECRET). Cookie vencido nao pode custar as vendas: sem ele a rodada segue
+  // so com pedidos e comissao, e os cliques ficam para quando o cookie voltar.
+  let semCliques = !SHOPEE_COOKIE;
+  const hist = [];
+  const diasHist = [];
   for (const data of janela) {
-    const [cliques, conversoes] = await Promise.all([
-      shopeeCliquesPorSubId(inicioDoDia(data), fimDoDia(data)),
-      shopeeConversaoPorSubId(inicioDoDia(data), fimDoDia(data)),
-    ]);
-
-    const refs = new Set([...Object.keys(cliques), ...Object.keys(conversoes)]);
-    for (const ref of refs) {
-      const attr = porRef.get(ref);
-      if (!attr) continue; // ref que não saiu por nós (link antigo, outro canal)
-      const conv = conversoes[ref] || { pedidos: 0, vendas: 0, comissao: 0 };
-      mudou += registrar(data, attr, {
-        cliques: cliques[ref] || 0,
-        pedidos: conv.pedidos, vendas: conv.vendas, comissao: conv.comissao,
-      });
-    }
-
-    // O item comprado nem sempre e o divulgado: quando difere, e venda
-    // indireta e vira leitura de mercado, nao desempenho daquele disparo.
-    if (coletarNaoAtribuida) {
-      try {
-        const comprados = await shopeeItensComprados(inicioDoDia(data), fimDoDia(data));
-        marcarColeta?.('Shopee');
-        for (const { ref, item } of comprados) {
-          const attr = porRef.get(ref);
-          if (!attr) continue;
-          const idComprado = String(item.itemId || '');
-          if (!idComprado || idComprado === String(attr.asin || '')) continue;
-          coletarNaoAtribuida({
-            loja: 'Shopee', id: idComprado, dia: data, tipo: 'indireta',
-            // Quem clicou entrou por ESTE disparo e levou outra coisa: o par
-            // ref -> produto divulgado e o que responde "de qual link veio".
-            refOrigem: attr.ref, origemId: attr.asin || null, origemNome: attr.nome || '',
-            nome: item.itemName || '', categoria: item.globalCategoryLv1Name || '',
-            vendedor: item.shopName || '',
-            link: 'https://shopee.com.br/product/0/' + idComprado,
-            unidades: Math.max(1, parseInt(item.qty, 10) || 1),
-            vendas: parseFloat(item.actualAmount || item.itemPrice || 0) || 0,
-            comissao: parseFloat(item.itemTotalCommission || 0) || 0,
-          });
+    try {
+      let cliques = {};
+      if (!semCliques) {
+        try { cliques = await shopeeCliquesPorSubId(inicioDoDia(data), fimDoDia(data)); }
+        catch (e) {
+          semCliques = true;
+          console.warn(`[desempenho] Shopee: cliques indisponiveis (${e.message}) — seguindo so com as vendas da Open API`);
         }
-      } catch (e) {
-        console.warn(`[desempenho] Shopee: itens comprados ${data} —`, e.message);
       }
+      const conversoes = await shopeeConversaoPorSubId(inicioDoDia(data), fimDoDia(data));
+
+      const refs = new Set([...Object.keys(cliques), ...Object.keys(conversoes)]);
+      for (const ref of refs) {
+        const attr = porRef.get(ref);
+        if (!attr) continue; // ref que não saiu por nós (link antigo, outro canal)
+        const conv = conversoes[ref] || { pedidos: 0, vendas: 0, comissao: 0 };
+        mudou += registrar(data, attr, {
+          // null = cookie fora: nao sabemos, e 0 apagaria o clique ja gravado.
+          cliques: semCliques ? null : (cliques[ref] || 0),
+          pedidos: conv.pedidos, vendas: conv.vendas, comissao: conv.comissao,
+        });
+      }
+
+      // Itens comprados: alimentam o historico (todas as vendas) e, quando o
+      // item comprado nao e o divulgado, as descobertas (venda indireta).
+      const comprados = await shopeeItensComprados(inicioDoDia(data), fimDoDia(data));
+      marcarColeta?.('Shopee');
+      diasHist.push(data);
+      for (const { ref, item } of comprados) {
+        const idComprado = String(item.itemId || '');
+        if (!idComprado) continue;
+        const attr = porRef.get(ref);
+        const direta = !!attr && idComprado === String(attr.asin || '');
+        const u = Math.max(1, parseInt(item.qty, 10) || 1);
+        const v = parseFloat(item.actualAmount || item.itemPrice || 0) || 0;
+        const c = parseFloat(item.itemTotalCommission || 0) || 0;
+        const link = 'https://shopee.com.br/product/0/' + idComprado;
+        hist.push({
+          dia: data, id: idComprado, nome: item.itemName || '',
+          categoria: item.globalCategoryLv1Name || '', vendedor: item.shopName || '', link,
+          u, v, c, d: direta ? u : 0, i: direta ? 0 : u,
+        });
+        if (!attr || direta || !coletarNaoAtribuida) continue;
+        coletarNaoAtribuida({
+          loja: 'Shopee', id: idComprado, dia: data, tipo: 'indireta',
+          // Quem clicou entrou por ESTE disparo e levou outra coisa: o par
+          // ref -> produto divulgado e o que responde "de qual link veio".
+          refOrigem: attr.ref, origemId: attr.asin || null, origemNome: attr.nome || '',
+          nome: item.itemName || '', categoria: item.globalCategoryLv1Name || '',
+          vendedor: item.shopName || '', link,
+          unidades: u, vendas: v, comissao: c,
+        });
+      }
+    } catch (e) {
+      console.warn(`[desempenho] Shopee ${data}:`, e.message);
     }
   }
+  try { await acumularHistorico('Shopee', hist, diasHist); }
+  catch (e) { console.warn('[desempenho] historico Shopee nao gravou —', e.message); }
   return mudou;
 }
 
@@ -1515,6 +1612,8 @@ async function atualizarDesempenho(janela, inicioDoDia, fimDoDia) {
   const registrar = (data, attr, registro) => {
     const chave = chaveProduto(attr.loja, attr.asin);
     const doDia = (arquivo.dias[data] = arquivo.dias[data] || {});
+    // Clique desconhecido (cookie da Shopee fora) preserva o que ja estava gravado.
+    if (registro.cliques == null) registro = { ...registro, cliques: doDia[chave]?.cliques ?? 0 };
     if (JSON.stringify(doDia[chave] || null) === JSON.stringify(registro)) return 0;
     doDia[chave] = registro;
 
