@@ -2236,9 +2236,9 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field">
         <label>Cupom <span class="tag">vale para todos os links acima</span></label>
         <select id="vit-cupom-modo" onchange="vitToggleCupomModo()">
+          <option value="nenhum" selected>Sem cupom &mdash; n&atilde;o vincula nada</option>
           <option value="auto">Melhor cupom &mdash; o que der maior desconto em cada produto</option>
           <option value="fixo">Sempre este cupom &mdash; o mesmo para todos</option>
-          <option value="nenhum">Sem cupom &mdash; n&atilde;o vincula nada</option>
         </select>
       </div>
       <div class="field" id="vit-cupom-fixo-wrap" style="display:none">
@@ -2297,9 +2297,9 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field">
         <label>Cupom <span class="tag">vale para todos os selecionados</span></label>
         <select id="awc-cupom-modo" onchange="awcToggleCupomModo()">
+          <option value="nenhum" selected>Sem cupom &mdash; n&atilde;o vincula nada</option>
           <option value="auto">Melhor cupom &mdash; o que der maior desconto em cada produto</option>
           <option value="fixo">Sempre este cupom &mdash; o mesmo para todos</option>
-          <option value="nenhum">Sem cupom &mdash; n&atilde;o vincula nada</option>
         </select>
       </div>
       <div class="field" id="awc-cupom-fixo-wrap" style="display:none">
@@ -2386,12 +2386,12 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Cupom</label>
         <select id="lst-cupom-modo" onchange="lstToggleCupom()">
+          <option value="nenhum" selected>Sem cupom</option>
           <option value="auto">Automático — melhor cupom da base que sirva em cada produto</option>
           <option value="fixo">Sempre este cupom</option>
-          <option value="nenhum">Sem cupom</option>
         </select></div>
       <div class="field" id="lst-cupom-fixo-wrap" style="display:none">
-        <label>Qual cupom</label><select id="lst-cupom-codigo"></select></div>
+        <label>Qual cupom</label><select id="lst-cupom-codigo" onchange="renderLstSel()"></select></div>
     </div>
     <p style="font-size:10.5px;color:var(--muted2);margin:-6px 0 12px;line-height:1.5">
       No modo automático, cada produto recebe o cupom vigente daquela loja que der o
@@ -6307,6 +6307,7 @@ function lstTextoPrevisao(qtd, intervalo){
 }
 
 function lstToggleCupom(){
+  lstCompInvalidar();
   var fixo = document.getElementById('lst-cupom-modo').value === 'fixo';
   document.getElementById('lst-cupom-fixo-wrap').style.display = fixo ? 'flex' : 'none';
   if (fixo){
@@ -6365,7 +6366,8 @@ function novaLista(){
   document.getElementById('lst-tipo').disabled = false;
   document.getElementById('lst-nome').value = '';
   document.getElementById('lst-intervalo').value = 20;
-  document.getElementById('lst-cupom-modo').value = 'auto';
+  document.getElementById('lst-cupom-modo').value = 'nenhum';
+  lstToggleCupom();
   document.getElementById('lst-roteamento').value = 'geral';
   document.getElementById('lst-inicio-modo').value = 'agora';
   document.getElementById('lst-inicio-hora').value = '09:00';
@@ -6412,7 +6414,7 @@ function editarLista(id){
   document.getElementById('lst-ag-hora').value = (l.agenda && l.agenda.hora) || '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml((l.agenda && l.agenda.diasSemana) || []);
   abrirFormLista();
-  if (l.cupomModo === 'fixo') document.getElementById('lst-cupom-codigo').value = l.cupomCodigo || '';
+  if (l.cupomModo === 'fixo') { document.getElementById('lst-cupom-codigo').value = l.cupomCodigo || ''; renderLstSel(); }
 }
 
 function cancelarFormLista(){
@@ -6479,9 +6481,13 @@ var LST_AUTO_PRIOR = false, LST_PRIOR_FAIXA = 2;
 
 // Sem envio anterior, a referencia passa a ser a mediana de 30 dias do monitor
 // (a mesma que ele usa para achar queda). Positivo = abaixo da mediana.
+// Preco que o grupo vai ver: o atual ja com o cupom do disparo.
+function lstPrecoDivulgado(a){
+  return (a && a.precoDivulgado > 0) ? a.precoDivulgado : (a ? a.preco : 0);
+}
 function lstDescMediana(c){
   if (!c || !c.atual || !(c.mediana30 > 0) || c.atual.fonte !== 'monitor') return null;
-  return Math.round((1 - c.atual.preco / c.mediana30) * 1000) / 10;
+  return Math.round((1 - lstPrecoDivulgado(c.atual) / c.mediana30) * 1000) / 10;
 }
 
 function lstChavePrior(asin){
@@ -6629,28 +6635,41 @@ function renderLstSel(){
 // Busca so o que ainda nao esta em cache; o render nao espera a resposta.
 var LST_COMP = {}, LST_COMP_PEND = {}, LST_COMP_TTL = 10 * 60000;
 
+// O comparativo e calculado com o cupom que o disparo vai aplicar: trocar o
+// modo/codigo (ou o vinculo de um produto) torna o cache velho.
+function lstCompCupomAtual(){
+  var modo = (document.getElementById('lst-cupom-modo') || {}).value || 'nenhum';
+  var cod = modo === 'fixo' ? ((document.getElementById('lst-cupom-codigo') || {}).value || '') : '';
+  return { modo: modo, codigo: cod, chave: modo + '|' + cod };
+}
+function lstCompInvalidar(asin){
+  if (asin) { delete LST_COMP[asin]; return; }
+  LST_COMP = {};
+}
+
 function lstCarregarComparativo(){
   var agora = Date.now();
+  var cup = lstCompCupomAtual();
   var faltam = LST_SEL.map(function(p){ return p.asin; }).filter(function(a){
     var c = LST_COMP[a];
-    return !LST_COMP_PEND[a] && (!c || agora - c._em > LST_COMP_TTL);
+    return !LST_COMP_PEND[a] && (!c || c._cupom !== cup.chave || agora - c._em > LST_COMP_TTL);
   });
   if (!faltam.length) return;
   faltam.forEach(function(a){ LST_COMP_PEND[a] = true; });
   fetch(SERVER + '/vitrine/comparativo', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ asins: faltam })
+    body: JSON.stringify({ asins: faltam, cupomModo: cup.modo, cupomCodigo: cup.codigo || null })
   })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) throw new Error(d.erro || 'falhou');
       faltam.forEach(function(a){
         var c = (d.itens || {})[a] || { veredito:'erro' };
-        c._em = Date.now(); LST_COMP[a] = c;
+        c._em = Date.now(); c._cupom = cup.chave; LST_COMP[a] = c;
       });
     })
     .catch(function(e){
-      faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _em: Date.now() - LST_COMP_TTL + 60000 }; });
+      faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _cupom: cup.chave, _em: Date.now() - LST_COMP_TTL + 60000 }; });
     })
     .then(function(){
       faltam.forEach(function(a){ delete LST_COMP_PEND[a]; });
@@ -6671,16 +6690,22 @@ function lstLinhaComparativo(asin){
   if (c.veredito === 'erro') return '<div style="' + st + 'color:var(--muted2)">comparativo indisponível</div>';
 
   var a = c.atual, u = c.ultimoEnvio;
+  var comCupom = a && a.descontoCupom > 0;
   var agoraTxt = a
-    ? 'agora R$ ' + fmtBRL(a.preco)
+    ? (comCupom
+        ? 'agora <b>R$ ' + fmtBRL(a.precoDivulgado) + '</b> c/ cupom ' + esc(a.cupom || '')
+          + ' <span title="Preço na loja, antes do cupom">(loja R$ ' + fmtBRL(a.preco) + ')</span>'
+        : 'agora R$ ' + fmtBRL(a.preco))
+      + (a.avisoCupom ? ' <span style="color:var(--amber,#f59e0b)" title="' + esc(a.avisoCupom) + '">⚠ ' + esc(a.avisoCupom) + '</span>' : '')
       + (a.fonte === 'cadastro' ? ' <span title="Loja sem leitura de preço: valor do cadastro">(cadastro)</span>'
          : a.velho ? ' <span title="Última leitura do monitor tem mais de 6h">(lido ' + lstFmtDiaCurto(a.em) + ')</span>' : '')
       + (a.disponivel === false ? ' <b style="color:#fca5a5">indisponível</b>' : '')
     : 'sem preço atual';
   var extra = [];
   if (c.min90 != null) extra.push('mín. 90d R$ ' + fmtBRL(c.min90));
-  if (c.menorEnviado && u && c.menorEnviado.preco < u.preco)
-    extra.push('menor enviado R$ ' + fmtBRL(c.menorEnviado.preco) + ' em ' + lstFmtDiaCurto(c.menorEnviado.em));
+  var divEnv = function(e){ return (e.precoFinal && e.precoFinal < e.preco) ? e.precoFinal : e.preco; };
+  if (c.menorEnviado && u && divEnv(c.menorEnviado) < divEnv(u))
+    extra.push('menor enviado R$ ' + fmtBRL(divEnv(c.menorEnviado)) + ' em ' + lstFmtDiaCurto(c.menorEnviado.em));
   var extraTxt = extra.length ? ' · ' + extra.join(' · ') : '';
 
   if (c.veredito === 'inedito'){
@@ -6699,8 +6724,9 @@ function lstLinhaComparativo(asin){
     : ' <b style="color:' + cor + '">(' + (c.variacaoPct > 0 ? '+' : '') + String(c.variacaoPct).replace('.', ',') + '%)</b>';
   return '<div style="' + st + 'color:var(--muted2)">' + ico + ' último envio ' + lstFmtDiaCurto(u.em)
     + (c.viaGrupo ? ' <span title="Mesmo produto enviado por outra loja do grupo">(pela ' + esc(u.loja || 'outra loja') + ')</span>' : '')
-    + ' · R$ ' + fmtBRL(u.preco)
-    + (u.precoFinal && u.precoFinal < u.preco ? ' <span title="Preço final com cupom ' + esc(u.cupom || '') + '">(R$ ' + fmtBRL(u.precoFinal) + ' c/ cupom)</span>' : '')
+    + (u.precoFinal && u.precoFinal < u.preco
+        ? ' · R$ ' + fmtBRL(u.precoFinal) + ' c/ cupom ' + esc(u.cupom || '') + ' <span title="Preço na loja naquele envio">(loja R$ ' + fmtBRL(u.preco) + ')</span>'
+        : ' · R$ ' + fmtBRL(u.preco))
     + ' → ' + agoraTxt + var_
     + (c.envios90d > 1 ? ' · ' + c.envios90d + '× em 90d' : '')
     + extraTxt + '</div>';
@@ -8031,7 +8057,7 @@ function aposCadastroVitrine(salvos, destino, cupom, modoCupom, nicho){
     // A escolha feita no cadastro chega inteira no disparo: quem marcou "sem
     // cupom" nao pode receber um cupom automatico so porque esse e o padrao do
     // formulario.
-    var modo = modoCupom || (cupom ? 'fixo' : 'auto');
+    var modo = modoCupom || (cupom ? 'fixo' : 'nenhum');
     document.getElementById('lst-cupom-modo').value = modo;
     lstToggleCupom();
     if (modo === 'fixo' && cupom) {
@@ -8235,6 +8261,7 @@ function vincularCupomVitrine(btn){
   var i = VIT_CACHE.find(function(x){ return x.asin === btn.dataset.asin; }); if (!i) return;
   var novo = prompt('Código do cupom para "' + i.nome + '" (deixe vazio para desvincular):', i.cupom || '');
   if (novo === null) return;
+  lstCompInvalidar(i.asin);
   salvarCampoVitrine(i.asin, { cupom: novo.trim().toUpperCase() || null });
 }
 
