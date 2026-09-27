@@ -1,7 +1,9 @@
 # Captura Tica
 
 Extensão do Chrome que junta links de produtos enquanto você navega e despeja
-todos de uma vez no campo **Links** da aba Vitrine do painel.
+todos de uma vez no campo **Links** da aba Vitrine do painel — e que insere os
+cupons do Mercado Livre na sua conta, no ritmo que o servidor manda (seção
+*Cupons do Mercado Livre*).
 
 **Ela não cadastra nada.** O cadastro continua sendo seu, no painel, com a lista
 inteira à vista — é lá que você escolhe o cupom e o modo de disparo.
@@ -75,6 +77,59 @@ Depois de disparar, aparece um botão para cancelar o que ainda não saiu.
 mensagem em todos os grupos, sem revisão de preço e sem prévia da mensagem. Para
 qualquer coisa que não seja uma oferta óbvia e urgente, o caminho da fila é mais
 seguro — lá você vê a lista inteira antes.
+
+## Cupons do Mercado Livre (inserção na sua conta)
+
+Desde 27/09/2026 quem insere os cupons do ML na conta TSP é **esta extensão**,
+no seu Chrome. O servidor nunca mais toca a página do ML: a tentativa anterior
+(chamadas a partir do Railway) tinha assinatura de robô — IP de datacenter, TLS
+do Node com User-Agent de Chrome, POST sem navegação — e terminou com a conta
+restrita em set/2026. Ritmo não esconde identidade; a identidade certa é a sua.
+
+**Divisão de trabalho**
+
+| Quem | Faz |
+|---|---|
+| `baileys-server` (`insercao-ml-auto.js`) | Fila, atraso pós-captura (5–40 min), lotes de 2–4 cupons por visita, pausa longa entre visitas (40–150 min, maior de manhã), janela 8h–23h, teto diário sorteado (6–14), dias de folga (10%), disjuntor, avisos no bot |
+| Extensão (`cupons-ml.js`) | A cada 5 min pergunta ao servidor se há lote. Se houver, abre `mercadolivre.com.br/cupons` numa aba **em segundo plano**, clica em *Inserir código*, digita tecla a tecla, clica em *Inserir*, lê a resposta do ML e devolve o veredito. Fecha a aba ao terminar |
+
+Você não precisa estar na página do ML nem clicar por cupom. Basta o Chrome
+aberto (pode estar minimizado) com a sessão do ML logada neste perfil. Se o
+Chrome estiver fechado, o cupom espera na fila; passando de 3 h parado, volta
+para o `/inserir` do bot para você inserir do celular.
+
+**Configuração (uma vez)**
+
+1. No Railway (serviço `baileys-server`): `CUPONS_ML_INSERCAO_AUTO=1` e
+   `CUPONS_ML_EXTENSAO_TOKEN=<uma senha longa qualquer>`.
+2. No popup da extensão, seção **Cupons do Mercado Livre**: cole o mesmo token,
+   escolha o modo e ligue o interruptor.
+
+**Modos**
+
+- *Perguntar antes de inserir* (padrão): quando há lote pronto, chega uma
+  notificação do Chrome com os códigos e os botões **Inserir agora** / **Depois**.
+  Um clique para o lote inteiro. "Depois" adia 30 min.
+- *Automático*: insere sem perguntar. Recomendado só depois de duas semanas
+  sem disjuntor no modo anterior.
+
+**Vereditos que a extensão devolve**
+
+`inserido`, `ja_tinha`, `esgotado`, `vencido`, `inexistente` vêm do
+`response_code` da resposta do ML (capturada por um interceptor de `fetch` no
+mundo da página e lida pelo DOM); o texto na tela é só reserva. `problema`
+("Tivemos um problema"/HTTP 403) é o sintoma da restrição de conta: dois seguidos,
+ou um com 403, abrem o disjuntor. `sem_login` e `pagina_mudou` (seletor não
+encontrado) também desligam tudo e avisam no bot. Um erro qualquer encerra a
+visita — insistir em seguida é assinatura de robô.
+
+Os **seletores** da página vêm do servidor a cada lote (`SELETORES_PADRAO` em
+`insercao-ml-auto.js`, sobrepostos por `CUPONS_ML_AUTO_SELETORES`): se o ML mudar
+a página, corrige-se no servidor sem republicar a extensão.
+
+Rotas usadas (todas com header `X-Extensao-Token`): `GET /cupons/auto/estado`,
+`GET /cupons/auto/proximo[?espiar=1]`, `POST /cupons/auto/resultado`,
+`POST /cupons/auto/visita/fim`.
 
 ## Aparência
 

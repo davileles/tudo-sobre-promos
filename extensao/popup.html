@@ -38,6 +38,22 @@ li{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-top:1px soli
         color:var(--muted2);font-size:10px;letter-spacing:.3px;
         display:flex;justify-content:space-between;gap:8px}
 .rodape b{color:var(--muted);font-weight:700}
+.ml{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.ml .linha{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}
+.ml label{font-size:11.5px;color:var(--muted)}
+.ml select,.ml input[type=text],.ml input[type=password]{background:var(--surface);color:var(--text);border:1px solid var(--border-ctrl);
+  border-radius:8px;padding:6px 8px;font-family:'Montserrat',sans-serif;font-size:11.5px;width:190px}
+.ml .status{font-size:11px;color:var(--muted);line-height:1.5;margin-top:6px;word-break:break-word}
+.ml .status b{color:var(--text)}
+.ml .ok{color:#6ee7a8}.ml .ruim{color:var(--red)}
+.ml .mini{display:flex;gap:8px;margin-top:8px}
+.ml .mini .btn{padding:7px;font-size:11px}
+.toggle{position:relative;width:38px;height:22px;flex:none}
+.toggle input{opacity:0;width:0;height:0}
+.toggle span{position:absolute;inset:0;background:var(--border-ctrl);border-radius:22px;transition:.15s}
+.toggle span:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+.toggle input:checked+span{background:var(--accent)}
+.toggle input:checked+span:before{transform:translateX(16px)}
 </style>
 </head>
 <body>
@@ -47,6 +63,24 @@ li{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-top:1px soli
   <div class="acoes">
     <button class="btn" id="abrir">Abrir painel</button>
     <button class="btn btn-copy" id="limpar">Limpar fila</button>
+  </div>
+  <div class="ml">
+    <div class="linha">
+      <div class="sec-label" style="margin:0">Cupons do Mercado Livre</div>
+      <label class="toggle" title="Ligar/desligar a inserção pela extensão"><input type="checkbox" id="ml-ligado"><span></span></label>
+    </div>
+    <div class="linha"><label for="ml-modo">Modo</label>
+      <select id="ml-modo">
+        <option value="aprovar">Perguntar antes de inserir</option>
+        <option value="auto">Automático</option>
+      </select></div>
+    <div class="linha"><label for="ml-token">Token da extensão</label>
+      <input type="password" id="ml-token" placeholder="CUPONS_ML_EXTENSAO_TOKEN" autocomplete="off"></div>
+    <div class="status" id="ml-status">—</div>
+    <div class="mini">
+      <button class="btn" id="ml-salvar">Salvar</button>
+      <button class="btn btn-copy" id="ml-agora">Verificar agora</button>
+    </div>
   </div>
   <div class="rodape">
     <span>v<b id="versao">—</b></span>

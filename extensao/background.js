@@ -3,6 +3,9 @@
 // continua sendo feito por voce no painel, com a lista inteira na mao, onde
 // escolhe cupom e modo de disparo. A extensao so evita o copia-e-cola.
 
+// Insercao de cupons na conta do ML (fila do servidor, execucao aqui no Chrome).
+importScripts('cupons-ml.js');
+
 const FILA = 'fila';
 const ULTIMO_LOTE = 'ultimoLote';
 

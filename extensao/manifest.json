@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Captura Tica",
-  "version": "2.2.0",
-  "description": "Junta links de produtos e despeja no campo de cadastro da vitrine do Tica Promos.",
+  "version": "2.3.0",
+  "description": "Junta links de produtos para a vitrine do Tica Promos e insere os cupons do Mercado Livre na sua conta, no ritmo que o servidor manda.",
   "permissions": [
     "contextMenus",
     "scripting",
     "storage",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"

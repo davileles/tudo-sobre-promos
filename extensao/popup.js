@@ -66,3 +66,51 @@ document.getElementById('versao').textContent = VERSAO;
 document.getElementById('dominio').textContent = new URL(PAINEL).hostname;
 
 pintar();
+
+
+// ── Cupons do Mercado Livre (inserção pela extensão) ─────────────────────────
+const mlEl = id => document.getElementById(id);
+
+async function mlPintar() {
+  const cfg = await pedir({ tipo: 'ml-cfg' });
+  if (!cfg) return;
+  mlEl('ml-ligado').checked = !!cfg.ligado;
+  mlEl('ml-modo').value = cfg.modo || 'aprovar';
+  mlEl('ml-token').value = cfg.token || '';
+  const st = mlEl('ml-status');
+  if (!cfg.token) { st.innerHTML = 'Cole aqui o mesmo valor de <b>CUPONS_ML_EXTENSAO_TOKEN</b> do Railway e salve.'; return; }
+  if (!cfg.ligado) { st.textContent = 'Desligada. Ligue no interruptor para a fila andar.'; return; }
+  st.textContent = 'Consultando o servidor…';
+  const e = await pedir({ tipo: 'ml-estado' });
+  if (!e) { st.textContent = 'Sem resposta da extensão.'; return; }
+  const s = e.servidor || {};
+  const partes = [];
+  if (!s.ok) partes.push('<span class="ruim">Servidor: ' + (s.erro || 'sem resposta') + '</span>');
+  else {
+    if (!s.ligada) partes.push('<span class="ruim">Servidor com a fila desligada (CUPONS_ML_INSERCAO_AUTO)</span>');
+    else if (s.disjuntor) partes.push('<span class="ruim">Disjuntor: ' + (s.disjuntor.motivo || '') + '</span>');
+    else partes.push('<span class="ok">Ligada</span> · hoje <b>' + s.feitasHoje + '/' + s.tetoDia + '</b>' + (s.folgaHoje ? ' · dia de folga' : '')
+      + (s.dentroDaJanela ? '' : ' · fora do horário'));
+    partes.push('Na fila: <b>' + (s.naFila || []).length + '</b>' + ((s.naFila || []).length ? ' — ' + s.naFila.slice(0, 6).join(', ') : '')
+      + ((s.emVisita || []).length ? '<br>Inserindo agora: ' + s.emVisita.join(', ') : '')
+      + (s.proximaEm && s.proximaEm > Date.now() ? '<br>Próxima visita: ~' + s.proximaHora : ''));
+  }
+  if (e.ultimo) partes.push('Último: ' + e.ultimo.texto.replace(/</g, '&lt;'));
+  st.innerHTML = partes.join('<br>');
+}
+
+mlEl('ml-salvar').addEventListener('click', async () => {
+  await pedir({ tipo: 'ml-salvar', cfg: { ligado: mlEl('ml-ligado').checked, modo: mlEl('ml-modo').value, token: mlEl('ml-token').value } });
+  mlPintar();
+});
+mlEl('ml-ligado').addEventListener('change', async () => {
+  await pedir({ tipo: 'ml-salvar', cfg: { ligado: mlEl('ml-ligado').checked } });
+  mlPintar();
+});
+mlEl('ml-agora').addEventListener('click', async () => {
+  mlEl('ml-status').textContent = 'Verificando…';
+  await pedir({ tipo: 'ml-agora' });
+  mlPintar();
+});
+
+mlPintar();
