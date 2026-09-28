@@ -216,7 +216,7 @@ async function mlRodarVisita(visita) {
         await mlReportarCupom(visita, visita.lote[visita.feitos], { veredito: 'sem_login', mensagem: String(login).slice(0, 120) });
         motivoFim = 'sem_login';
       } else {
-        await mlInjetar(visita.tabId, mlAquecer, [tempos], null, 20000);
+        await mlAquecerPassos(visita.tabId, tempos);
         visita.preparada = true;
         await mlSalvarVisita(visita);
       }
@@ -254,7 +254,7 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     try {
       if (!(await mlEsperarCarregar(tabId, 30000))) return { veredito: 'erro', mensagem: 'a aba de cupons foi fechada' };
-      const bruto = await mlInjetar(tabId, mlInserirUm, [codigo, sel, tempos], null, 75000);
+      const bruto = await mlInserirUmPassos(tabId, codigo, sel, tempos);
       if (!bruto) return { veredito: 'erro', mensagem: 'sem retorno da página' };
       if (bruto.veredito) return bruto;                      // pagina_mudou etc.
       return mlClassificar(bruto.resp, bruto.textoTela);
@@ -389,15 +389,16 @@ function mlChecarLogin() {
 }
 
 // Mundo ISOLADO: como uma pessoa, rola um pouco a lista antes de comecar.
-async function mlAquecer(tempos) {
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Aquecimento conduzido pelo service worker (nada de espera dentro da página).
+function mlPassoRolar(y) { window.scrollTo({ top: y, behavior: 'smooth' }); return true; }
+async function mlAquecerPassos(tabId, tempos) {
   const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
-  await sleep(rnd(tempos.antesDoPrimeiroS) * 1000);
-  window.scrollBy({ top: 200 + Math.random() * 400, behavior: 'smooth' });
-  await sleep(rnd([600, 1500]));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  await sleep(rnd([500, 1200]));
-  return true;
+  const dorme = ms => new Promise(r => setTimeout(r, ms));
+  await dorme(rnd(tempos.antesDoPrimeiroS) * 1000);
+  await mlInjetar(tabId, mlPassoRolar, [200 + Math.random() * 400], null, 15000);
+  await dorme(rnd([600, 1500]));
+  await mlInjetar(tabId, mlPassoRolar, [0], null, 15000);
+  await dorme(rnd([500, 1200]));
 }
 
 // Mundo ISOLADO: depois de a pagina recarregar, le a resposta guardada.
@@ -411,13 +412,53 @@ function mlLerGuardado(sel, codigo) {
   return { resp, textoTela };
 }
 
-// Mundo ISOLADO: UM cupom. Devolve { resp, textoTela } (o service worker
-// classifica) ou { veredito: 'pagina_mudou', mensagem } se faltou seletor.
-async function mlInserirUm(codigo, sel, tempos) {
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
-  const esperar = async (fn, ms) => { const ate = Date.now() + ms; while (Date.now() < ate) { const v = fn(); if (v) return v; await sleep(150); } return null; };
+// ── UM cupom, em PASSOS CURTOS (28/09/2026) ──────────────────────────────────
+// A aba do ML fica em segundo plano e o Chrome estrangula os timers de aba em
+// segundo plano (1 s ou mais por setTimeout, piorando com o tempo). Com a
+// digitação e as esperas DENTRO da página, cada cupom demorava mais que o
+// anterior até estourar o prazo. Agora cada injeção é instantânea (clica,
+// digita UMA tecla, lê) e quem espera é o service worker, que não é
+// estrangulado. Devolve { resp, textoTela } ou { veredito: 'pagina_mudou' }.
 
+// Mundo ISOLADO — estado do modal.
+function mlPassoEstado(sel) {
+  const campo = document.querySelector(sel.campo);
+  return { campoVisivel: !!(campo && campo.offsetParent), temAbrir: !!document.querySelector(sel.abrir) };
+}
+
+// Mundo ISOLADO — prepara o cupom: zera a resposta anterior e o campo.
+function mlPassoPreparar(sel, codigo) {
+  document.documentElement.removeAttribute('data-tica-resp');
+  try { sessionStorage.removeItem('tica-resp'); sessionStorage.setItem('tica-cod', codigo); } catch (_) {}
+  const campo = document.querySelector(sel.campo);
+  if (!campo) return false;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  campo.focus();
+  setter.call(campo, '');
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
+// Mundo ISOLADO — digita UMA tecla.
+function mlPassoTecla(sel, ch) {
+  const campo = document.querySelector(sel.campo);
+  if (!campo) return false;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  if (document.activeElement !== campo) campo.focus();
+  campo.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+  setter.call(campo, campo.value + ch);
+  campo.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: 'insertText' }));
+  campo.dispatchEvent(new KeyboardEvent('keyup', { key: ch, bubbles: true }));
+  return true;
+}
+function mlPassoFimDigitacao(sel) {
+  const campo = document.querySelector(sel.campo);
+  if (campo) campo.dispatchEvent(new Event('change', { bubbles: true }));
+  return !!campo;
+}
+
+// Mundo ISOLADO — clica em 'abrir' | 'botao' | 'fechar' como uma pessoa.
+function mlPassoClicar(sel, qual) {
   function clicarHumano(el) {
     const r = el.getBoundingClientRect();
     const x = r.left + r.width * (0.3 + Math.random() * 0.4), y = r.top + r.height * (0.3 + Math.random() * 0.4);
@@ -428,67 +469,80 @@ async function mlInserirUm(codigo, sel, tempos) {
     el.dispatchEvent(ev('mouseup'));
     el.click();
   }
-
-  async function digitar(campo, texto) {
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-    campo.focus();
-    setter.call(campo, '');
-    campo.dispatchEvent(new Event('input', { bubbles: true }));
-    for (const ch of texto) {
-      campo.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
-      setter.call(campo, campo.value + ch);
-      campo.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: 'insertText' }));
-      campo.dispatchEvent(new KeyboardEvent('keyup', { key: ch, bubbles: true }));
-      await sleep(rnd(tempos.digitacaoMs));
-      if (Math.random() < 0.12) await sleep(rnd(tempos.pausaDigitacaoMs));
-    }
-    campo.dispatchEvent(new Event('change', { bubbles: true }));
+  const campo = document.querySelector(sel.campo);
+  const caixa = campo ? campo.closest('[role=dialog], [class*="modal"]') : null;
+  let el = null;
+  if (qual === 'abrir') el = document.querySelector(sel.abrir);
+  else if (qual === 'fechar') el = document.querySelector(sel.fechar);
+  else {
+    el = document.querySelector(sel.botao);
+    // Plano B (ML mudando classes): o botao "Inserir" dentro do dialogo do campo.
+    if (!el && caixa) el = [...caixa.querySelectorAll('button')].find(x => /^\s*inserir\s*$/i.test(x.innerText || '')) || null;
+    if (el && (el.disabled || el.getAttribute('aria-disabled') === 'true')) return { ok: false, desabilitado: true };
   }
-
-  function lerResposta() {
-    const bruto = document.documentElement.getAttribute('data-tica-resp');
-    if (!bruto) return null;
-    try { return JSON.parse(bruto); } catch (_) { return null; }
-  }
-
-  document.documentElement.removeAttribute('data-tica-resp');
-  try { sessionStorage.removeItem('tica-resp'); sessionStorage.setItem('tica-cod', codigo); } catch (_) {}
-  // Modal pode ja estar aberto do cupom anterior.
-  let campo = document.querySelector(sel.campo);
-  if (!campo || !campo.offsetParent) {
-    const abrir = await esperar(() => document.querySelector(sel.abrir), 6000);
-    if (!abrir) return { veredito: 'pagina_mudou', mensagem: 'abrir ' + sel.abrir };
-    abrir.scrollIntoView({ block: 'center' });
-    await sleep(rnd([400, 1200]));
-    clicarHumano(abrir);
-    campo = await esperar(() => document.querySelector(sel.campo), 8000);
-    if (!campo) return { veredito: 'pagina_mudou', mensagem: 'campo ' + sel.campo };
-    await sleep(rnd([500, 1500]));
-  }
-  await digitar(campo, codigo);
-  await sleep(rnd([400, 1100]));
-  // Plano B (ML mudando classes): o botao "Inserir" dentro do dialogo do campo.
-  const acharBotao = () => {
-    let b = document.querySelector(sel.botao);
-    if (!b) {
-      const caixa = campo.closest('[role=dialog], [class*="modal"]') || document;
-      b = [...caixa.querySelectorAll('button')].find(x => /^\s*inserir\s*$/i.test(x.innerText || '')) || null;
-    }
-    return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' ? b : null;
-  };
-  const botao = await esperar(acharBotao, 5000);
-  if (!botao) {
-    const caixa = campo.closest('[role=dialog], [class*="modal"]');
+  if (!el) {
     const pistas = caixa ? [...caixa.querySelectorAll('button')].map(x => (x.className || '').split(' ')[0] + ':' + (x.innerText || '').trim().slice(0, 15) + (x.disabled ? '(off)' : '')).join(' | ') : 'sem dialogo';
-    return { veredito: 'pagina_mudou', mensagem: 'botao — ' + pistas.slice(0, 110) };
+    return { ok: false, pistas: pistas.slice(0, 110) };
   }
-  clicarHumano(botao);
-  const resp = await esperar(lerResposta, rnd(tempos.aposClicarS) * 1000 + 8000);
-  await sleep(rnd([800, 2000]));
-  const modal = document.querySelector(sel.modal) || campo.closest('[role=dialog]');
-  const textoTela = (((modal && modal.innerText) || '') + ' ' + [...document.querySelectorAll('.andes-snackbar, [role=alert], [role=status]')].map(e => e.innerText).join(' ')).replace(/\s+/g, ' ').trim();
-  // Fecha o modal para o proximo (ou para sair limpo).
-  const fechar = document.querySelector(sel.fechar);
-  if (fechar) { await sleep(rnd([500, 1500])); clicarHumano(fechar); }
+  if (qual === 'abrir') el.scrollIntoView({ block: 'center' });
+  clicarHumano(el);
+  return { ok: true };
+}
+
+// Mundo ISOLADO — resposta capturada pela escuta (mundo MAIN) e texto da tela.
+function mlPassoLerResposta() {
+  const bruto = document.documentElement.getAttribute('data-tica-resp');
+  if (!bruto) return null;
+  try { return JSON.parse(bruto); } catch (_) { return null; }
+}
+function mlPassoTexto(sel) {
+  const campo = document.querySelector(sel.campo);
+  const modal = document.querySelector(sel.modal) || (campo && campo.closest('[role=dialog]'));
+  return (((modal && modal.innerText) || '') + ' ' + [...document.querySelectorAll('.andes-snackbar, [role=alert], [role=status]')].map(e => e.innerText).join(' ')).replace(/\s+/g, ' ').trim();
+}
+
+// Service worker — conduz os passos.
+async function mlInserirUmPassos(tabId, codigo, sel, tempos) {
+  const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
+  const dorme = ms => new Promise(r => setTimeout(r, ms));
+  const inj = (func, args) => mlInjetar(tabId, func, args, null, 15000);
+  const esperar = async (fn, ms, passo) => {
+    const ate = Date.now() + ms;
+    while (Date.now() < ate) { const v = await fn(); if (v) return v; await dorme(passo || 300); }
+    return null;
+  };
+
+  // Modal pode ja estar aberto do cupom anterior.
+  const est = await inj(mlPassoEstado, [sel]);
+  if (!est || !est.campoVisivel) {
+    if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 6000))) return { veredito: 'pagina_mudou', mensagem: 'abrir ' + sel.abrir };
+    await dorme(rnd([300, 900]));
+    await inj(mlPassoClicar, [sel, 'abrir']);
+    if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).campoVisivel, 8000))) return { veredito: 'pagina_mudou', mensagem: 'campo ' + sel.campo };
+    await dorme(rnd([300, 900]));
+  }
+  if (!(await inj(mlPassoPreparar, [sel, codigo]))) return { veredito: 'pagina_mudou', mensagem: 'campo ' + sel.campo };
+  for (const ch of codigo) {
+    if (!(await inj(mlPassoTecla, [sel, ch]))) return { veredito: 'pagina_mudou', mensagem: 'campo sumiu durante a digitação' };
+    await dorme(rnd(tempos.digitacaoMs));
+    if (Math.random() < 0.12) await dorme(rnd(tempos.pausaDigitacaoMs));
+  }
+  await inj(mlPassoFimDigitacao, [sel]);
+  await dorme(rnd([300, 800]));
+
+  let clique = null;
+  const ate = Date.now() + 5000;
+  while (Date.now() < ate) {
+    clique = await inj(mlPassoClicar, [sel, 'botao']);
+    if (clique && clique.ok) break;
+    await dorme(300);
+  }
+  if (!clique || !clique.ok) return { veredito: 'pagina_mudou', mensagem: 'botao — ' + ((clique && clique.pistas) || 'desabilitado') };
+
+  const resp = await esperar(() => inj(mlPassoLerResposta, []), rnd(tempos.aposClicarS) * 1000 + 8000, 300);
+  await dorme(rnd([600, 1500]));
+  const textoTela = await inj(mlPassoTexto, [sel]).catch(() => '');
+  await dorme(rnd([300, 900]));
+  await inj(mlPassoClicar, [sel, 'fechar']).catch(() => {});   // fecha o modal para o proximo
   return { resp, textoTela };
 }
