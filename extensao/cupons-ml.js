@@ -7,13 +7,14 @@
 //
 // Carregado pelo background.js via importScripts(). Estado em chrome.storage:
 //   mlAuto   { ligado, modo: 'aprovar'|'auto', token, servidor }
-//   mlVisita { id, lote, tabId, iniciadaEm }   — visita em andamento
+//   mlVisita { id, lote, tabId, feitos, batida, sel, tempos } — visita em andamento (retomável)
 //   mlUltimo { em, texto }                      — última linha de status (popup)
 
 const ML_SERVIDOR_PADRAO = 'https://baileys-server-production-ebfe.up.railway.app';
 const ML_ALARME = 'tica-cupons-ml';
-const ML_PERIODO_MIN = 5;
-const ML_VISITA_EXPIRA_MS = 24 * 60000;   // o servidor expira em 25
+const ML_PERIODO_MIN = 1;                 // consulta o servidor a cada minuto (modo enxuto)
+const ML_VISITA_PARADA_MS = 5 * 60000;    // sem avanço há tanto = travou (o servidor desiste em 7)
+let mlRodandoId = null;                   // visita que ESTE service worker está conduzindo
 const ML_NOTIF_APROVAR = 'tica-ml-aprovar';
 const ML_REAVISAR_MS = 30 * 60000;
 
@@ -46,7 +47,7 @@ async function mlArmarAlarme() {
   const cfg = await mlCfg();
   const atual = await chrome.alarms.get(ML_ALARME);
   if (cfg.ligado && cfg.token) {
-    if (!atual) await chrome.alarms.create(ML_ALARME, { delayInMinutes: 0.5, periodInMinutes: ML_PERIODO_MIN });
+    if (!atual || atual.periodInMinutes !== ML_PERIODO_MIN) await chrome.alarms.create(ML_ALARME, { delayInMinutes: 0.5, periodInMinutes: ML_PERIODO_MIN });
   } else if (atual) {
     await chrome.alarms.clear(ML_ALARME);
   }
@@ -60,8 +61,19 @@ async function mlCiclo() {
 
   const { mlVisita } = await chrome.storage.local.get({ mlVisita: null });
   if (mlVisita) {
-    if (Date.now() - mlVisita.iniciadaEm < ML_VISITA_EXPIRA_MS) return;   // ainda rodando na aba
-    await mlEncerrarVisita(mlVisita, 'expirada');
+    const parada = Date.now() - (mlVisita.batida || mlVisita.iniciadaEm) > ML_VISITA_PARADA_MS;
+    if (mlRodandoId === mlVisita.id) {
+      if (!parada) return;                                  // andando normalmente
+      mlRodandoId = null;                                   // travou numa chamada: abandona
+      await mlStatus('Visita travada — encerrando e pedindo lote novo');
+      await mlEncerrarVisita(mlVisita, 'travada');
+    } else if (!parada) {
+      // O Chrome derrubou o service worker no meio da visita: retoma de onde parou.
+      mlRodarVisita(mlVisita).catch(e => mlStatus('Erro na visita: ' + e.message));
+      return;
+    } else {
+      await mlEncerrarVisita(mlVisita, 'expirada');
+    }
   }
 
   if (cfg.modo === 'auto') {
@@ -146,40 +158,80 @@ async function mlEsperarCarregar(tabId, limiteMs) {
   return true;
 }
 
-async function mlInjetar(tabId, func, args, mundo) {
-  const [r] = await chrome.scripting.executeScript({ target: { tabId }, world: mundo || 'ISOLATED', func, args: args || [] });
-  return r ? r.result : undefined;
+// Toda injecao tem prazo: uma aba congelada/descartada pelo Chrome deixava o
+// executeScript pendurado para sempre e a visita "sumia" (28/09/2026).
+async function mlInjetar(tabId, func, args, mundo, limiteMs) {
+  const exec = chrome.scripting.executeScript({ target: { tabId }, world: mundo || 'ISOLATED', func, args: args || [] });
+  let timer;
+  const prazo = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('a página não respondeu em ' + Math.round((limiteMs || 30000) / 1000) + ' s')), limiteMs || 30000); });
+  try {
+    const [r] = await Promise.race([exec, prazo]);
+    return r ? r.result : undefined;
+  } finally { clearTimeout(timer); }
 }
 
 // Prepara a pagina (de novo, se ela recarregou): escuta no mundo MAIN.
 async function mlPrepararPagina(tabId, sel) {
   if (!(await mlEsperarCarregar(tabId, 30000))) throw new Error('a aba de cupons foi fechada');
-  await mlInjetar(tabId, mlInstalarEscuta, [sel.apiInputCode], 'MAIN');
+  await mlInjetar(tabId, mlInstalarEscuta, [sel.apiInputCode], 'MAIN', 15000);
 }
 
 async function mlIniciarVisita(r) {
   const aba = await chrome.tabs.create({ url: r.seletores.url, active: false });
-  const visita = { id: r.visitaId, lote: r.lote, tabId: aba.id, iniciadaEm: Date.now() };
+  chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {});
+  const visita = { id: r.visitaId, lote: r.lote, tabId: aba.id, iniciadaEm: Date.now(), batida: Date.now(),
+    feitos: 0, sel: r.seletores, tempos: r.tempos, preparada: false };
   await chrome.storage.local.set({ mlVisita: visita });
   await mlStatus('Inserindo ' + r.lote.map(c => c.codigo).join(', ') + '…');
-  const sel = r.seletores, tempos = r.tempos;
+  return mlRodarVisita(visita);
+}
+
+async function mlSalvarVisita(visita) {
+  visita.batida = Date.now();
+  const { mlVisita } = await chrome.storage.local.get({ mlVisita: null });
+  if (mlVisita && mlVisita.id === visita.id) await chrome.storage.local.set({ mlVisita: visita });
+}
+
+// Conduz (ou retoma) a visita a partir de visita.feitos. O progresso vai para
+// o storage a cada cupom: se o Chrome matar o service worker, o próximo alarme
+// (1 min) continua do cupom seguinte, sem esperar a visita expirar.
+async function mlRodarVisita(visita) {
+  mlRodandoId = visita.id;
+  const sel = visita.sel, tempos = visita.tempos;
   const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
   let motivoFim = 'concluida';
   try {
-    await mlPrepararPagina(aba.id, sel);
-    const login = await mlInjetar(aba.id, mlChecarLogin, []);
-    if (login) {
-      await mlReportarCupom(visita, r.lote[0], { veredito: 'sem_login', mensagem: String(login).slice(0, 120) });
-      motivoFim = 'sem_login';
-    } else {
-      await mlInjetar(aba.id, mlAquecer, [tempos]);
-      for (let i = 0; i < r.lote.length; i++) {
-        const c = r.lote[i];
-        const res = await mlInserirComRecarga(aba.id, c.codigo, sel, tempos);
+    // Aba fechada (ou nunca aberta nesta retomada): abre de novo.
+    let viva = false; try { viva = !!(await chrome.tabs.get(visita.tabId)); } catch (_) {}
+    if (!viva) {
+      const aba = await chrome.tabs.create({ url: sel.url, active: false });
+      chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {});
+      visita.tabId = aba.id; visita.preparada = false;
+    }
+    await mlSalvarVisita(visita);
+    await mlPrepararPagina(visita.tabId, sel);
+    if (!visita.preparada) {
+      const login = await mlInjetar(visita.tabId, mlChecarLogin, [], null, 15000);
+      if (login) {
+        await mlReportarCupom(visita, visita.lote[visita.feitos], { veredito: 'sem_login', mensagem: String(login).slice(0, 120) });
+        motivoFim = 'sem_login';
+      } else {
+        await mlInjetar(visita.tabId, mlAquecer, [tempos], null, 20000);
+        visita.preparada = true;
+        await mlSalvarVisita(visita);
+      }
+    }
+    if (motivoFim === 'concluida') {
+      for (let i = visita.feitos; i < visita.lote.length; i++) {
+        const c = visita.lote[i];
+        const res = await mlInserirComRecarga(visita.tabId, c.codigo, sel, tempos);
+        if (mlRodandoId !== visita.id) return;               // abandonada pelo alarme enquanto esperava
         await mlReportarCupom(visita, c, res);
+        visita.feitos = i + 1;
+        await mlSalvarVisita(visita);
         // Um erro encerra a visita: insistir em seguida e assinatura de robo.
         if (['problema', 'sem_login', 'pagina_mudou', 'erro'].includes(res.veredito)) { motivoFim = res.veredito; break; }
-        if (i < r.lote.length - 1) await mlEsperarVivo(rnd(tempos.entreCuponsS) * 1000);
+        if (i < visita.lote.length - 1) await mlEsperarVivo(rnd(tempos.entreCuponsS) * 1000);
       }
       if (motivoFim === 'concluida') await mlEsperarVivo(rnd(tempos.antesDeFecharS) * 1000);
     }
@@ -187,6 +239,8 @@ async function mlIniciarVisita(r) {
     await mlStatus('Erro na visita: ' + (e.message || e));
     motivoFim = 'erro';
   }
+  if (mlRodandoId !== visita.id) return;
+  mlRodandoId = null;
   const { mlVisita } = await chrome.storage.local.get({ mlVisita: null });
   if (mlVisita && mlVisita.id === visita.id) await mlEncerrarVisita(visita, motivoFim);
   const { mlUltimo } = await chrome.storage.local.get({ mlUltimo: null });
@@ -200,7 +254,7 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     try {
       if (!(await mlEsperarCarregar(tabId, 30000))) return { veredito: 'erro', mensagem: 'a aba de cupons foi fechada' };
-      const bruto = await mlInjetar(tabId, mlInserirUm, [codigo, sel, tempos]);
+      const bruto = await mlInjetar(tabId, mlInserirUm, [codigo, sel, tempos], null, 75000);
       if (!bruto) return { veredito: 'erro', mensagem: 'sem retorno da página' };
       if (bruto.veredito) return bruto;                      // pagina_mudou etc.
       return mlClassificar(bruto.resp, bruto.textoTela);
@@ -211,7 +265,7 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
       try { await mlPrepararPagina(tabId, sel); }
       catch (e2) { return { veredito: 'erro', mensagem: 'extensão: ' + String(e2.message || e2).slice(0, 120) }; }
       await mlEsperarVivo(1500);
-      const guardado = await mlInjetar(tabId, mlLerGuardado, [sel, codigo]).catch(() => null);
+      const guardado = await mlInjetar(tabId, mlLerGuardado, [sel, codigo], null, 15000).catch(() => null);
       if (guardado && guardado.login) return { veredito: 'sem_login', mensagem: String(guardado.login).slice(0, 120) };
       if (guardado && guardado.resp) return mlClassificar(guardado.resp, guardado.textoTela);
       // Recarregou antes da resposta: tenta de novo (so uma vez).
