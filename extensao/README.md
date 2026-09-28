@@ -91,7 +91,7 @@ restrita em set/2026. Ritmo não esconde identidade; a identidade certa é a sua
 | Quem | Faz |
 |---|---|
 | `baileys-server` (`insercao-ml-auto.js`) | Fila, atraso pós-captura (5–40 min), lotes de 2–4 cupons por visita, pausa longa entre visitas (40–150 min, maior de manhã), janela 8h–23h, teto diário sorteado (6–14), dias de folga (10%), disjuntor, avisos no bot |
-| Extensão (`cupons-ml.js`) | A cada 5 min pergunta ao servidor se há lote. Se houver, abre `mercadolivre.com.br/cupons` numa aba **em segundo plano**, clica em *Inserir código*, digita tecla a tecla, clica em *Inserir*, lê a resposta do ML e devolve o veredito. Fecha a aba ao terminar |
+| Extensão (`cupons-ml.js`) | A cada 5 min pergunta ao servidor se há lote. Se houver, abre `mercadolivre.com.br/cupons` numa aba **em segundo plano**, clica em *Inserir código*, digita tecla a tecla, clica em *Inserir*, lê a resposta do ML e devolve o veredito. Fecha a aba ao terminar. Desde a 2.3.1 o service worker conduz **cupom a cupom** (uma injeção curta por cupom): se a página recarregar depois de uma inserção, a resposta sobrevive no `sessionStorage` da aba e a visita continua — antes o lote inteiro morria com "Frame with ID 0 was removed" e o service worker era derrubado pelo limite de 5 min do Chrome, o que também deixava o popup lento |
 
 Você não precisa estar na página do ML nem clicar por cupom. Basta o Chrome
 aberto (pode estar minimizado) com a sessão do ML logada neste perfil. Se o
