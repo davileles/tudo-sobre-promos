@@ -413,12 +413,25 @@ async function mlInserirUm(codigo, sel, tempos) {
   }
   await digitar(campo, codigo);
   await sleep(rnd([400, 1100]));
-  const botao = await esperar(() => { const b = document.querySelector(sel.botao); return b && !b.disabled ? b : null; }, 5000);
-  if (!botao) return { veredito: 'pagina_mudou', mensagem: 'botao ' + sel.botao };
+  // Plano B (ML mudando classes): o botao "Inserir" dentro do dialogo do campo.
+  const acharBotao = () => {
+    let b = document.querySelector(sel.botao);
+    if (!b) {
+      const caixa = campo.closest('[role=dialog], [class*="modal"]') || document;
+      b = [...caixa.querySelectorAll('button')].find(x => /^\s*inserir\s*$/i.test(x.innerText || '')) || null;
+    }
+    return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' ? b : null;
+  };
+  const botao = await esperar(acharBotao, 5000);
+  if (!botao) {
+    const caixa = campo.closest('[role=dialog], [class*="modal"]');
+    const pistas = caixa ? [...caixa.querySelectorAll('button')].map(x => (x.className || '').split(' ')[0] + ':' + (x.innerText || '').trim().slice(0, 15) + (x.disabled ? '(off)' : '')).join(' | ') : 'sem dialogo';
+    return { veredito: 'pagina_mudou', mensagem: 'botao — ' + pistas.slice(0, 110) };
+  }
   clicarHumano(botao);
   const resp = await esperar(lerResposta, rnd(tempos.aposClicarS) * 1000 + 8000);
   await sleep(rnd([800, 2000]));
-  const modal = document.querySelector(sel.modal);
+  const modal = document.querySelector(sel.modal) || campo.closest('[role=dialog]');
   const textoTela = (((modal && modal.innerText) || '') + ' ' + [...document.querySelectorAll('.andes-snackbar, [role=alert], [role=status]')].map(e => e.innerText).join(' ')).replace(/\s+/g, ' ').trim();
   // Fecha o modal para o proximo (ou para sair limpo).
   const fechar = document.querySelector(sel.fechar);
