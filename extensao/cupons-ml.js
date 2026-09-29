@@ -423,7 +423,8 @@ function mlLerGuardado(sel, codigo) {
 // Mundo ISOLADO — estado do modal.
 function mlPassoEstado(sel) {
   const campo = document.querySelector(sel.campo);
-  return { campoVisivel: !!(campo && campo.offsetParent), temAbrir: !!document.querySelector(sel.abrir) };
+  return { campoVisivel: !!(campo && campo.offsetParent), temAbrir: !!document.querySelector(sel.abrir),
+    url: location.href.slice(0, 100), titulo: (document.title || '').slice(0, 60) };
 }
 
 // Mundo ISOLADO — prepara o cupom: zera a resposta anterior e o campo.
@@ -515,7 +516,17 @@ async function mlInserirUmPassos(tabId, codigo, sel, tempos) {
   // Modal pode ja estar aberto do cupom anterior.
   const est = await inj(mlPassoEstado, [sel]);
   if (!est || !est.campoVisivel) {
-    if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 6000))) return { veredito: 'pagina_mudou', mensagem: 'abrir ' + sel.abrir };
+    if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 6000))) {
+      // 29/09/2026: o botao sumiu numa visita mas estava la ao abrir a pagina
+      // de novo — antes de declarar "pagina mudou", recarrega uma vez.
+      await chrome.tabs.reload(tabId).catch(() => {});
+      await mlEsperarVivo(1500);
+      await mlPrepararPagina(tabId, sel);
+      if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 10000))) {
+        const e = await inj(mlPassoEstado, [sel]).catch(() => null);
+        return { veredito: 'pagina_mudou', mensagem: 'abrir ' + sel.abrir + (e ? ' @ ' + e.url + ' «' + e.titulo + '»' : '') };
+      }
+    }
     await dorme(rnd([300, 900]));
     await inj(mlPassoClicar, [sel, 'abrir']);
     if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).campoVisivel, 8000))) return { veredito: 'pagina_mudou', mensagem: 'campo ' + sel.campo };
