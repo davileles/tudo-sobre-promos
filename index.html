@@ -6034,6 +6034,7 @@ function lstItensHtml(l){
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;padding-left:26px;color:var(--muted)">'
           +   (st ? '<span>' + st + '</span>' : '')
           +   (jaFoi ? '' : '<span style="color:' + (d.erro ? '#fca5a5' : 'var(--muted)') + '">' + esc(d.txt) + '</span>')
+          +   (jaFoi || !(l.cuponsItem && l.cuponsItem[it.asin]) ? '' : '<span>🎟️ ' + esc(l.cuponsItem[it.asin]) + '</span>')
           +   (jaFoi || it.sumiu ? '' : lstSelectNicho(it.asin, it.nicho))
           + '</div>'
           + '</div>';
@@ -6396,7 +6397,7 @@ function editarLista(id){
   var l = LST_CACHE.find(function(x){ return x.id === id; });
   if (!l) return;
   LST_EDIT = id;
-  LST_SEL = l.itens.map(function(i){ return { asin:i.asin, nome:i.nome }; });
+  LST_SEL = l.itens.map(function(i){ return { asin:i.asin, nome:i.nome, cupom:(l.cuponsItem || {})[i.asin] || '' }; });
   document.getElementById('lst-form-titulo').textContent = 'Editando: ' + l.nome;
   // Lista ja salva nao vira envio unico no meio do caminho: o registro existe.
   document.getElementById('lst-tipo').value = 'salva';
@@ -6566,6 +6567,48 @@ function lstCupomVinculado(asin){
   return (v && v.cupom) ? v.cupom : null;
 }
 
+// ── CUPOM POR PRODUTO NA MONTAGEM ──
+// Numa fila sem cupom (ou no automatico), um produto pode ter um cupom proprio.
+// Fica na lista (cuponsItem) e vence o modo da lista so para aquele item — nao
+// mexe no vinculo do produto na base.
+function lstCuponsItem(){
+  var m = {};
+  LST_SEL.forEach(function(p){ if (p.cupom) m[p.asin] = p.cupom; });
+  return m;
+}
+
+function lstSelectCupomItem(p){
+  var v = VIT_CACHE.find(function(x){ return x.asin === p.asin; });
+  var loja = (v && v.loja) || '';
+  var vig = cuponsVigentes();
+  var daLoja = vig.filter(function(c){ return (c.loja || '') === loja; });
+  var lista = (daLoja.length ? daLoja : vig).slice().sort(function(a, b){
+    var l = (a.loja || '').localeCompare(b.loja || '', 'pt-BR');
+    return l !== 0 ? l : (a.codigo || '').localeCompare(b.codigo || '', 'pt-BR');
+  });
+  var atual = p.cupom || '';
+  var achou = false;
+  var ops = lista.map(function(c){
+    var sel = c.codigo === atual; if (sel) achou = true;
+    var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
+    return '<option value="' + esc(c.codigo) + '"' + (sel ? ' selected' : '') + '>'
+      + (daLoja.length ? '' : esc(c.loja || 'Outros') + ' · ') + esc(c.codigo) + ' · ' + val + '</option>';
+  }).join('');
+  if (atual && !achou) ops = '<option value="' + esc(atual) + '" selected>' + esc(atual) + ' (fora da base)</option>' + ops;
+  return '<select title="Cupom só deste produto (vence o modo da lista)" onclick="event.stopPropagation()" '
+    + 'onchange="lstDefinirCupomItem(\'' + esc(p.asin) + '\', this.value)" '
+    + 'style="font-size:11px;padding:2px 4px;max-width:150px;margin-top:0' + (atual ? ';border-color:var(--green)' : '') + '">'
+    + '<option value="">🎟️ Cupom da lista</option>' + ops + '</select>';
+}
+
+function lstDefinirCupomItem(asin, codigo){
+  var p = LST_SEL.find(function(x){ return x.asin === asin; });
+  if (!p) return;
+  p.cupom = codigo || '';
+  lstCompInvalidar(asin);
+  renderLstSel();
+}
+
 function renderLstSel(){
   var el = document.getElementById('lst-sel');
   if (!LST_SEL.length){
@@ -6588,12 +6631,13 @@ function renderLstSel(){
       : '')
   + LST_SEL.map(function(p, i){
     return '<div class="grp-chip">'
-      + '<span style="flex:1">' + (i+1) + '. ' + esc(p.nome)
-      + (function(){ var cup = lstCupomVinculado(p.asin); if (!cup) return '';
+      + '<span style="flex:1">' + (i+1) + '. ' + lstNomeComLink(p)
+      + (function(){ if (p.cupom) return ''; var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
       + lstLinhaComparativo(p.asin)
       + '</span>'
+      + lstSelectCupomItem(p)
       + lstSelectNicho(p.asin)
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',-1)" title="Subir">↑</button>'
       + '<button onclick="lstMover(\'' + esc(p.asin) + '\',1)" title="Descer">↓</button>'
@@ -6642,6 +6686,11 @@ function lstCompCupomAtual(){
   var cod = modo === 'fixo' ? ((document.getElementById('lst-cupom-codigo') || {}).value || '') : '';
   return { modo: modo, codigo: cod, chave: modo + '|' + cod };
 }
+// Chave do cupom de UM item: o do produto (escolhido na montagem) vence o da lista.
+function lstCompChaveItem(asin, cup){
+  var p = LST_SEL.find(function(x){ return x.asin === asin; });
+  return (p && p.cupom) ? 'item|' + p.cupom : cup.chave;
+}
 function lstCompInvalidar(asin){
   if (asin) { delete LST_COMP[asin]; return; }
   LST_COMP = {};
@@ -6652,24 +6701,24 @@ function lstCarregarComparativo(){
   var cup = lstCompCupomAtual();
   var faltam = LST_SEL.map(function(p){ return p.asin; }).filter(function(a){
     var c = LST_COMP[a];
-    return !LST_COMP_PEND[a] && (!c || c._cupom !== cup.chave || agora - c._em > LST_COMP_TTL);
+    return !LST_COMP_PEND[a] && (!c || c._cupom !== lstCompChaveItem(a, cup) || agora - c._em > LST_COMP_TTL);
   });
   if (!faltam.length) return;
   faltam.forEach(function(a){ LST_COMP_PEND[a] = true; });
   fetch(SERVER + '/vitrine/comparativo', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ asins: faltam, cupomModo: cup.modo, cupomCodigo: cup.codigo || null })
+    body: JSON.stringify({ asins: faltam, cupomModo: cup.modo, cupomCodigo: cup.codigo || null, cuponsItem: lstCuponsItem() })
   })
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) throw new Error(d.erro || 'falhou');
       faltam.forEach(function(a){
         var c = (d.itens || {})[a] || { veredito:'erro' };
-        c._em = Date.now(); c._cupom = cup.chave; LST_COMP[a] = c;
+        c._em = Date.now(); c._cupom = lstCompChaveItem(a, cup); LST_COMP[a] = c;
       });
     })
     .catch(function(e){
-      faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _cupom: cup.chave, _em: Date.now() - LST_COMP_TTL + 60000 }; });
+      faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _cupom: lstCompChaveItem(a, cup), _em: Date.now() - LST_COMP_TTL + 60000 }; });
     })
     .then(function(){
       faltam.forEach(function(a){ delete LST_COMP_PEND[a]; });
@@ -6819,6 +6868,7 @@ function salvarLista(){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ produtos: produtos, intervaloMin: intervalo,
                              cupomModo: modo, cupomCodigo: cupomCodigo,
+                             cuponsItem: lstCuponsItem(),
                              roteamento: roteamento,
                              iniciarHora: inicioHora,
                              janelas: lstJanelasEscolhidas() })
@@ -6856,6 +6906,7 @@ function salvarLista(){
       intervaloMin: intervalo,
       cupomModo: modo,
       cupomCodigo: cupomCodigo,
+      cuponsItem: lstCuponsItem(),
       roteamento: roteamento,
       efemera: false,
       agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
