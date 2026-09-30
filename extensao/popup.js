@@ -95,6 +95,14 @@ async function mlPintar() {
       + ((s.emVisita || []).length ? '<br>Inserindo agora: ' + s.emVisita.join(', ') : '')
       + (s.proximaEm && s.proximaEm > Date.now() ? '<br>Próxima visita: ~' + s.proximaHora : ''));
   }
+  if (s.ok && s.leitura) {
+    const l = s.leitura, u = l.ultimo;
+    const hora = t => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    if (!l.ligada) partes.push('Validade: leitura desligada no servidor (CUPONS_ML_LEITURA)');
+    else if (u && u.ok) partes.push('Validade lida às <b>' + hora(u.em) + '</b> · ' + u.naPagina + ' cupons na conta');
+    else if (u) partes.push('<span class="ruim">Validade: ' + String(u.erro || 'falhou').replace(/</g, '&lt;') + '</span>');
+    else partes.push('Validade: ainda não lida');
+  }
   if (e.ultimo) partes.push('Último: ' + e.ultimo.texto.replace(/</g, '&lt;'));
   st.innerHTML = partes.join('<br>');
 }

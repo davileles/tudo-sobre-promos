@@ -9,6 +9,8 @@
 //   mlAuto   { ligado, modo: 'aprovar'|'auto', token, servidor }
 //   mlVisita { id, lote, tabId, feitos, batida, sel, tempos } — visita em andamento (retomável)
 //   mlUltimo { em, texto }                      — última linha de status (popup)
+//   mlLeitura { consultadoEm }                  — última vez que perguntou se a leitura de validade está devida
+//   mlLerAposVisita                             — visita inseriu cupom: ler a validade logo em seguida
 
 const ML_SERVIDOR_PADRAO = 'https://baileys-server-production-ebfe.up.railway.app';
 const ML_ALARME = 'tica-cupons-ml';
@@ -17,6 +19,8 @@ const ML_VISITA_PARADA_MS = 5 * 60000;    // sem avanço há tanto = travou (o s
 let mlRodandoId = null;                   // visita que ESTE service worker está conduzindo
 const ML_NOTIF_APROVAR = 'tica-ml-aprovar';
 const ML_REAVISAR_MS = 30 * 60000;
+const ML_LEITURA_CONSULTA_MS = 10 * 60000; // pergunta ao servidor se a leitura de validade está devida
+let mlLendo = false;                      // leitura de "Meus cupons" em andamento neste service worker
 
 async function mlCfg() {
   const s = await chrome.storage.local.get({ mlAuto: null });
@@ -75,6 +79,10 @@ async function mlCiclo() {
       await mlEncerrarVisita(mlVisita, 'expirada');
     }
   }
+
+  // Consulta de validade (30/09/2026): o servidor diz quando está devida; a
+  // leitura roda aqui, com a sessão logada de verdade.
+  if (await mlTalvezLer()) return;
 
   if (cfg.modo === 'auto') {
     const r = await mlChamar('/cupons/auto/proximo');
@@ -241,6 +249,8 @@ async function mlRodarVisita(visita) {
   }
   if (mlRodandoId !== visita.id) return;
   mlRodandoId = null;
+  // Entrou cupom novo na conta: a validade real dele já está em "Meus cupons".
+  if (visita.inseridos) await chrome.storage.local.set({ mlLerAposVisita: true });
   const { mlVisita } = await chrome.storage.local.get({ mlVisita: null });
   if (mlVisita && mlVisita.id === visita.id) await mlEncerrarVisita(visita, motivoFim);
   const { mlUltimo } = await chrome.storage.local.get({ mlUltimo: null });
@@ -275,6 +285,7 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
 }
 
 async function mlReportarCupom(visita, c, res) {
+  if (res.veredito === 'inserido') visita.inseridos = (visita.inseridos || 0) + 1;
   await mlReportar('/cupons/auto/resultado', { visitaId: visita.id, chave: c.chave, veredito: res.veredito,
     rc: res.rc || null, status: res.status || null, mensagem: res.mensagem || '', venceuEm: res.venceuEm || null });
   await mlStatus((ML_ROTULO[res.veredito] || res.veredito) + ' ' + c.codigo + (res.mensagem ? ' — ' + String(res.mensagem).slice(0, 80) : ''));
@@ -313,6 +324,72 @@ async function mlEncerrarVisita(visita, motivo) {
   if (visita.tabId) chrome.tabs.remove(visita.tabId).catch(() => {});
 }
 
+// ── Consulta de validade: lê "Meus cupons" e manda ao servidor ───────────────
+// O servidor decide se está devida (intervalo, janela de horário) e reserva a
+// leitura; aqui só abrimos as páginas numa aba em segundo plano, rolamos até o
+// fim para os cards carregarem, copiamos o conteúdo e fechamos. Nada é
+// clicado nem inserido. Devolve true quando uma leitura começou.
+async function mlTalvezLer() {
+  if (mlLendo) return true;
+  const s = await chrome.storage.local.get({ mlLeitura: null, mlLerAposVisita: false });
+  const lt = s.mlLeitura || {};
+  const aposVisita = !!s.mlLerAposVisita;
+  if (!aposVisita && Date.now() - (lt.consultadoEm || 0) < ML_LEITURA_CONSULTA_MS) return false;
+  await chrome.storage.local.set({ mlLeitura: Object.assign({}, lt, { consultadoEm: Date.now() }), mlLerAposVisita: false });
+  let r = null;
+  try { r = await mlChamar('/cupons/auto/leitura' + (aposVisita ? '?aposVisita=1' : '')); } catch (_) { return false; }
+  if (!r || !r.devida || !Array.isArray(r.urls) || !r.urls.length) return false;
+  mlLendo = true;
+  mlLerCupons(r.urls)
+    .catch(e => mlStatus('Erro na leitura de validade: ' + (e.message || e)))
+    .finally(() => { mlLendo = false; });
+  return true;
+}
+
+async function mlLerCupons(urls) {
+  await mlStatus('Lendo a validade dos cupons na sua conta…');
+  const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
+  const paginas = [];
+  let aba = null, erro = null;
+  try {
+    aba = await chrome.tabs.create({ url: urls[0], active: false });
+    chrome.tabs.update(aba.id, { autoDiscardable: false }).catch(() => {});
+    for (let i = 0; i < urls.length; i++) {
+      if (i > 0) { await chrome.tabs.update(aba.id, { url: urls[i] }); await mlEsperarVivo(800); }
+      if (!(await mlEsperarCarregar(aba.id, 30000))) throw new Error('a aba de cupons foi fechada');
+      await mlEsperarVivo(rnd([2000, 3500]));
+      const login = await mlInjetar(aba.id, mlChecarLogin, [], null, 15000);
+      if (login) { erro = 'Mercado Livre deslogado neste Chrome'; break; }
+      // Parte dos cards carrega por JS conforme a página rola.
+      let altura = 0;
+      for (let k = 0; k < 5; k++) {
+        const h = await mlInjetar(aba.id, mlRolarFim, [], null, 15000).catch(() => 0);
+        await mlEsperarVivo(rnd([1200, 2200]));
+        if (h && h === altura) break;
+        altura = h;
+      }
+      const pg = await mlInjetar(aba.id, mlLerPaginaCupons, [], null, 20000);
+      paginas.push({ url: urls[i], html: (pg && pg.html) || '', texto: (pg && pg.texto) || '' });
+      if (i < urls.length - 1) await mlEsperarVivo(rnd([1500, 3000]));
+    }
+  } catch (e) { erro = 'extensão: ' + String(e.message || e).slice(0, 140); }
+  if (aba) chrome.tabs.remove(aba.id).catch(() => {});
+
+  if (!paginas.length) {
+    await mlReportar('/cupons/auto/leitura', { erro: erro || 'nenhuma página lida' });
+    return mlStatus('Leitura de validade falhou: ' + (erro || 'nenhuma página lida'));
+  }
+  let r;
+  try { r = await mlChamar('/cupons/auto/leitura', { paginas, origem: 'extensao' }, 60000); }
+  catch (e) { r = { ok: false, erro: e.message }; }
+  if (r && r.ok) {
+    await mlStatus('📅 Validade lida: ' + r.naPagina + ' cupons na conta · ' + (r.atualizados || []).length + ' atualizado(s)'
+      + ((r.criados || []).length ? ' · ' + r.criados.length + ' novo(s): ' + r.criados.slice(0, 4).join(', ') : ''));
+  } else {
+    await mlStatus('Leitura de validade: ' + ((r && r.erro) || 'sem resposta do servidor'));
+  }
+}
+
 const ML_ROTULO = { inserido: '✅ inserido', ja_tinha: '☑️ já estava', esgotado: '🗑 esgotado', vencido: '🗑 vencido',
   inexistente: '🗑 inexistente', problema: '⚠️ o ML respondeu com erro', sem_login: '🔒 ML deslogado', pagina_mudou: '🧩 página mudou', erro: '❌ erro' };
 
@@ -337,7 +414,8 @@ chrome.runtime.onMessage.addListener((msg, _r, responder) => {
     }
     if (msg.tipo === 'ml-agora') {
       // "Verificar agora" do popup: pula a espera do alarme.
-      await chrome.storage.local.set({ mlAvisadoEm: 0 });
+      const { mlLeitura } = await chrome.storage.local.get({ mlLeitura: null });
+      await chrome.storage.local.set({ mlAvisadoEm: 0, mlLeitura: Object.assign({}, mlLeitura, { consultadoEm: 0 }) });
       await mlCiclo().catch(e => mlStatus('Erro: ' + e.message));
       return responder({ ok: true });
     }
@@ -386,6 +464,22 @@ function mlInstalarEscuta(caminhoApi) {
 function mlChecarLogin() {
   if (/\/login|\/jms\/|registration|hub\/login/i.test(location.href) || document.querySelector('input[type=password], form[action*="login"]')) return location.href;
   return null;
+}
+
+// Mundo ISOLADO: rola até o fim (leitura de validade). Devolve a altura.
+function mlRolarFim() {
+  const h = document.documentElement.scrollHeight;
+  window.scrollTo({ top: h, behavior: 'smooth' });
+  return h;
+}
+
+// Mundo ISOLADO: conteúdo da página sem scripts/imagens (o servidor só precisa
+// dos rótulos dos cards) e o texto visível como plano B.
+function mlLerPaginaCupons() {
+  if (!document.body) return { html: '', texto: '' };
+  const corpo = document.body.cloneNode(true);
+  corpo.querySelectorAll('script, style, noscript, svg, template, iframe, img, picture, video, link').forEach(e => e.remove());
+  return { html: corpo.outerHTML.slice(0, 3000000), texto: (document.body.innerText || '').slice(0, 400000) };
 }
 
 // Mundo ISOLADO: como uma pessoa, rola um pouco a lista antes de comecar.
