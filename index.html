@@ -6309,6 +6309,13 @@ function lstTextoPrevisao(qtd, intervalo){
 
 function lstToggleCupom(){
   lstCompInvalidar();
+  // Trocar o modo da lista vale para os itens que estao no padrao; cupom
+  // especifico escolhido no item continua.
+  var _m = document.getElementById('lst-cupom-modo').value;
+  LST_SEL.forEach(function(p){
+    if (_m === 'nenhum' && !p.cupom) p.cupom = '__SEM__';
+    else if (_m !== 'nenhum' && p.cupom === '__SEM__') p.cupom = '';
+  });
   var fixo = document.getElementById('lst-cupom-modo').value === 'fixo';
   document.getElementById('lst-cupom-fixo-wrap').style.display = fixo ? 'flex' : 'none';
   if (fixo){
@@ -6388,7 +6395,7 @@ function novoDisparoComSelecionados(){
   var marcados = VIT_CACHE.filter(function(p){ return VIT_SEL[p.asin]; });
   if (!marcados.length) return;
   novaLista();
-  LST_SEL = marcados.map(function(p){ return { asin:p.asin, nome:p.nome }; });
+  LST_SEL = marcados.map(function(p){ return { asin:p.asin, nome:p.nome, cupom:lstCupomPadraoItem() }; });
   LST_AUTO_PRIOR = true;   // ordena sozinho quando o comparativo de todos chegar
   renderLstSel();
 }
@@ -6447,7 +6454,7 @@ function lstSugerir(){
 function lstAdd(asin){
   var p = VIT_CACHE.find(function(x){ return x.asin === asin; });
   if (!p) return;
-  if (!LST_SEL.some(function(x){ return x.asin === asin; })) LST_SEL.push({ asin:asin, nome:p.nome });
+  if (!LST_SEL.some(function(x){ return x.asin === asin; })) LST_SEL.push({ asin:asin, nome:p.nome, cupom:lstCupomPadraoItem() });
   document.getElementById('lst-add').value = '';
   document.getElementById('lst-sug').style.display = 'none';
   renderLstSel();
@@ -6571,6 +6578,12 @@ function lstCupomVinculado(asin){
 // Numa fila sem cupom (ou no automatico), um produto pode ter um cupom proprio.
 // Fica na lista (cuponsItem) e vence o modo da lista so para aquele item — nao
 // mexe no vinculo do produto na base.
+// Padrao do item novo: sem cupom. Com a lista em automatico/fixo, o item segue a lista.
+function lstCupomPadraoItem(){
+  var m = (document.getElementById('lst-cupom-modo') || {}).value || 'nenhum';
+  return m === 'nenhum' ? '__SEM__' : '';
+}
+
 function lstCuponsItem(){
   var m = {};
   LST_SEL.forEach(function(p){ if (p.cupom) m[p.asin] = p.cupom; });
@@ -6603,8 +6616,8 @@ function lstSelectCupomItem(p){
   return '<select title="Cupom só deste produto (vence o modo da lista)" onclick="event.stopPropagation()" '
     + 'onchange="lstDefinirCupomItem(\'' + esc(p.asin) + '\', this.value)" '
     + 'style="font-size:11px;padding:2px 4px;max-width:150px;margin-top:0' + (atual ? ';border-color:var(--green)' : '') + '">'
-    + '<option value="">🎟️ ' + rotL + '</option>'
     + '<option value="__SEM__"' + (atual === '__SEM__' ? ' selected' : '') + '>🚫 Sem cupom (preço cheio)</option>'
+    + '<option value=""' + (atual ? '' : ' selected') + '>🎟️ ' + rotL + '</option>'
     + ops + '</select>';
 }
 
