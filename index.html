@@ -6034,7 +6034,7 @@ function lstItensHtml(l){
           + '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;padding-left:26px;color:var(--muted)">'
           +   (st ? '<span>' + st + '</span>' : '')
           +   (jaFoi ? '' : '<span style="color:' + (d.erro ? '#fca5a5' : 'var(--muted)') + '">' + esc(d.txt) + '</span>')
-          +   (jaFoi || !(l.cuponsItem && l.cuponsItem[it.asin]) ? '' : '<span>🎟️ ' + esc(l.cuponsItem[it.asin]) + '</span>')
+          +   (jaFoi || !(l.cuponsItem && l.cuponsItem[it.asin]) ? '' : (l.cuponsItem[it.asin] === '__SEM__' ? '<span>🚫 sem cupom</span>' : '<span>🎟️ ' + esc(l.cuponsItem[it.asin]) + '</span>'))
           +   (jaFoi || it.sumiu ? '' : lstSelectNicho(it.asin, it.nicho))
           + '</div>'
           + '</div>';
@@ -6594,11 +6594,18 @@ function lstSelectCupomItem(p){
     return '<option value="' + esc(c.codigo) + '"' + (sel ? ' selected' : '') + '>'
       + (daLoja.length ? '' : esc(c.loja || 'Outros') + ' · ') + esc(c.codigo) + ' · ' + val + '</option>';
   }).join('');
-  if (atual && !achou) ops = '<option value="' + esc(atual) + '" selected>' + esc(atual) + ' (fora da base)</option>' + ops;
+  if (atual && atual !== '__SEM__' && !achou) ops = '<option value="' + esc(atual) + '" selected>' + esc(atual) + ' (fora da base)</option>' + ops;
+  // O rotulo padrao diz o que "cupom da lista" vai fazer com este item agora.
+  var modoL = (document.getElementById('lst-cupom-modo') || {}).value || 'nenhum';
+  var rotL = modoL === 'nenhum' ? 'Cupom da lista (sem cupom)'
+           : modoL === 'fixo'   ? 'Cupom da lista (fixo)'
+           : 'Cupom da lista (automático)';
   return '<select title="Cupom só deste produto (vence o modo da lista)" onclick="event.stopPropagation()" '
     + 'onchange="lstDefinirCupomItem(\'' + esc(p.asin) + '\', this.value)" '
     + 'style="font-size:11px;padding:2px 4px;max-width:150px;margin-top:0' + (atual ? ';border-color:var(--green)' : '') + '">'
-    + '<option value="">🎟️ Cupom da lista</option>' + ops + '</select>';
+    + '<option value="">🎟️ ' + rotL + '</option>'
+    + '<option value="__SEM__"' + (atual === '__SEM__' ? ' selected' : '') + '>🚫 Sem cupom (preço cheio)</option>'
+    + ops + '</select>';
 }
 
 function lstDefinirCupomItem(asin, codigo){
