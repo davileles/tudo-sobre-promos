@@ -1343,14 +1343,19 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('c-msg','c-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
-        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">vazio = imediato</span></span>
-        <div class="sched-row">
+        <span class="sched-label">Quando enviar</span>
+        <div class="quando-row" id="c-quando">
+          <button type="button" class="quando-opt on" data-q="janela" onclick="escolherQuando('c','janela')">🕐 Na janela</button>
+          <button type="button" class="quando-opt" data-q="agora" onclick="escolherQuando('c','agora')">⚡ Agora</button>
+          <button type="button" class="quando-opt" data-q="agendar" onclick="escolherQuando('c','agendar')">📅 Agendar</button>
+        </div>
+        <div class="sched-row" id="c-sched-row" style="display:none;margin-top:8px">
           <input type="datetime-local" id="c-sched" oninput="atualizarHintSched('c')"/>
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('c')">✕</button>
         </div>
-        <span class="sched-hint" id="c-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+        <span class="sched-hint" id="c-sched-hint">Segue a janela de disparos configurada.</span>
       </div>
-      <button class="btn btn-send" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input','c-sched')">⚡ Enviar no WhatsApp</button>
+      <button class="btn btn-send" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input','c-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="c-ok"></p>
       <p class="send-ok" id="c-send-ok"></p>
     </div>
@@ -1539,14 +1544,19 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('l-msg','l-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
-        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">vazio = imediato</span></span>
-        <div class="sched-row">
+        <span class="sched-label">Quando enviar</span>
+        <div class="quando-row" id="l-quando">
+          <button type="button" class="quando-opt on" data-q="janela" onclick="escolherQuando('l','janela')">🕐 Na janela</button>
+          <button type="button" class="quando-opt" data-q="agora" onclick="escolherQuando('l','agora')">⚡ Agora</button>
+          <button type="button" class="quando-opt" data-q="agendar" onclick="escolherQuando('l','agendar')">📅 Agendar</button>
+        </div>
+        <div class="sched-row" id="l-sched-row" style="display:none;margin-top:8px">
           <input type="datetime-local" id="l-sched" oninput="atualizarHintSched('l')"/>
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('l')">✕</button>
         </div>
-        <span class="sched-hint" id="l-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+        <span class="sched-hint" id="l-sched-hint">Segue a janela de disparos configurada.</span>
       </div>
-      <button class="btn btn-send" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input','l-sched')">⚡ Enviar no WhatsApp</button>
+      <button class="btn btn-send" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input','l-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="l-ok"></p>
       <p class="send-ok" id="l-send-ok"></p>
     </div>
@@ -3367,7 +3377,9 @@ function ggAbrir() {
 
 var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
-  if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos(false);
+  if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos('o', false);
+  if (name === 'cupom' && quandoSel('c') === 'janela') carregarJanelaDisparos('c', false);
+  if (name === 'livre' && quandoSel('l') === 'janela') carregarJanelaDisparos('l', false);
   if (name === 'ltv') name = 'trafego';   // LTV agora mora dentro do Trafego
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -11054,12 +11066,14 @@ function limparSched(pid) {
   if (el) { el.value = ''; atualizarHintSched(pid); }
 }
 /* ══════ QUANDO ENVIAR (na janela / agora / agendar) ══════
-   Na janela = a mesma janela de publicação do monitor ("Publicar das/Até").
+   Na janela: cupom usa a janela de horário dos cupons (Ajustes); oferta e
+   mensagem usam a janela de publicação do monitor ("Publicar das/Até").
    Dentro dela a mensagem entra no portão de publicação do servidor, espaçada
    do radar, monitor e listas; fora dela vira agendamento para a próxima
    abertura (aparece em Agendados e dá para cancelar). */
 var QUANDO_ROTULO_BTN = { janela: '🕐 Enviar na janela', agora: '⚡ Enviar agora', agendar: '📅 Agendar envio' };
-var _janelaDisp = null, _janelaDispEm = 0;
+var _janelaDisp = {}, _janelaDispEm = {};
+function tipoJanela(pid) { return pid === 'c' ? 'cupom' : 'oferta'; }
 function quandoSel(pid) {
   var row = document.getElementById(pid + '-quando');
   if (!row) return null;
@@ -11077,7 +11091,7 @@ function escolherQuando(pid, q) {
   if (sr) sr.style.display = q === 'agendar' ? '' : 'none';
   var btn = document.getElementById(pid + '-send-btn');
   if (btn && QUANDO_ROTULO_BTN[q]) btn.textContent = QUANDO_ROTULO_BTN[q];
-  if (q === 'janela') carregarJanelaDisparos(false);
+  if (q === 'janela') carregarJanelaDisparos(pid, false);
   atualizarHintSched(pid);
 }
 function iniciarQuando(pid) {
@@ -11085,14 +11099,17 @@ function iniciarQuando(pid) {
   try { q = localStorage.getItem('tsp-quando-' + pid); } catch (e) {}
   escolherQuando(pid, QUANDO_ROTULO_BTN[q] ? q : 'janela');
 }
-function carregarJanelaDisparos(forcar) {
-  if (!forcar && _janelaDisp && Date.now() - _janelaDispEm < 60000) return;
-  fetch(SERVER + '/janela-disparos?t=' + Date.now(), { cache: 'no-cache' })
+function carregarJanelaDisparos(pid, forcar) {
+  var tp = tipoJanela(pid);
+  if (!forcar && _janelaDisp[tp] && Date.now() - (_janelaDispEm[tp] || 0) < 60000) return;
+  fetch(SERVER + '/janela-disparos?tipo=' + tp + '&t=' + Date.now(), { cache: 'no-cache' })
     .then(function (r) { return r.json(); })
     .then(function (d) {
       if (!d || !d.ok) return;
-      _janelaDisp = d; _janelaDispEm = Date.now();
-      ['o'].forEach(function (pid) { if (quandoSel(pid) === 'janela') atualizarHintSched(pid); });
+      _janelaDisp[tp] = d; _janelaDispEm[tp] = Date.now();
+      ['c', 'o', 'l'].forEach(function (p) {
+        if (tipoJanela(p) === tp && quandoSel(p) === 'janela') atualizarHintSched(p);
+      });
     }).catch(function () {});
 }
 function atualizarHintSched(pid) {
@@ -11102,11 +11119,13 @@ function atualizarHintSched(pid) {
   var q = quandoSel(pid);
   if (q === 'janela') {
     hint.className = 'sched-hint';
-    if (!_janelaDisp) { hint.textContent = 'Segue a janela de disparos configurada (horário de Brasília).'; return; }
-    hint.textContent = 'Janela de disparos: ' + _janelaDisp.janelas + ' (Brasília). '
-      + (_janelaDisp.dentro
+    var jd = _janelaDisp[tipoJanela(pid)];
+    var nomeJ = pid === 'c' ? 'Janela dos cupons' : 'Janela de disparos';
+    if (!jd) { hint.textContent = 'Segue a janela de disparos configurada (horário de Brasília).'; return; }
+    hint.textContent = nomeJ + ': ' + jd.janelas + ' (Brasília). '
+      + (jd.dentro
           ? 'Agora está dentro — entra na fila de publicação, espaçada dos outros disparos.'
-          : 'Agora está fora — fica agendado para ' + _janelaDisp.proximaAbertura + '.');
+          : 'Agora está fora — fica agendado para ' + jd.proximaAbertura + '.');
     return;
   }
   if (q === 'agora') {
@@ -14959,8 +14978,8 @@ function montarImportantesProntos() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montarImportantesProntos);
 else montarImportantesProntos();
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { iniciarQuando('o'); });
-else iniciarQuando('o');
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { ['c','o','l'].forEach(iniciarQuando); });
+else ['c','o','l'].forEach(iniciarQuando);
 </script>
 </body>
 </html>
