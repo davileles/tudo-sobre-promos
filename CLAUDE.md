@@ -246,7 +246,7 @@ Cron do GitHub está degradado (atrasa 2–4 h): disparo real vem do Railway; cr
 
 **Rotas (252; 193 obrigatórias em `superficie.json`)** — tenant por token (`X-TSP-Token`/`?tsp_token=`); sem token = `tsp`; **token inválido = 401, nunca cai na raiz**.
 - Saúde/sessão: `/`, `/status`, `/health`, `/painel`, `/painel-json`, `/qr`, `/pair`, `/sessao/diagnostico`, `POST /reconectar|reset-sessao|reset-sessao-completo|reset-sender-keys|renovar-identidade|curar-conflito`, `/manutencao/*`.
-- Envio: `POST /enviar|enviar-imagem|enviar-arquivo|enviar-audio`.
+- Envio: `POST /enviar|enviar-imagem|enviar-arquivo|enviar-audio`. `POST /enviar` aceita `quando:'janela'` (gerador TSP, aba Criar oferta → "🕐 Na janela"): usa a janela de publicação do monitor (`publicacao.janelas`, fallback `LISTA_JANELAS`); dentro dela publica pelo portão de publicação em segundo plano, fora vira agendamento para a próxima abertura. `GET /janela-disparos` informa a janela ao painel.
 - Contas: `/contas*`. Grupos: `/grupos*`, `/grupos/censo*`, `/grupos/membros/{eventos,hoje,ltv,permanencia,resumo,retencao,trafego}`, `/grupos-gestao/*`, `/gg/*`, `/monitor*`.
 - Fila/aprovação: `/fila-envio*`, `/painel/*`, `/operacao/*`.
 - Cupons: `/cupons/*`. Marketplace: `/mkt/*`, `/vitrine*`, `/listas*`, `/templates*`, `/tsp/*`, `/ml/*`, `/shopee/*`, `/magalu/*`, `/awin/*`.

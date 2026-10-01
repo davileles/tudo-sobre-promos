@@ -370,6 +370,10 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .sched-clear:hover{border-color:var(--red);color:var(--red)}
   .sched-hint{display:block;font-size:11px;color:var(--muted2);margin-top:7px;line-height:1.4}
   .sched-hint.agendado{color:var(--accent);font-weight:700}
+  .quando-row{display:flex;gap:6px;flex-wrap:wrap}
+  .quando-opt{flex:1;min-width:96px;background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .quando-opt:hover{border-color:var(--accent);color:var(--text)}
+  .quando-opt.on{border-color:var(--accent);background:var(--card);color:var(--accent)}
   .ok,.send-ok{font-size:12px;color:var(--green);font-weight:700;text-align:center;min-height:16px}
   .send-err{color:var(--red)}
 
@@ -1454,14 +1458,19 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="copy-wrap">
       <button class="btn btn-copy" onclick="copiar('o-msg','o-ok')">Copiar para WhatsApp</button>
       <div class="sched-wrap">
-        <span class="sched-label">🕐 Agendar envio <span class="tag" style="text-transform:none">vazio = imediato</span></span>
-        <div class="sched-row">
+        <span class="sched-label">Quando enviar</span>
+        <div class="quando-row" id="o-quando">
+          <button type="button" class="quando-opt on" data-q="janela" onclick="escolherQuando('o','janela')">🕐 Na janela</button>
+          <button type="button" class="quando-opt" data-q="agora" onclick="escolherQuando('o','agora')">⚡ Agora</button>
+          <button type="button" class="quando-opt" data-q="agendar" onclick="escolherQuando('o','agendar')">📅 Agendar</button>
+        </div>
+        <div class="sched-row" id="o-sched-row" style="display:none;margin-top:8px">
           <input type="datetime-local" id="o-sched" oninput="atualizarHintSched('o')"/>
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('o')">✕</button>
         </div>
-        <span class="sched-hint" id="o-sched-hint">Deixe em branco para envio imediato. Horário de Brasília (SP).</span>
+        <span class="sched-hint" id="o-sched-hint">Segue a janela de disparos configurada.</span>
       </div>
-      <button class="btn btn-send" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input','o-sched')">⚡ Enviar no WhatsApp</button>
+      <button class="btn btn-send" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input','o-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="o-ok"></p>
       <p class="send-ok" id="o-send-ok"></p>
     </div>
@@ -3358,6 +3367,7 @@ function ggAbrir() {
 
 var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
+  if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos(false);
   if (name === 'ltv') name = 'trafego';   // LTV agora mora dentro do Trafego
   // O login dos Resultados mora na aba Comissao (IDs sao unicos no documento):
   // sem sessao valida, Trafego cairia numa aba vazia sem explicacao.
@@ -11043,14 +11053,73 @@ function limparSched(pid) {
   var el = document.getElementById(pid+'-sched');
   if (el) { el.value = ''; atualizarHintSched(pid); }
 }
+/* ══════ QUANDO ENVIAR (na janela / agora / agendar) ══════
+   Na janela = a mesma janela de publicação do monitor ("Publicar das/Até").
+   Dentro dela a mensagem entra no portão de publicação do servidor, espaçada
+   do radar, monitor e listas; fora dela vira agendamento para a próxima
+   abertura (aparece em Agendados e dá para cancelar). */
+var QUANDO_ROTULO_BTN = { janela: '🕐 Enviar na janela', agora: '⚡ Enviar agora', agendar: '📅 Agendar envio' };
+var _janelaDisp = null, _janelaDispEm = 0;
+function quandoSel(pid) {
+  var row = document.getElementById(pid + '-quando');
+  if (!row) return null;
+  var on = row.querySelector('.quando-opt.on');
+  return on ? on.getAttribute('data-q') : 'janela';
+}
+function escolherQuando(pid, q) {
+  var row = document.getElementById(pid + '-quando');
+  if (!row) return;
+  [].forEach.call(row.querySelectorAll('.quando-opt'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-q') === q);
+  });
+  try { localStorage.setItem('tsp-quando-' + pid, q); } catch (e) {}
+  var sr = document.getElementById(pid + '-sched-row');
+  if (sr) sr.style.display = q === 'agendar' ? '' : 'none';
+  var btn = document.getElementById(pid + '-send-btn');
+  if (btn && QUANDO_ROTULO_BTN[q]) btn.textContent = QUANDO_ROTULO_BTN[q];
+  if (q === 'janela') carregarJanelaDisparos(false);
+  atualizarHintSched(pid);
+}
+function iniciarQuando(pid) {
+  var q = null;
+  try { q = localStorage.getItem('tsp-quando-' + pid); } catch (e) {}
+  escolherQuando(pid, QUANDO_ROTULO_BTN[q] ? q : 'janela');
+}
+function carregarJanelaDisparos(forcar) {
+  if (!forcar && _janelaDisp && Date.now() - _janelaDispEm < 60000) return;
+  fetch(SERVER + '/janela-disparos?t=' + Date.now(), { cache: 'no-cache' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.ok) return;
+      _janelaDisp = d; _janelaDispEm = Date.now();
+      ['o'].forEach(function (pid) { if (quandoSel(pid) === 'janela') atualizarHintSched(pid); });
+    }).catch(function () {});
+}
 function atualizarHintSched(pid) {
   var el = document.getElementById(pid+'-sched');
   var hint = document.getElementById(pid+'-sched-hint');
   if (!el || !hint) return;
+  var q = quandoSel(pid);
+  if (q === 'janela') {
+    hint.className = 'sched-hint';
+    if (!_janelaDisp) { hint.textContent = 'Segue a janela de disparos configurada (horário de Brasília).'; return; }
+    hint.textContent = 'Janela de disparos: ' + _janelaDisp.janelas + ' (Brasília). '
+      + (_janelaDisp.dentro
+          ? 'Agora está dentro — entra na fila de publicação, espaçada dos outros disparos.'
+          : 'Agora está fora — fica agendado para ' + _janelaDisp.proximaAbertura + '.');
+    return;
+  }
+  if (q === 'agora') {
+    hint.className = 'sched-hint';
+    hint.textContent = 'Sai imediatamente, ignorando a janela e o espaçamento.';
+    return;
+  }
   var val = el.value;
   if (!val) {
     hint.className = 'sched-hint';
-    hint.textContent = 'Deixe em branco para envio imediato. Horário de Brasília (SP).';
+    hint.textContent = q === 'agendar'
+      ? 'Escolha data e hora. Horário de Brasília (SP).'
+      : 'Deixe em branco para envio imediato. Horário de Brasília (SP).';
     return;
   }
   var spDate = parseDatetimeAsSP(val);
@@ -11100,8 +11169,18 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
   var s = document.getElementById(statusId);
   if (!wsConectado) { s.className='send-ok send-err'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; },4000); return; }
 
+  // Controle "Quando enviar" (só existe em alguns painéis; sem ele, vale o
+  // comportamento antigo: campo de agendamento vazio = imediato).
+  var quando = quandoSel(prefEnvio);
+  if (quando === 'agendar') {
+    var _se = schedInputId ? document.getElementById(schedInputId) : null;
+    if (!_se || !_se.value) {
+      s.className='send-ok send-err'; s.textContent='Escolha a data e a hora do agendamento.';
+      setTimeout(function(){ s.textContent=''; },4000); return;
+    }
+  }
   var agendarEm = null;
-  if (schedInputId) {
+  if (schedInputId && quando !== 'janela' && quando !== 'agora') {
     var schedEl = document.getElementById(schedInputId);
     if (schedEl && schedEl.value) {
       var spDate = parseDatetimeAsSP(schedEl.value);
@@ -11113,13 +11192,35 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     }
   }
 
-  s.className='send-ok'; s.textContent = agendarEm ? 'Agendando...' : 'Enviando...';
+  s.className='send-ok'; s.textContent = agendarEm ? 'Agendando...' : (quando === 'janela' ? 'Colocando na janela...' : 'Enviando...');
   try {
     var pid = imgInputId ? imgInputId.replace('-img-input','') : null;
     var imgInput = imgInputId ? document.getElementById(imgInputId) : null;
     var file = (imgInput && imgInput.files[0]) ? imgInput.files[0] : (pid && window._pastedFiles && window._pastedFiles[pid]) ? window._pastedFiles[pid] : null;
     var r;
-    if (file && !agendarEm) {
+    if (quando === 'janela') {
+      // Sempre JSON: fora da janela vira agendamento, e o anexo precisa ficar
+      // guardado até a hora do disparo (mesmo teto do envio agendado).
+      var pj = { mensagem: texto, grupo: 'tsp', tipo: tipoEnvio, quando: 'janela',
+                 trilhas: trilhasEnvio, categoria: catEnvio || null };
+      if (file) {
+        if (file.size > ANEXO_AGEND_MAX) {
+          s.className='send-ok send-err';
+          s.textContent='Imagem de '+Math.round(file.size/1024)+' KB — o limite para envio na janela é '+Math.round(ANEXO_AGEND_MAX/1024)+' KB. Use ⚡ Agora.';
+          setTimeout(function(){ s.textContent=''; },6000); return;
+        }
+        pj.anexo = { base64: await arquivoParaBase64(file), mimetype: file.type || 'image/jpeg', nomeArquivo: file.name || '' };
+      } else if (msgId === 'o-msg' && _produtoBuscado
+          && _produtoBuscado.produto.link === document.getElementById('o-link').value.trim()) {
+        pj.preview = {
+          link: _produtoBuscado.produto.link,
+          titulo: _produtoBuscado.produto.titulo,
+          descricao: 'R$ ' + fmt(_produtoBuscado.produto.preco) + ' · ' + _produtoBuscado.loja,
+          imagemUrl: _produtoBuscado.produto.imagemUrl,
+        };
+      }
+      r = await fetch(SERVER+'/enviar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(pj) });
+    } else if (file && !agendarEm) {
       var formData = new FormData();
       formData.append('imagem',file); formData.append('legenda',texto); formData.append('grupo','tsp');
       formData.append('tipo',tipoEnvio);
@@ -11159,7 +11260,11 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     }
     var d = await r.json();
     if (d.ok) {
-      s.textContent = d.agendado
+      s.textContent = d.enfileirado
+        ? ('🕐 Na fila de disparos' + (d.esperaMin ? ' — sai em ~' + d.esperaMin + ' min' : ' — saindo agora') + '.')
+        : d.agendado && d.foraDaJanela
+        ? ('🕐 Fora da janela (' + d.janelas + ') — agendado para ' + d.horario + ' (SP).')
+        : d.agendado
         ? ('📅 Agendado para ' + d.horario + ' (SP)!')
         : ('✓ Enviado em ' + (d.enviados || 1) + ' grupo(s)!'
            + ((d.falhas && d.falhas.length) ? ' — ' + d.falhas.length + ' falha(s)' : ''));
@@ -14854,6 +14959,8 @@ function montarImportantesProntos() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', montarImportantesProntos);
 else montarImportantesProntos();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { iniciarQuando('o'); });
+else iniciarQuando('o');
 </script>
 </body>
 </html>
