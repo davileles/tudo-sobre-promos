@@ -573,6 +573,14 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .grp-box-n{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:1px 8px;font-size:10px;color:var(--text)}
   .grp-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;padding:5px 0;border-bottom:1px dashed var(--border)}
   .grp-chip:last-child{border-bottom:none}
+  /* Montagem do disparo (Catálogo): no celular os seletores de cupom/nicho
+     esmagavam o nome do produto a largura zero. Quebra a linha: nome em cima. */
+  .lst-item .lst-item-nome{min-width:0}
+  @media(max-width:640px){
+    .grp-chip.lst-item{flex-wrap:wrap;row-gap:6px}
+    .grp-chip.lst-item .lst-item-nome{flex:1 1 100%!important;white-space:normal;overflow-wrap:anywhere}
+    .grp-chip.lst-item select{flex:1 1 0;min-width:0;max-width:none!important}
+  }
   .grp-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .grp-chip button{background:transparent;border:none;color:var(--muted2);cursor:pointer;font-size:12px;padding:0 2px;flex-shrink:0}
   .grp-chip button:hover{color:#e5534b}
@@ -6672,8 +6680,8 @@ function renderLstSel(){
         + 'title="Sorteia uma nova ordem para mesclar as categorias no grupo">🔀 Embaralhar ordem</button></div>'
       : '')
   + LST_SEL.map(function(p, i){
-    return '<div class="grp-chip">'
-      + '<span style="flex:1">' + (i+1) + '. ' + lstNomeComLink(p)
+    return '<div class="grp-chip lst-item">'
+      + '<span class="lst-item-nome" style="flex:1">' + (i+1) + '. ' + lstNomeComLink(p)
       + (function(){ if (p.cupom) return ''; var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
