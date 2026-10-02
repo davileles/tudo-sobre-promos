@@ -6807,6 +6807,22 @@ function lstLinhaComparativo(asin){
     extra.push('menor enviado R$ ' + fmtBRL(divEnv(c.menorEnviado)) + ' em ' + lstFmtDiaCurto(c.menorEnviado.em));
   var extraTxt = extra.length ? ' · ' + extra.join(' · ') : '';
 
+  // Sem oferta na loja: o "preco de agora" nao existe. Mostra o ultimo preco
+  // lido como o que ele e (passado), sem veredito de mais barato/mais caro.
+  if (a && a.disponivel === false){
+    var conf = a.semOfertaEm ? ' <span title="Última conferência do monitor na loja">(conferido ' + lstFmtDiaCurto(a.semOfertaEm) + ')</span>' : '';
+    var desde = (a.semOfertaDesde && lstFmtDiaCurto(a.semOfertaDesde) !== lstFmtDiaCurto(a.semOfertaEm))
+      ? ' desde ' + lstFmtDiaCurto(a.semOfertaDesde) : '';
+    var ultPreco = a.preco > 0
+      ? ' · último preço R$ ' + fmtBRL(a.preco) + (a.em ? ' em ' + lstFmtDiaCurto(a.em) : '') : '';
+    var ultEnv = u
+      ? ' · último envio ' + lstFmtDiaCurto(u.em) + ' por R$ ' + fmtBRL(divEnv(u))
+        + (c.envios90d > 1 ? ' · ' + c.envios90d + '× em 90d' : '')
+      : '';
+    return '<div style="' + st + 'color:var(--muted2)">⛔ <b style="color:#fca5a5">indisponível na loja</b>'
+      + desde + conf + ultPreco + ultEnv + '</div>';
+  }
+
   if (c.veredito === 'inedito'){
     var dm = lstDescMediana(c), medTxt = '';
     if (dm != null){
@@ -6832,18 +6848,39 @@ function lstLinhaComparativo(asin){
 }
 
 function lstResumoComparativo(){
-  var n = { melhor:0, igual:0, pior:0, inedito:0 };
-  LST_SEL.forEach(function(p){ var c = LST_COMP[p.asin]; if (c && n[c.veredito] != null) n[c.veredito]++; });
+  var n = { melhor:0, igual:0, pior:0, inedito:0, indisponivel:0 };
+  LST_SEL.forEach(function(p){
+    var c = LST_COMP[p.asin];
+    if (!c) return;
+    if (lstCompIndisponivel(c)) { n.indisponivel++; return; }
+    if (n[c.veredito] != null) n[c.veredito]++;
+  });
   var partes = [];
   if (n.melhor)  partes.push('🟢 ' + n.melhor + ' mais barato(s)');
   if (n.igual)   partes.push('🟡 ' + n.igual + ' igual(is)');
   if (n.pior)    partes.push('🔴 ' + n.pior + ' mais caro(s)');
   if (n.inedito) partes.push('🆕 ' + n.inedito + ' inédito(s)');
+  if (n.indisponivel) partes.push('⛔ ' + n.indisponivel + ' indisponível(is)');
   if (!partes.length) return '';
   return '<div style="font-size:11px;margin-top:6px;color:var(--muted2);display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
     + '<span>Contra o último envio: ' + partes.join(' · ') + '</span>'
     + (n.pior ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverPiores()">Remover os 🔴 (' + n.pior + ')</button>' : '')
+    + (n.indisponivel ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverIndisponiveis()">Remover os ⛔ (' + n.indisponivel + ')</button>' : '')
     + '</div>';
+}
+
+// Produto que a loja nao esta vendendo agora (monitor leu a pagina sem preco).
+function lstCompIndisponivel(c){
+  return !!(c && c.atual && c.atual.disponivel === false);
+}
+
+function lstRemoverIndisponiveis(){
+  var fora = {}, qtd = 0;
+  LST_SEL.forEach(function(p){ if (lstCompIndisponivel(LST_COMP[p.asin])) { fora[p.asin] = true; qtd++; } });
+  if (!qtd) return;
+  if (!confirm('Remover ' + qtd + ' produto(s) indisponível(is) na loja?')) return;
+  LST_SEL = LST_SEL.filter(function(p){ return !fora[p.asin]; });
+  renderLstSel();
 }
 
 function lstRemoverPiores(){
@@ -14793,7 +14830,8 @@ function mpRenderProdutos() {
     h += '<tr><td style="padding-right:10px"><b>' + mpEsc((p.nome || p.asin).slice(0, 58)) + '</b><br>'
       + '<span style="color:var(--muted);font-size:11px">' + mpEsc(p.loja) + ' · ' + mpEsc(p.nicho)
       + ' · ' + p.dias + ' dia(s) de série' + (imaturo ? ' <span style="color:#f59e0b">(imaturo)</span>' : '')
-      + ' · lido ' + mpFmtData(p.lidoEm) + '</span></td>'
+      + ' · lido ' + mpFmtData(p.lidoEm)
+      + (p.disponivel === false ? ' · <b style="color:#fca5a5">indisponível na loja</b>' : '') + '</span></td>'
       + '<td class="dv-td-n" style="white-space:nowrap">' + mpFmtR(p.precoAtual)
       + '<br><span style="color:' + cor + ';font-size:11px">'
       + (p.quedaPct == null ? '—' : (p.quedaPct > 0 ? '-' + p.quedaPct + '%' : '+' + Math.abs(p.quedaPct) + '%')) + '</span></td>'
