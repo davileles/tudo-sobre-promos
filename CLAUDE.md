@@ -213,6 +213,7 @@ Cron do GitHub está degradado (atrasa 2–4 h): disparo real vem do Railway; cr
 - No server.js: `WA_ENVIO_URL=http://wa-envio.railway.internal:8080`, `WA_ENVIO_TOKEN`, `WA_ENVIO_CONTAS` (CSV liga o motor por conta), `WA_ENVIO_GRUPOS`. O server.js só enfileira; timeout 115 s.
 - Erro traz `fase`: `validacao|conexao|quarentena|preparo|upload|envio`. Antes do envio → cai no Baileys do mesmo número. **`fase: envio` (ambíguo) nunca é reenviado por outro número → outbox.**
 - Leitura em sombra via `/interno/wa-leitura/{grupos,mensagens,participantes,comparacao}`.
+- `POST /contas/{id}/apagar {jid,id}`: apaga para todos uma mensagem que a própria conta enviou (`BuildRevoke` com sender vazio).
 
 **Contas WhatsApp (decisão de 17/09/2026)**
 - `principal`: lê as passagens do CDV e as fontes do TSP (WhatsApp/Telegram), faz as funções base (DM, Hubla, campanhas, resolver JID) e é **reserva** quando outro número falha.
@@ -318,7 +319,7 @@ Cron do GitHub está degradado (atrasa 2–4 h): disparo real vem do Railway; cr
 
 ### 4.6 `tudo-sobre-promos` (painel Tica Promos/TSP — `gestao.ticapromos.com.br`)
 - `index.html` (~14,7k linhas) é o painel; `gestao.html` e `painel.html` só redirecionam para `./` (manter por links antigos).
-- Navegação por `SECOES` (aba nova → incluir em `SECOES` **e** `ROTULO_ABA`): Hoje (`hoje`, `alertas`) · Publicar (`aprov`, `filaenvio`, `agend`, `divulg`, `cupom`, `oferta`, `disparos`, `livre`) · Catálogo (`vitrine`, `cupons`, `monprecos`, `descobertas`) · Resultados (`comissao`, `cliques`, `rastreio`, `trafego`+LTV) · Grupos (`grupos` Trilhas, `dist`, `admgrupos`, `saude`) · Ajustes (`config` Negócio/Técnica, `templates`, `conexao`).
+- Navegação por `SECOES` (aba nova → incluir em `SECOES` **e** `ROTULO_ABA`): Hoje (`hoje`, `alertas`) · Publicar (`aprov`, `filaenvio`, `agend`, `enviadas` — apagar para todos o que saiu nos grupos nas últimas 48 h, `divulg`, `cupom`, `oferta`, `disparos`, `livre`) · Catálogo (`vitrine`, `cupons`, `monprecos`, `descobertas`) · Resultados (`comissao`, `cliques`, `rastreio`, `trafego`+LTV) · Grupos (`grupos` Trilhas, `dist`, `admgrupos`, `saude`) · Ajustes (`config` Negócio/Técnica, `templates`, `conexao`).
 - **Não remover os botões de `#tabs-legado`** (fora da tela): os badges (`#aprov-badge`…) são filhos deles.
 - Login OTP (`app:'tsp'`) → `localStorage.tsp_auth` (24 h). `fetch` interceptado envia `X-TSP-Token` ao baileys e ao proxy; abas próprias usam `?tsp_token=` (`urlComToken()`). Operador (tenant ≠ `tsp`) não vê Comissão/Tráfego/LTV/Resultados (`html.visao-operador`, `localStorage['tsp-visao']`).
 - Os endpoints novos do roadmap (fases 1–5 no baileys) **ainda não são consumidos** por este front.

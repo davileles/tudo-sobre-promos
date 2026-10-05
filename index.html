@@ -496,6 +496,16 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .wa-img{width:100%;max-width:400px;border-radius:8px;display:block;margin-bottom:8px}
   .wa-prev-carregando{font-size:11px;color:var(--muted);padding:4px 0}
   .ag-acoes{display:flex;justify-content:flex-end;margin-top:10px}
+  .env-aviso{font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.5}
+  .env-check{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+  .env-grupos{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .env-g{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;border:1px solid var(--border);border-radius:10px;padding:7px 10px}
+  .env-g-nome{font-weight:700;flex:1;min-width:140px}
+  .env-g-meta{color:var(--muted);font-size:11px}
+  .env-g.apagada{opacity:.55}
+  .env-g.apagada .env-g-nome{text-decoration:line-through}
+  .env-g-erro{color:var(--red);font-size:11px;width:100%}
+  .ag-card.apagada::before{background:var(--muted)}
 
   /* ══ GRUPOS ══ */
   .grp{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 16px;margin-bottom:8px;position:relative;overflow:hidden}
@@ -1088,6 +1098,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-alertas" onclick="switchTab('alertas')">🚨 Alertas<span class="tab-badge" id="alertas-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-filaenvio" onclick="switchTab('filaenvio')">📋 Fila<span class="tab-badge" id="filaenvio-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-agend" onclick="switchTab('agend')">🕐 Agendados<span class="tab-badge" id="agend-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-enviadas" onclick="switchTab('enviadas')">🗑️ Enviadas</button>
   <button class="main-tab" id="tab-aprov" onclick="switchTab('aprov')">✅ Aprovação<span class="tab-badge" id="aprov-badge" style="display:none">0</span></button>
   <button class="main-tab" id="tab-divulg" onclick="switchTab('divulg')">📊 Divulgações</button>
   <button class="main-tab" id="tab-cupom" onclick="switchTab('cupom')">🏷️ Criar cupom</button>
@@ -1213,6 +1224,19 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
   </div>
   <div id="agend-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- ════════ ENVIADAS — apagar para todos o que ja saiu nos grupos (ate ~2 dias) ════════ -->
+<div class="panel" id="panel-enviadas">
+  <div class="fila-bar">
+    <span id="env-status">Carregando...</span>
+    <div class="fila-acoes">
+      <label class="env-check"><input type="checkbox" id="env-todos" onchange="carregarEnviadas()"/> incluir grupos do CDV</label>
+      <button class="btn btn-sm" onclick="carregarEnviadas()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div class="env-aviso">Mensagens enviadas nos grupos nas últimas 48 h. O WhatsApp só permite <b>apagar para todos</b> até cerca de 2 dias depois do envio — e só pelo mesmo número que enviou.</div>
+  <div id="env-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- ════════ DIVULGACOES — quantos itens sairam por plataforma em cada dia ════════ -->
@@ -3383,7 +3407,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos('o', false);
   if (name === 'cupom' && quandoSel('c') === 'janela') carregarJanelaDisparos('c', false);
@@ -3404,6 +3428,7 @@ function switchTab(name) {
   if (name === 'filaenvio') carregarFilaEnvio();
   if (name === 'aprov') carregarAprovacao();
   if (name === 'agend') carregarAgendados();
+  if (name === 'enviadas') carregarEnviadas();
   if (name === 'divulg') carregarDivulgacoes();
   if (name === 'grupos') { if (!GRUPOS_CACHE.length) carregarGrupos(); if (!TG_CANAIS_CACHE.length) carregarCanaisTg(); carregarMonitor(); }
   // O autocomplete do distribuidor le a mesma lista de grupos da aba Grupos.
@@ -3466,7 +3491,7 @@ function switchTab(name) {
    sozinha a partir deste mapa. */
 var SECOES = [
   { id: 'hoje',       label: 'Hoje',       abas: ['hoje','alertas'] },
-  { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','divulg','cupom','oferta','disparos','livre'] },
+  { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','enviadas','divulg','cupom','oferta','disparos','livre'] },
   // id 'produtos' mantido (aba lembrada e badges); o rotulo e Catalogo:
   // material de trabalho — produtos, cupons e o que alimenta a base
   { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','descobertas'] },
@@ -3477,7 +3502,7 @@ var SECOES = [
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
 ];
 var ROTULO_ABA = {
-  hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', aprov: 'Aprovação',
+  hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', enviadas: 'Enviadas', aprov: 'Aprovação',
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
   livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
@@ -11335,6 +11360,96 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       setTimeout(function(){ s.textContent=''; },5000);
     } else { s.className='send-ok send-err'; s.textContent='Erro: '+(d.erro||'falha'); setTimeout(function(){ s.textContent=''; },5000); }
   } catch(e) { s.className='send-ok send-err'; s.textContent='Sem resposta do servidor.'; setTimeout(function(){ s.textContent=''; },4000); }
+}
+
+/* ══════ ENVIADAS — apagar para todos ══════
+   O baileys-server registra toda mensagem que sai para grupo (conta, motor e
+   chave do WhatsApp) por ~2 dias. Aqui as copias da mesma publicacao aparecem
+   juntas; apagar de todos pede confirmacao e sai em ritmo humano no servidor. */
+var ENV_CACHE = [];
+async function carregarEnviadas() {
+  var lista  = document.getElementById('env-lista');
+  var status = document.getElementById('env-status');
+  var todos  = document.getElementById('env-todos').checked;
+  try {
+    var r = await fetch(SERVER + '/enviadas-grupos?escopo=' + (todos ? 'todos' : 'tsp'), { cache:'no-cache' });
+    var d = await r.json();
+    if (!d.ok) {
+      lista.innerHTML = '<div class="fila-vazia">' + esc(d.erro || 'Erro ao carregar.') + '</div>';
+      status.textContent = r.status === 401 ? 'Login necessário' : 'Erro';
+      return;
+    }
+    ENV_CACHE = d.publicacoes || [];
+    var vivas = ENV_CACHE.filter(function(p){ return p.copias.some(function(c){ return !c.apagadaEm; }); }).length;
+    status.textContent = ENV_CACHE.length
+      ? ENV_CACHE.length + ' publicação(ões) nas últimas 48 h · ' + vivas + ' ainda no ar'
+      : 'Nada enviado nas últimas 48 h';
+    if (!ENV_CACHE.length) {
+      lista.innerHTML = '<div class="fila-vazia">Nenhuma mensagem enviada aos grupos nas últimas 48 h.<br>O registro começa a contar a partir desta versão do servidor.</div>';
+      return;
+    }
+    lista.innerHTML = ENV_CACHE.map(function(p, i) {
+      var noAr = p.copias.filter(function(c){ return !c.apagadaEm; });
+      var noPrazo = noAr.filter(function(c){ return c.noPrazo; });
+      var grupos = p.copias.slice().sort(function(a,b){ return String(a.nomeGrupo).localeCompare(String(b.nomeGrupo), 'pt-BR'); }).map(function(c) {
+        var acao = c.apagadaEm
+          ? '<span class="env-g-meta">🗑️ apagada ' + fmtQuandoSP(c.apagadaEm) + '</span>'
+          : '<button class="btn btn-rej btn-sm" onclick="apagarEnviada(' + i + ',\'' + esc(c.id) + '\',\'' + esc(c.grupo) + '\')">Apagar</button>';
+        return '<div class="env-g' + (c.apagadaEm ? ' apagada' : '') + '">'
+          + '<span class="env-g-nome">' + esc(c.nomeGrupo) + '</span>'
+          + '<span class="env-g-meta">' + fmtQuandoSP(c.em) + ' · ' + esc(c.conta) + (c.noPrazo ? '' : ' · ⚠️ fora do prazo') + '</span>'
+          + acao
+          + (c.erro && !c.apagadaEm ? '<span class="env-g-erro">Última tentativa falhou: ' + esc(c.erro) + '</span>' : '')
+          + '</div>';
+      }).join('');
+      var tipo = p.tipo && p.tipo !== 'texto' ? '<span class="ag-tag">' + esc(p.tipo) + '</span>' : '';
+      return '<div class="ag-card' + (noAr.length ? '' : ' apagada') + '">'
+        + '<div class="ag-topo">'
+        +   '<span class="ag-quando">📤 ' + fmtQuandoSP(p.primeiraEm) + '</span>'
+        +   '<span class="ag-tag">' + p.copias.length + ' grupo(s)</span>' + tipo
+        +   (noAr.length ? '' : '<span class="ag-tag">apagada de todos</span>')
+        + '</div>'
+        + '<div class="ag-msg">' + esc(p.texto || '(sem texto)') + '</div>'
+        + '<div class="env-grupos">' + grupos + '</div>'
+        + (noPrazo.length > 1
+            ? '<div class="ag-acoes"><button class="btn btn-rej btn-sm" onclick="apagarEnviada(' + i + ')">🗑️ Apagar de todos os ' + noPrazo.length + ' grupos</button></div>'
+            : '')
+        + '</div>';
+    }).join('');
+  } catch (e) {
+    lista.innerHTML = '<div class="fila-vazia">Sem resposta do servidor.</div>';
+    status.textContent = 'Erro de conexão';
+  }
+}
+
+async function apagarEnviada(idx, id, grupo) {
+  var p = ENV_CACHE[idx];
+  if (!p) return;
+  var alvos = p.copias.filter(function(c) {
+    return !c.apagadaEm && (id ? (c.id === id && c.grupo === grupo) : c.noPrazo);
+  });
+  if (!alvos.length) return;
+  var msg = alvos.length === 1
+    ? 'Apagar para todos esta mensagem em "' + alvos[0].nomeGrupo + '"?'
+    : 'Apagar para todos esta mensagem em ' + alvos.length + ' grupos?\n\nSai um grupo de cada vez (cerca de 2 s entre eles).';
+  if (!confirm(msg + '\n\nNão dá para desfazer.')) return;
+  var status = document.getElementById('env-status');
+  status.textContent = '🗑️ Apagando em ' + alvos.length + ' grupo(s)…';
+  try {
+    var r = await fetch(SERVER + '/enviadas-grupos/apagar', {
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ itens: alvos.map(function(c){ return { id: c.id, grupo: c.grupo }; }) })
+    });
+    var d = await r.json();
+    if (d.falhas) {
+      var erros = (d.resultados || []).filter(function(x){ return !x.ok; })
+        .map(function(x){ return '• ' + x.nomeGrupo + ': ' + x.erro; }).join('\n');
+      alert('Apagadas: ' + (d.apagadas || 0) + ' · falharam: ' + d.falhas + '\n\n' + erros);
+    } else if (!d.ok) {
+      alert('Não deu para apagar: ' + (d.erro || 'falha'));
+    }
+  } catch (e) { alert('Sem resposta do servidor.'); }
+  carregarEnviadas();
 }
 
 /* ══════ AGENDADOS ══════ */
