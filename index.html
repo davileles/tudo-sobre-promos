@@ -2452,7 +2452,7 @@ body.travado > *:not(#login-screen){display:none !important}
 
     <div class="field" style="margin-bottom:12px">
       <label>Destino <span class="tag">usa o nicho curado de cada produto</span></label>
-      <select id="lst-roteamento" onchange="renderLstSel()">
+      <select id="lst-roteamento" onchange="LST_ROT_MANUAL = true; renderLstSel()">
         <option value="geral">Só os grupos gerais &mdash; ignora o nicho curado</option>
         <option value="nicho_e_geral">Grupo do nicho + grupos gerais</option>
         <option value="so_nicho">Só o grupo do nicho</option>
@@ -5842,6 +5842,11 @@ function valorCampo(id){
 /* ══════ LISTAS DE REENVIO ══════ */
 var LST_CACHE = [];
 var LST_SEL   = [];      // produtos do formulario: [{asin, nome}]
+// Destino automatico: quando TODOS os produtos tem nicho marcado, o formulario
+// ja vem em "so o grupo do nicho". LST_ROT_MANUAL = o operador escolheu o
+// Destino na mao (ou a lista ja salva tem o dela) e a regra nao reescreve mais.
+// LST_ROT_BASE = o que vale quando a regra nao se aplica.
+var LST_ROT_MANUAL = false, LST_ROT_BASE = 'geral', LST_ROT_AUTO = false;
 var LST_EDIT  = null;    // id em edicao (null = nova)
 var LST_TIMER = null;
 var DIAS_SEM  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -6432,6 +6437,7 @@ function novaLista(){
   document.getElementById('lst-cupom-modo').value = 'nenhum';
   lstToggleCupom();
   document.getElementById('lst-roteamento').value = 'geral';
+  LST_ROT_MANUAL = false; LST_ROT_BASE = 'geral'; LST_ROT_AUTO = false;
   document.getElementById('lst-inicio-modo').value = 'agora';
   document.getElementById('lst-inicio-hora').value = '09:00';
   document.getElementById('lst-jan-ativo').classList.remove('on');
@@ -6468,6 +6474,7 @@ function editarLista(id){
   document.getElementById('lst-intervalo').value = l.intervaloMin;
   document.getElementById('lst-cupom-modo').value = l.cupomModo;
   document.getElementById('lst-roteamento').value = l.roteamento || 'geral';
+  LST_ROT_MANUAL = true; LST_ROT_AUTO = false;   // lista salva mantem o destino dela
   var _jan = (l.janelas && l.janelas.length) ? l.janelas[0] : null;
   document.getElementById('lst-jan-ativo').classList.toggle('on', !!_jan);
   document.getElementById('lst-jan-inicio').value = _jan ? _jan.inicio : '08:00';
@@ -6685,6 +6692,7 @@ function lstDefinirCupomItem(asin, codigo){
 }
 
 function renderLstSel(){
+  lstAutoRoteamento();
   var el = document.getElementById('lst-sel');
   if (!LST_SEL.length){
     el.innerHTML = '<div style="font-size:12px;color:var(--muted2);padding:6px 0">Nenhum produto ainda.</div>';
@@ -6736,6 +6744,9 @@ function renderLstSel(){
       // Aviso na hora de montar a fila, nao depois do disparo: com o destino em
       // nicho, item sem curadoria e pulado pelo servidor.
       var rot = (document.getElementById('lst-roteamento') || {}).value || 'geral';
+      if (LST_ROT_AUTO && rot === 'so_nicho')
+        return '<div style="font-size:11px;margin-top:4px;color:var(--muted2)">\u2139\ufe0f Todos os produtos t\u00eam nicho marcado \u2014 '
+          + 'o destino foi ajustado para <b>s\u00f3 o grupo do nicho</b>. Para mandar tamb\u00e9m nos gerais, troque o Destino acima.</div>';
       if (rot === 'geral') return '';
       var sem = LST_SEL.filter(function(p){ return !lstNichoDoItem(p.asin); }).length;
       if (!sem) return '';
@@ -6920,6 +6931,16 @@ function lstRemoverPiores(){
 // Nicho curado do item, lido da base de produtos: LST_SEL so guarda asin e nome.
 // 'geral' e curadoria de "bom produto, mas nao e de nicho" e conta como sem
 // nicho aqui — exatamente como o servidor trata no disparo.
+// Todos os produtos com nicho marcado (curado, diferente de 'geral') => so nicho.
+// Basta um sem nicho para voltar ao destino base: com "so nicho" ele seria pulado.
+function lstAutoRoteamento(){
+  var sel = document.getElementById('lst-roteamento');
+  if (!sel || LST_ROT_MANUAL) { LST_ROT_AUTO = false; return; }
+  var todos = LST_SEL.length > 0 && LST_SEL.every(function(p){ return !!lstNichoDoItem(p.asin); });
+  LST_ROT_AUTO = todos;
+  sel.value = todos ? 'so_nicho' : LST_ROT_BASE;
+}
+
 function lstNichoDoItem(asin){
   var i = (VIT_CACHE || []).filter(function(x){ return x.asin === asin; })[0];
   var n = i && i.nicho ? String(i.nicho).trim() : '';
@@ -8215,8 +8236,14 @@ function aposCadastroVitrine(salvos, destino, cupom, modoCupom, nicho){
     // nicho aos gerais em vez de trocar um pelo outro, porque trocar corta
     // alcance em silencio. Para sair so no nicho e um clique no formulario, que
     // agora nao e mais reescrito por baixo.
-    if (nicho && nicho !== 'geral')
-      document.getElementById('lst-roteamento').value = 'nicho_e_geral';
+    // Regra de 05/10/2026: produto com nicho declarado sai so no grupo do
+    // nicho (lstAutoRoteamento). Se algum item da selecao ficar sem nicho, o
+    // destino base passa a ser nicho + geral, como antes.
+    if (nicho && nicho !== 'geral') {
+      LST_ROT_BASE = 'nicho_e_geral';
+      if (!LST_ROT_MANUAL) document.getElementById('lst-roteamento').value = 'so_nicho';
+      LST_ROT_AUTO = !LST_ROT_MANUAL;
+    }
     // A escolha feita no cadastro chega inteira no disparo: quem marcou "sem
     // cupom" nao pode receber um cupom automatico so porque esse e o padrao do
     // formulario.
