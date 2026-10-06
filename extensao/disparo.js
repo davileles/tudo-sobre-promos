@@ -62,6 +62,7 @@ async function cadastrar() {
     $('meta').querySelector('.asin').textContent = salvo.asin;
     $('form').classList.remove('some');
     carregarCupons(salvo.loja);
+    carregarPrevia();
   } catch (e) {
     estado('Erro ao cadastrar: ' + e.message, 'err');
   }
@@ -116,7 +117,122 @@ async function carregarCupons(loja) {
 
 $('modo').addEventListener('change', () => {
   $('wrapCupom').classList.toggle('some', $('modo').value !== 'fixo');
+  carregarPrevia();
 });
+$('cupom').addEventListener('change', () => carregarPrevia());
+
+// ── 2b. PRÉVIA E EDIÇÃO ───────────────────────────────────────────────────────
+// O servidor monta o texto exatamente como o disparo montaria (mesmo cupom).
+// O operador pode trocar o nome e mexer no texto; a edição vai junto no
+// disparo (edicoesItem) e o servidor troca só os links pelos do momento do envio.
+let PREVIA = null;        // resposta de /listas/disparo-unico/previa
+let NOME_ORIG = '';       // nome como aparece no texto original
+let NOME_ATUAL = '';      // nome atualmente no texto (para trocar ao digitar)
+let PREVIA_SEQ = 0;
+
+const RE_URL = /https?:\/\/[^\s`"'<>]+/g;
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// Formatação do WhatsApp para a bolha: *negrito*, _itálico_, ~riscado~, ```mono```.
+function formatarWa(t) {
+  // Links saem antes da formatação: _ e * dentro de URL não podem virar estilo.
+  const links = [];
+  let h = escHtml(t).replace(/https?:\/\/[^\s<]+/g, u => { links.push(u); return '\u0000' + (links.length - 1) + '\u0000'; });
+  h = h.replace(/```([\s\S]+?)```/g, '<code>$1</code>')
+       .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+       .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, '$1<b>$2</b>')
+       .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?:;]|$)/g, '$1<i>$2</i>')
+       .replace(/(^|[\s(])~([^~\n]+)~(?=[\s).,!?:;]|$)/g, '$1<s>$2</s>')
+;
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => '<a>' + links[+i] + '</a>');
+}
+
+function editado() {
+  if (!PREVIA) return false;
+  return $('textoEd').value.trim() !== String(PREVIA.mensagem || '').trim()
+      || (NOME_ORIG && $('nomeEd').value.trim() !== NOME_ORIG);
+}
+
+function renderBolha() {
+  const img = PREVIA && PREVIA.imagemUrl
+    ? '<img src="' + escHtml(PREVIA.imagemUrl) + '" alt="">' : '';
+  $('bolha').innerHTML = img + '<div class="wa-txt">' + formatarWa($('textoEd').value) + '</div>';
+  $('seloEd').classList.toggle('some', !editado());
+}
+
+async function carregarPrevia() {
+  if (!ITEM) return;
+  const seq = ++PREVIA_SEQ;
+  const modo = $('modo').value;
+  const codigo = modo === 'fixo' ? $('cupom').value : null;
+  if (modo === 'fixo' && !codigo) return;
+  if (editado() && !confirm('Atualizar a prévia descarta o que você editou. Continuar?')) return;
+  $('hintPrevia').textContent = 'Montando a prévia…';
+  try {
+    const r = await fetch(SERVIDOR + '/listas/disparo-unico/previa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asin: ITEM.asin, cupomModo: modo, cupomCodigo: codigo }),
+    });
+    const d = await r.json();
+    if (seq !== PREVIA_SEQ) return;          // outra prévia mais nova já foi pedida
+    if (!d.ok) {
+      PREVIA = null;
+      $('bolha').innerHTML = '<div class="wa-txt">Sem prévia.</div>';
+      $('hintPrevia').textContent = 'Não deu para montar a prévia: ' + (d.erro || 'erro')
+        + '. O disparo ainda tenta montar na hora do envio.';
+      $('textoEd').value = '';
+      $('wrapNome').classList.add('some');
+      return;
+    }
+    PREVIA = d;
+    const txt = String(d.mensagem || '');
+    NOME_ORIG = [d.titulo, d.nome].map(x => String(x || '').trim()).find(x => x && txt.includes(x)) || '';
+    NOME_ATUAL = NOME_ORIG;
+    $('nomeEd').value = NOME_ORIG;
+    $('wrapNome').classList.toggle('some', !NOME_ORIG);
+    $('textoEd').value = txt;
+    renderBolha();
+    const preco = v => v == null ? '?' : 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+    $('hintPrevia').textContent = 'Preço de agora: ' + preco(d.preco)
+      + (d.cupom ? ' · com ' + d.cupom + ': ' + preco(d.precoFinal) : '')
+      + (d.avisoCupom ? ' · ⚠️ ' + d.avisoCupom : '');
+  } catch (e) {
+    if (seq !== PREVIA_SEQ) return;
+    $('hintPrevia').textContent = 'Não deu para montar a prévia: ' + e.message;
+  }
+}
+
+$('nomeEd').addEventListener('input', () => {
+  const novo = $('nomeEd').value;
+  if (NOME_ATUAL && novo.trim()) {
+    $('textoEd').value = $('textoEd').value.split(NOME_ATUAL).join(novo);
+    NOME_ATUAL = novo;
+  }
+  renderBolha();
+});
+$('textoEd').addEventListener('input', renderBolha);
+$('desfazerEd').addEventListener('click', () => {
+  if (!PREVIA) return;
+  $('textoEd').value = PREVIA.mensagem || '';
+  $('nomeEd').value = NOME_ORIG; NOME_ATUAL = NOME_ORIG;
+  renderBolha();
+});
+$('atualizarPrevia').addEventListener('click', () => carregarPrevia());
+
+// Edição que vai junto no disparo (null = sem edição: sai o texto do servidor).
+function edicaoParaEnvio() {
+  if (!PREVIA || !editado()) return null;
+  const nome = NOME_ORIG ? $('nomeEd').value.trim() : '';
+  return {
+    texto: $('textoEd').value,
+    nome: nome && nome !== NOME_ORIG ? nome : '',
+    nomeOriginal: NOME_ORIG,
+    precoFinal: PREVIA.precoFinal,
+    cupom: PREVIA.cupom,
+  };
+}
 
 // ── 3. DISPARO ────────────────────────────────────────────────────────────────
 $('disparar').addEventListener('click', async () => {
@@ -126,11 +242,22 @@ $('disparar').addEventListener('click', async () => {
   if (modo === 'fixo' && !codigo) { estado('Escolha o cupom ou troque o modo.', 'err'); return; }
   const hora = $('hora').value || null;
 
+  const ed = edicaoParaEnvio();
+  if (ed) {
+    const tinhaLink = (String(PREVIA.mensagem || '').match(RE_URL) || []).length;
+    if (tinhaLink && !(ed.texto.match(RE_URL) || []).length) {
+      estado('O texto editado ficou sem o link do produto. Recoloque o link ou volte ao original.', 'err');
+      return;
+    }
+    if (!ed.texto.trim()) { estado('O texto da mensagem está vazio.', 'err'); return; }
+  }
+
   const resumo = 'Disparar agora para os grupos:\n\n'
     + (ITEM.nome || ITEM.asin) + '\n'
     + 'Loja: ' + (ITEM.loja || '?') + '\n'
     + 'Cupom: ' + (modo === 'fixo' ? codigo : modo === 'auto' ? 'melhor disponível' : 'nenhum') + '\n'
-    + 'Início: ' + (hora || 'imediato') + '\n\n'
+    + 'Início: ' + (hora || 'imediato') + '\n'
+    + 'Texto: ' + (ed ? 'editado por você' : 'original') + '\n\n'
     + 'Não há desfazer depois que a mensagem sai.';
   if (!confirm(resumo)) return;
 
@@ -144,6 +271,7 @@ $('disparar').addEventListener('click', async () => {
         cupomModo: modo,
         cupomCodigo: codigo,
         iniciarHora: hora,
+        edicoesItem: ed ? { [ITEM.asin]: ed } : undefined,
       }),
     });
     const d = await r.json();

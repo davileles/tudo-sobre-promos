@@ -67,6 +67,24 @@ input:focus,select:focus{border-color:var(--accent)}
 .send-ok.send-err{color:var(--red)}
 .send-ok.neutro{color:var(--muted)}
 .some{display:none}
+
+/* Prévia no formato do WhatsApp */
+.wa{background:#0b141a;border-radius:12px;padding:14px 12px}
+.wa-bolha{background:#005c4b;color:#e9edef;border-radius:10px 10px 10px 2px;padding:6px 6px 8px;
+          max-width:100%;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:13.5px;
+          line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.wa-bolha img{display:block;width:100%;max-height:260px;object-fit:contain;background:#fff;
+              border-radius:7px;margin-bottom:6px}
+.wa-bolha .wa-txt{padding:0 4px}
+.wa-bolha code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.wa-bolha a{color:#53bdeb;text-decoration:none}
+textarea{width:100%;min-height:200px;resize:vertical;background:var(--card);border:1px solid var(--border-ctrl);
+  color:var(--text);padding:10px 12px;border-radius:10px;font-size:12.5px;line-height:1.45;
+  font-family:ui-monospace,Menlo,monospace;outline:none}
+textarea:focus{border-color:var(--accent)}
+.linha-acoes{display:flex;gap:8px;margin-top:8px}
+.linha-acoes .btn{margin-top:0}
+.selo-ed{font-size:10px;font-weight:700;color:var(--accent);margin-left:6px;text-transform:none;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -101,6 +119,28 @@ input:focus,select:focus{border-color:var(--accent)}
       <label>Começar às <span class="tag">opcional</span></label>
       <input id="hora" type="time"/>
       <div class="hint">Só hoje. Horário já vencido dispara na hora.</div>
+    </div>
+  </div>
+
+  <div class="card" id="cardPrevia">
+    <div class="card-title" style="margin-bottom:14px">Prévia da mensagem <span class="selo-ed some" id="seloEd">editada</span></div>
+    <div class="wa"><div class="wa-bolha" id="bolha"><div class="wa-txt" id="bolhaTxt">Montando a prévia…</div></div></div>
+    <div class="hint" id="hintPrevia"></div>
+
+    <div class="field some" id="wrapNome" style="margin-top:14px">
+      <label>Nome do produto</label>
+      <input id="nomeEd" type="text"/>
+    </div>
+
+    <div class="field" style="margin-top:14px;margin-bottom:0">
+      <label>Texto da mensagem</label>
+      <textarea id="textoEd" spellcheck="true"></textarea>
+      <div class="hint">Use *negrito*, _itálico_ e ~riscado~ como no WhatsApp. Não apague o link.
+        Preço e cupom são conferidos de novo na hora do envio: se mudarem, sai o texto novo com o nome que você editou.</div>
+      <div class="linha-acoes">
+        <button class="btn btn-copy" id="desfazerEd" type="button">↺ Voltar ao texto original</button>
+        <button class="btn btn-copy" id="atualizarPrevia" type="button">↻ Atualizar prévia</button>
+      </div>
     </div>
   </div>
 
