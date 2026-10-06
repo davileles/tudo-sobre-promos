@@ -6657,18 +6657,15 @@ function lstSelectCupomItem(p){
   var loja = (v && v.loja) || '';
   var vig = cuponsVigentes();
   var daLoja = vig.filter(function(c){ return (c.loja || '') === loja; });
-  var lista = (daLoja.length ? daLoja : vig).slice().sort(function(a, b){
-    var l = (a.loja || '').localeCompare(b.loja || '', 'pt-BR');
-    return l !== 0 ? l : (a.codigo || '').localeCompare(b.codigo || '', 'pt-BR');
-  });
+  var lista = daLoja.length ? daLoja : vig;
   var atual = p.cupom || '';
   var achou = false;
-  var ops = lista.map(function(c){
+  var ops = optgroupsCupons(lista, function(c){
     var sel = c.codigo === atual; if (sel) achou = true;
     var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
     return '<option value="' + esc(c.codigo) + '"' + (sel ? ' selected' : '') + '>'
-      + (daLoja.length ? '' : esc(c.loja || 'Outros') + ' · ') + esc(c.codigo) + ' · ' + val + '</option>';
-  }).join('');
+      + esc(c.codigo) + ' · ' + val + '</option>';
+  });
   if (atual && atual !== '__SEM__' && !achou) ops = '<option value="' + esc(atual) + '" selected>' + esc(atual) + ' (fora da base)</option>' + ops;
   // O rotulo padrao diz o que "cupom da lista" vai fazer com este item agora.
   var modoL = (document.getElementById('lst-cupom-modo') || {}).value || 'nenhum';
@@ -7825,10 +7822,34 @@ function carregarVitrine(){
 // Restritos CONTINUAM aqui de propósito: este select é a vinculação explícita a
 // um produto — exatamente o único uso permitido para eles. O rótulo avisa.
 function cuponsVigentes(){
-  return CUPONS_CACHE.filter(cupomUsavel).sort(function(a,b){
-    var l = (a.loja||'').localeCompare(b.loja||'','pt-BR');
-    return l !== 0 ? l : (a.codigo||'').localeCompare(b.codigo||'');
+  return CUPONS_CACHE.filter(cupomUsavel).sort(ordenarCuponsAlfa);
+}
+
+// Todo select de cupom: agrupado por loja (<optgroup>) e em ordem alfabética —
+// lojas de A a Z e, dentro de cada loja, códigos de A a Z. A loja é agrupada
+// sem diferenciar maiúscula/acento ("amazon" e "Amazon" caem no mesmo grupo).
+function _lojaCupomChave(c){
+  return String((c && c.loja) || 'Outros').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+function ordenarCuponsAlfa(a, b){
+  var opt = { numeric: true, sensitivity: 'base' };
+  var l = String(a.loja || 'Outros').localeCompare(String(b.loja || 'Outros'), 'pt-BR', opt);
+  return l !== 0 ? l : String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', opt);
+}
+// optionHtml(cupom) devolve o <option> de cada cupom; a lista não precisa vir ordenada.
+function optgroupsCupons(lista, optionHtml){
+  var grupos = {}, nomes = {};
+  lista.slice().sort(ordenarCuponsAlfa).forEach(function(c){
+    var k = _lojaCupomChave(c);
+    if (!grupos[k]) { grupos[k] = []; nomes[k] = c.loja || 'Outros'; }
+    grupos[k].push(c);
   });
+  return Object.keys(grupos).sort(function(a, b){
+    return String(nomes[a]).localeCompare(String(nomes[b]), 'pt-BR', { sensitivity: 'base' });
+  }).map(function(k){
+    return '<optgroup label="' + esc(nomes[k]) + '">' + grupos[k].map(optionHtml).join('') + '</optgroup>';
+  }).join('');
 }
 
 // Rotulo com loja, codigo e desconto: sem os tres nao da para escolher com
@@ -7838,7 +7859,7 @@ function opcoesCupom(){
   if (!vig.length) {
     return '<option value="">— nenhum cupom vigente (ative na aba Base de Cupons) —</option>';
   }
-  return '<option value="">— escolha um cupom —</option>' + vig.map(function(c){
+  return '<option value="">— escolha um cupom —</option>' + optgroupsCupons(vig, function(c){
     var v = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
     var extra = [];
     if (c.limite != null) extra.push('teto desc. R$ ' + c.limite);
@@ -7846,11 +7867,11 @@ function opcoesCupom(){
     if (c.minimo)         extra.push('mín R$ ' + c.minimo);
     return '<option value="' + esc(c.codigo) + '">'
       + (c.restrito === true ? '🎯 ' : '')
-      + esc(c.loja || 'Outros') + ' · ' + esc(c.codigo) + ' · ' + v
+      + esc(c.codigo) + ' · ' + v
       + (extra.length ? ' (' + extra.join(', ') + ')' : '')
       + (c.restrito === true ? ' — só produtos específicos' : '')
       + '</option>';
-  }).join('');
+  });
 }
 
 // Horas que o preco informado a mao para a Magalu continua valendo. O servidor
@@ -10578,12 +10599,11 @@ function preencherCuponsVinculo(cupons) {
   var sel  = document.getElementById('o-cupom-sel');
   sel.innerHTML = '<option value="">Sem cupom</option>';
   if (!cupons.length) { wrap.style.display = 'none'; return; }
-  cupons.forEach(function(c, i) {
-    var op = document.createElement('option');
-    op.value = String(i);
-    op.textContent = c.codigo + ' — ' + (c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmt(c.valor))
-      + ' (economia de R$ ' + fmt(c.descontoAplicado) + ')';
-    sel.appendChild(op);
+  var idx = new Map(cupons.map(function(c, i){ return [c, i]; }));
+  sel.innerHTML += optgroupsCupons(cupons, function(c) {
+    return '<option value="' + idx.get(c) + '">' + esc(c.codigo + ' — '
+      + (c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmt(c.valor))
+      + ' (economia de R$ ' + fmt(c.descontoAplicado) + ')') + '</option>';
   });
   sel._cupons = cupons;
   wrap.style.display = 'flex';
@@ -10602,7 +10622,7 @@ function cuponsVigentesDaLoja(loja) {
   return (daLoja.length ? daLoja : vig).sort(ordenarCupons);
 }
 
-function rotuloCupomBase(c) {
+function rotuloCupomBase(c, semLoja) {
   var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + fmtBRL(c.valor);
   var reg = [];
   if (c.minimo) reg.push('mín. R$ ' + fmtBRL(c.minimo));
@@ -10610,7 +10630,7 @@ function rotuloCupomBase(c) {
   return (c.restrito === true ? '🎯 ' : '')
        + String(c.codigo).toUpperCase() + ' — ' + val
        + (reg.length ? ' (' + reg.join(' · ') + ')' : '')
-       + ' · ' + (c.loja || 'sem loja')
+       + (semLoja ? '' : ' · ' + (c.loja || 'sem loja'))
        + (c.restrito === true ? ' · só produtos específicos' : '');
 }
 
@@ -10620,9 +10640,9 @@ function preencherCupomBaseOferta() {
   var atual = sel.value;
   var lista = cuponsVigentesDaLoja(getLoja('o'));
   sel.innerHTML = '<option value="">Digitar à mão</option>'
-    + lista.map(function(c){
-        return '<option value="' + esc(c.chave) + '">' + esc(rotuloCupomBase(c)) + '</option>';
-      }).join('');
+    + optgroupsCupons(lista, function(c){
+        return '<option value="' + esc(c.chave) + '">' + esc(rotuloCupomBase(c, true)) + '</option>';
+      });
   sel._lista = lista;
   if (atual && lista.some(function(c){ return c.chave === atual; })) sel.value = atual;
 }

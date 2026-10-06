@@ -80,10 +80,10 @@ async function carregarCupons(loja) {
       .filter(c => c.ativo !== false)
       .filter(c => !c.validadeAte || new Date(c.validadeAte).getTime() > agora)
       .filter(c => chaveLoja(c.loja) === chave)
-      // Restritos vão para o fim: o topo da lista é o que o operador escolhe no
-      // automático, e cupom de seleção fechada nunca deve ser o padrão visual.
-      .sort((a, b) => ((a.restrito === true) - (b.restrito === true))
-                   || ((b.valor || 0) - (a.valor || 0)));
+      // Agrupado por loja e em ordem alfabética (loja A→Z, código A→Z), como em
+      // todo select de cupom do ecossistema.
+      .sort((a, b) => String(a.loja || '').localeCompare(String(b.loja || ''), 'pt-BR', { sensitivity: 'base' })
+                   || String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', { numeric: true, sensitivity: 'base' }));
 
     sel.innerHTML = '';
     if (!daLoja.length) {
@@ -91,11 +91,19 @@ async function carregarCupons(loja) {
       $('hintCupom').textContent = 'Sem cupom cadastrado para esta loja — use "melhor cupom" ou "sem cupom".';
       return;
     }
+    const grupos = new Map();
     for (const c of daLoja) {
+      const k = chaveLoja(c.loja);
+      if (!grupos.has(k)) {
+        const g = document.createElement('optgroup');
+        g.label = c.loja || loja || 'Outros';
+        grupos.set(k, g);
+        sel.appendChild(g);
+      }
       const o = document.createElement('option');
       o.value = c.codigo;
       o.textContent = descreveCupom(c);
-      sel.appendChild(o);
+      grupos.get(k).appendChild(o);
     }
     const nRes = daLoja.filter(c => c.restrito === true).length;
     $('hintCupom').textContent = daLoja.length + ' cupom(ns) vigente(s) para ' + loja + '.'
