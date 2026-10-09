@@ -84,6 +84,8 @@ textarea{width:100%;min-height:200px;resize:vertical;background:var(--card);bord
 textarea:focus{border-color:var(--accent)}
 .linha-acoes{display:flex;gap:8px;margin-top:8px}
 .linha-acoes .btn{margin-top:0}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.duas .field{margin-bottom:12px}
 .selo-ed{font-size:10px;font-weight:700;color:var(--accent);margin-left:6px;text-transform:none;letter-spacing:0}
 </style>
 </head>
@@ -98,13 +100,37 @@ textarea:focus{border-color:var(--accent)}
 
 <div id="form" class="some">
   <div class="card">
-    <div class="card-title" style="margin-bottom:14px">Como enviar</div>
+    <div class="card-title" style="margin-bottom:14px">Dados da oferta</div>
+
+    <div class="field">
+      <label>Gatilho <span class="tag">opcional</span></label>
+      <input id="fGatilho" type="text" placeholder="Ex: Corre que é por tempo limitado!"/>
+    </div>
+
+    <div class="field">
+      <label>Nome do produto</label>
+      <input id="fNome" type="text" placeholder="Ex: Tênis Nike Air Max 90"/>
+    </div>
+
+    <div class="duas">
+      <div class="field">
+        <label>Valor original (R$)</label>
+        <input id="fDe" type="number" min="0" step="0.01" placeholder="Ex: 299.90"/>
+      </div>
+      <div class="field">
+        <label>Valor final (R$) <span class="tag">sem cupom</span></label>
+        <input id="fPor" type="number" min="0" step="0.01" placeholder="Ex: 199.90"/>
+      </div>
+    </div>
+    <div class="hint" id="hintValores" style="margin-top:-6px;margin-bottom:12px">
+      Vêm da loja agora. Deixe como está para o preço ser conferido de novo na hora do envio; se mudar, vale o que você digitou.</div>
 
     <div class="field">
       <label>Cupom</label>
       <select id="modo">
-        <option value="auto">Melhor cupom &mdash; o que der maior desconto</option>
-        <option value="fixo">Escolher um cupom desta loja</option>
+        <option value="manual">Digitar o cupom à mão</option>
+        <option value="fixo">Escolher da base desta loja</option>
+        <option value="auto" selected>Melhor cupom &mdash; o que der maior desconto</option>
         <option value="nenhum">Sem cupom</option>
       </select>
     </div>
@@ -113,6 +139,32 @@ textarea:focus{border-color:var(--accent)}
       <label>Qual cupom</label>
       <select id="cupom"></select>
       <div class="hint" id="hintCupom"></div>
+    </div>
+
+    <div class="some" id="wrapManual">
+      <div class="duas">
+        <div class="field">
+          <label>Código do cupom</label>
+          <input id="fCupom" type="text" placeholder="Ex: EXTRA10" style="text-transform:uppercase"/>
+        </div>
+        <div class="field">
+          <label>Tipo de desconto</label>
+          <select id="fTipo">
+            <option value="pct">Percentual (%)</option>
+            <option value="reais">Valor fixo (R$)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Valor do desconto do cupom <span class="tag">opcional</span></label>
+        <input id="fCupomValor" type="number" min="0" step="0.01" placeholder="Ex: 10"/>
+        <div class="hint">Com valor, o "Por" já sai com o cupom aplicado sobre o valor final. Sem valor, só o código aparece.</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Importante <span class="tag">opcional</span></label>
+      <input id="fImportante" type="text" placeholder="Ex: Estoque limitado!"/>
     </div>
 
     <div class="field" style="margin-bottom:0">
@@ -127,16 +179,11 @@ textarea:focus{border-color:var(--accent)}
     <div class="wa"><div class="wa-bolha" id="bolha"><div class="wa-txt" id="bolhaTxt">Montando a prévia…</div></div></div>
     <div class="hint" id="hintPrevia"></div>
 
-    <div class="field some" id="wrapNome" style="margin-top:14px">
-      <label>Nome do produto</label>
-      <input id="nomeEd" type="text"/>
-    </div>
-
     <div class="field" style="margin-top:14px;margin-bottom:0">
       <label>Texto da mensagem</label>
       <textarea id="textoEd" spellcheck="true"></textarea>
       <div class="hint">Use *negrito*, _itálico_ e ~riscado~ como no WhatsApp. Não apague o link.
-        Preço e cupom são conferidos de novo na hora do envio: se mudarem, sai o texto novo com o nome que você editou.</div>
+        Para trocar nome, valores, cupom ou avisos, use os campos acima — o texto livre só vale se preço e cupom não mudarem até o envio.</div>
       <div class="linha-acoes">
         <button class="btn btn-copy" id="desfazerEd" type="button">↺ Voltar ao texto original</button>
         <button class="btn btn-copy" id="atualizarPrevia" type="button">↻ Atualizar prévia</button>

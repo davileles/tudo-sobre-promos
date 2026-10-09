@@ -70,6 +70,15 @@ trabalha com o ASIN e reconsulta preço e link de afiliado a partir do cadastro.
 O que some é o trabalho manual: não há campo para colar, lista para montar nem
 aba para navegar.
 
+Desde a 2.8.0 a janela tem os **mesmos campos da aba "Criar oferta"** do painel:
+gatilho, nome do produto, valor original (De), valor final sem cupom (Por), cupom
+(melhor da base, escolher da base, **digitar à mão** com código, tipo e valor, ou
+sem cupom) e IMPORTANTE. Nome, De e Por chegam preenchidos com o que a loja mostra;
+só o que você muda vai para o servidor (`ajustes` na prévia, `ajustesItem` no
+disparo), que monta a mensagem pelo template da loja com esses valores — na prévia
+e de novo na hora do envio, com o link e o rastreio do momento. Campo intocado
+continua sendo conferido na loja no envio.
+
 Se você desistir, a janela oferece *deixar só cadastrado* ou *remover da base*.
 Depois de disparar, aparece um botão para cancelar o que ainda não saiu.
 

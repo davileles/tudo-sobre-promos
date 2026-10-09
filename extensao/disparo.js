@@ -117,17 +117,56 @@ async function carregarCupons(loja) {
 
 $('modo').addEventListener('change', () => {
   $('wrapCupom').classList.toggle('some', $('modo').value !== 'fixo');
+  $('wrapManual').classList.toggle('some', $('modo').value !== 'manual');
   carregarPrevia();
 });
 $('cupom').addEventListener('change', () => carregarPrevia());
+
+// ── 2a. CAMPOS DA OFERTA ──────────────────────────────────────────────────────
+// Os mesmos campos da aba "Criar oferta" do painel. Nome, De e Por chegam
+// preenchidos com o que a loja mostra agora; só vai para o servidor o que o
+// operador mudou (campo intocado = o servidor confere de novo no envio).
+// Cupom digitado à mão: o servidor monta sem cupom da base e escreve este.
+let ORIG = null;          // { nome, de, por } da primeira prévia
+
+const valNum = id => { const v = parseFloat(String($(id).value).replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : null; };
+const fix2 = v => v == null ? '' : Number(v).toFixed(2);
+
+function modoServidor() {
+  const m = $('modo').value;
+  return m === 'manual' ? 'nenhum' : m;
+}
+
+function ajustesOferta() {
+  const a = {};
+  const gat = $('fGatilho').value.trim(); if (gat) a.gatilho = gat;
+  const imp = $('fImportante').value.trim(); if (imp) a.importante = imp;
+  const nome = $('fNome').value.trim();
+  if (nome && (!ORIG || nome !== ORIG.nome)) a.nome = nome;
+  const de = valNum('fDe'), por = valNum('fPor');
+  if (de && (!ORIG || fix2(de) !== fix2(ORIG.de))) a.precoDe = de;
+  if (por && (!ORIG || fix2(por) !== fix2(ORIG.por))) a.preco = por;
+  if ($('modo').value === 'manual') {
+    const codigo = $('fCupom').value.trim().toUpperCase();
+    if (codigo) a.cupom = { codigo, tipo: $('fTipo').value, valor: valNum('fCupomValor') };
+  }
+  return Object.keys(a).length ? a : null;
+}
+
+let _tCampos = null;
+function camposMudaram() {
+  clearTimeout(_tCampos);
+  _tCampos = setTimeout(() => carregarPrevia(), 600);
+}
+['fGatilho', 'fNome', 'fDe', 'fPor', 'fCupom', 'fCupomValor', 'fImportante']
+  .forEach(id => $(id).addEventListener('input', camposMudaram));
+$('fTipo').addEventListener('change', camposMudaram);
 
 // ── 2b. PRÉVIA E EDIÇÃO ───────────────────────────────────────────────────────
 // O servidor monta o texto exatamente como o disparo montaria (mesmo cupom).
 // O operador pode trocar o nome e mexer no texto; a edição vai junto no
 // disparo (edicoesItem) e o servidor troca só os links pelos do momento do envio.
 let PREVIA = null;        // resposta de /listas/disparo-unico/previa
-let NOME_ORIG = '';       // nome como aparece no texto original
-let NOME_ATUAL = '';      // nome atualmente no texto (para trocar ao digitar)
 let PREVIA_SEQ = 0;
 
 const RE_URL = /https?:\/\/[^\s`"'<>]+/g;
@@ -151,8 +190,7 @@ function formatarWa(t) {
 
 function editado() {
   if (!PREVIA) return false;
-  return $('textoEd').value.trim() !== String(PREVIA.mensagem || '').trim()
-      || (NOME_ORIG && $('nomeEd').value.trim() !== NOME_ORIG);
+  return $('textoEd').value.trim() !== String(PREVIA.mensagem || '').trim();
 }
 
 function renderBolha() {
@@ -165,15 +203,16 @@ function renderBolha() {
 async function carregarPrevia() {
   if (!ITEM) return;
   const seq = ++PREVIA_SEQ;
-  const modo = $('modo').value;
+  const modo = modoServidor();
   const codigo = modo === 'fixo' ? $('cupom').value : null;
   if (modo === 'fixo' && !codigo) return;
-  if (editado() && !confirm('Atualizar a prévia descarta o que você editou. Continuar?')) return;
+  if (editado() && !confirm('Atualizar a prévia descarta o que você editou no texto. Continuar?')) return;
   $('hintPrevia').textContent = 'Montando a prévia…';
   try {
     const r = await fetch(SERVIDOR + '/listas/disparo-unico/previa', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asin: ITEM.asin, cupomModo: modo, cupomCodigo: codigo }),
+      body: JSON.stringify({ asin: ITEM.asin, cupomModo: modo, cupomCodigo: codigo,
+                             ajustes: ORIG ? ajustesOferta() : null }),
     });
     const d = await r.json();
     if (seq !== PREVIA_SEQ) return;          // outra prévia mais nova já foi pedida
@@ -183,16 +222,19 @@ async function carregarPrevia() {
       $('hintPrevia').textContent = 'Não deu para montar a prévia: ' + (d.erro || 'erro')
         + '. O disparo ainda tenta montar na hora do envio.';
       $('textoEd').value = '';
-      $('wrapNome').classList.add('some');
       return;
     }
     PREVIA = d;
-    const txt = String(d.mensagem || '');
-    NOME_ORIG = [d.titulo, d.nome].map(x => String(x || '').trim()).find(x => x && txt.includes(x)) || '';
-    NOME_ATUAL = NOME_ORIG;
-    $('nomeEd').value = NOME_ORIG;
-    $('wrapNome').classList.toggle('some', !NOME_ORIG);
-    $('textoEd').value = txt;
+    if (!ORIG) {
+      // Primeira prévia: o que a loja mostra agora vira o valor inicial dos campos.
+      ORIG = { nome: String(d.titulo || d.nome || ITEM.nome || '').trim(),
+               de: d.precoDe != null ? Number(d.precoDe) : null,
+               por: d.preco != null ? Number(d.preco) : null };
+      if (!$('fNome').value.trim()) $('fNome').value = ORIG.nome;
+      if (!$('fDe').value) $('fDe').value = fix2(ORIG.de);
+      if (!$('fPor').value) $('fPor').value = fix2(ORIG.por);
+    }
+    $('textoEd').value = String(d.mensagem || '');
     renderBolha();
     const preco = v => v == null ? '?' : 'R$ ' + Number(v).toFixed(2).replace('.', ',');
     $('hintPrevia').textContent = 'Preço de agora: ' + preco(d.preco)
@@ -204,19 +246,10 @@ async function carregarPrevia() {
   }
 }
 
-$('nomeEd').addEventListener('input', () => {
-  const novo = $('nomeEd').value;
-  if (NOME_ATUAL && novo.trim()) {
-    $('textoEd').value = $('textoEd').value.split(NOME_ATUAL).join(novo);
-    NOME_ATUAL = novo;
-  }
-  renderBolha();
-});
 $('textoEd').addEventListener('input', renderBolha);
 $('desfazerEd').addEventListener('click', () => {
   if (!PREVIA) return;
   $('textoEd').value = PREVIA.mensagem || '';
-  $('nomeEd').value = NOME_ORIG; NOME_ATUAL = NOME_ORIG;
   renderBolha();
 });
 $('atualizarPrevia').addEventListener('click', () => carregarPrevia());
@@ -224,11 +257,10 @@ $('atualizarPrevia').addEventListener('click', () => carregarPrevia());
 // Edição que vai junto no disparo (null = sem edição: sai o texto do servidor).
 function edicaoParaEnvio() {
   if (!PREVIA || !editado()) return null;
-  const nome = NOME_ORIG ? $('nomeEd').value.trim() : '';
   return {
     texto: $('textoEd').value,
-    nome: nome && nome !== NOME_ORIG ? nome : '',
-    nomeOriginal: NOME_ORIG,
+    nome: '',
+    nomeOriginal: '',
     precoFinal: PREVIA.precoFinal,
     cupom: PREVIA.cupom,
   };
@@ -237,10 +269,14 @@ function edicaoParaEnvio() {
 // ── 3. DISPARO ────────────────────────────────────────────────────────────────
 $('disparar').addEventListener('click', async () => {
   if (!ITEM) return;
-  const modo = $('modo').value;
+  const modoTela = $('modo').value;
+  const modo = modoServidor();
   const codigo = modo === 'fixo' ? $('cupom').value : null;
   if (modo === 'fixo' && !codigo) { estado('Escolha o cupom ou troque o modo.', 'err'); return; }
+  if (modoTela === 'manual' && !$('fCupom').value.trim()) { estado('Digite o código do cupom ou troque o modo.', 'err'); return; }
+  if (ORIG && !$('fNome').value.trim()) { estado('Preencha o nome do produto.', 'err'); return; }
   const hora = $('hora').value || null;
+  const aj = ajustesOferta();
 
   const ed = edicaoParaEnvio();
   if (ed) {
@@ -253,9 +289,11 @@ $('disparar').addEventListener('click', async () => {
   }
 
   const resumo = 'Disparar agora para os grupos:\n\n'
-    + (ITEM.nome || ITEM.asin) + '\n'
+    + ($('fNome').value.trim() || ITEM.nome || ITEM.asin) + '\n'
     + 'Loja: ' + (ITEM.loja || '?') + '\n'
-    + 'Cupom: ' + (modo === 'fixo' ? codigo : modo === 'auto' ? 'melhor disponível' : 'nenhum') + '\n'
+    + 'Cupom: ' + (modoTela === 'manual' ? $('fCupom').value.trim().toUpperCase() + ' (digitado)'
+                   : modo === 'fixo' ? codigo : modo === 'auto' ? 'melhor disponível' : 'nenhum') + '\n'
+    + (aj && (aj.preco || aj.precoDe) ? 'Valores: digitados por você\n' : '')
     + 'Início: ' + (hora || 'imediato') + '\n'
     + 'Texto: ' + (ed ? 'editado por você' : 'original') + '\n\n'
     + 'Não há desfazer depois que a mensagem sai.';
@@ -272,6 +310,7 @@ $('disparar').addEventListener('click', async () => {
         cupomCodigo: codigo,
         iniciarHora: hora,
         edicoesItem: ed ? { [ITEM.asin]: ed } : undefined,
+        ajustesItem: aj ? { [ITEM.asin]: aj } : undefined,
       }),
     });
     const d = await r.json();
