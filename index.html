@@ -2297,9 +2297,16 @@ body.travado > *:not(#login-screen){display:none !important}
         <select id="vit-cupom-novo"></select>
       </div>
     </div>
-    <div class="field" style="margin-top:10px">
-      <label>Nicho curado <span class="tag">vale para todos os links acima</span></label>
-      <select id="vit-nicho"><option value="">Deixar o classificador decidir</option></select>
+    <div class="g2" style="margin-top:10px">
+      <div class="field">
+        <label>Nicho curado <span class="tag">vale para todos os links acima</span></label>
+        <select id="vit-nicho"><option value="">Deixar o classificador decidir</option></select>
+      </div>
+      <div class="field">
+        <label>Etiqueta <span class="tag">opcional · campanha ou marca</span></label>
+        <input type="text" id="vit-etiqueta" maxlength="60" list="vit-etiquetas-dl" autocomplete="off" placeholder="Ex: Promo Marca X"/>
+        <datalist id="vit-etiquetas-dl"></datalist>
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn btn-copy" style="margin-top:0;flex:1;min-width:150px" onclick="cadastrarVitrine('so')">➕ Só cadastrar na base</button>
@@ -2382,10 +2389,12 @@ body.travado > *:not(#login-screen){display:none !important}
       <input type="text" id="vit-busca" class="busca-mini" autocomplete="off" placeholder="Buscar na base…" oninput="vitFiltrar()"/>
       <select id="vit-loja" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"></select>
       <select id="vit-filtro-nicho" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"><option value="">Todos os nichos</option></select>
+      <select id="vit-filtro-etiqueta" onchange="vitFiltrar()" style="width:auto;padding:7px 10px;font-size:12px"><option value="">Todas as etiquetas</option></select>
       <button class="btn btn-copy btn-sm" onclick="resolverNomesVitrine()" title="Lê na Amazon o título dos itens que ficaram como &quot;Produto ASIN&quot;">✎ Resolver nomes</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(true)">Selecionar todos</button>
       <button class="btn btn-copy btn-sm" onclick="marcarTodosVitrine(false)">Limpar seleção</button>
       <button class="btn btn-copy btn-sm" id="vit-btn-nicho" onclick="marcarNichoSelecionados()" disabled>🏷 Definir nicho dos selecionados</button>
+      <button class="btn btn-copy btn-sm" id="vit-btn-etiqueta" onclick="marcarEtiquetaSelecionados()" disabled>🔖 Etiqueta dos selecionados</button>
       <button class="btn btn-rej btn-sm" id="vit-btn-excluir" onclick="excluirSelecionadosVitrine()" disabled>🗑 Excluir selecionados</button>
     </div>
   </div>
@@ -2507,6 +2516,24 @@ body.travado > *:not(#login-screen){display:none !important}
         <div class="mon-campo" style="flex:1;min-width:230px"><label>Dias da semana</label>
           <div class="mon-lojas" id="lst-ag-dias"></div></div>
       </div>
+      <div class="sec-label" style="margin-top:4px">Seleção do dia <span class="tag">opcional</span></div>
+      <div class="mon-linha" style="margin-bottom:8px">
+        <div class="mon-campo"><label>Ligada</label>
+          <button class="sw" id="lst-sd-ativo" onclick="this.classList.toggle('on')"></button></div>
+        <div class="mon-campo"><label>Quantos por dia</label>
+          <input type="number" id="lst-sd-max" value="10" min="1" max="200" style="width:90px"/></div>
+        <div class="mon-campo"><label>Desconto mínimo (%)</label>
+          <input type="number" id="lst-sd-desc" value="0" min="0" max="90" style="width:90px"/></div>
+        <div class="mon-campo"><label>Tirar os mais caros que no último envio</label>
+          <button class="sw on" id="lst-sd-piores" onclick="this.classList.toggle('on')"></button></div>
+      </div>
+      <p style="font-size:10.5px;color:var(--muted2);margin:-2px 0 12px;line-height:1.5">
+        Ligada, a lista guarda todos os produtos, mas <b>a cada execução</b> (pela agenda ou pelo botão) o servidor
+        consulta o preço de cada um e monta a fila do dia só com os mais atrativos: maior desconto contra o último
+        envio (ou contra a mediana de 30 dias, se o produto nunca saiu) e, no empate, o enviado há mais tempo.
+        Indisponíveis na loja ficam de fora. O desconto mínimo zero aceita qualquer produto que não tenha piorado.
+        O card da lista mostra o que saiu e por que o resto ficou de fora.
+      </p>
     </div>
 
     <div class="sec-label">Produtos deste disparo</div>
@@ -5899,7 +5926,7 @@ function renderListas(){
 
     var progresso = '';
     if (ex){
-      var feitos = ex.indice, tot = l.produtos.length;
+      var feitos = ex.indice, tot = (l.filaDia || l.produtos).length;
       var pct = tot ? Math.round(feitos / tot * 100) : 0;
       var horaProx = new Date(ex.proximoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
       // Fila criada com hora marcada: enquanto nada saiu, o card diz que esta
@@ -5956,7 +5983,10 @@ function renderListas(){
       +   '<b>' + l.produtos.length + '</b> produto(s) · a cada <b>' + l.intervaloMin + ' min</b> · ' + duracao
       +   ' · janela ' + esc((l.janelasEfetivas || []).map(function(j){ return j.inicio + '–' + j.fim; }).join(', '))
       +   ((l.janelas && l.janelas.length) ? '' : ' <span class="tag">padrão</span>') + '</div>'
-      + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">' + cupom + ' · ' + agenda + '</div>'
+      + '<div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">' + cupom + ' · ' + agenda
+      +   (l.selecaoDia && l.selecaoDia.ativo ? ' · <b>seleção do dia</b>: até ' + l.selecaoDia.maxItens + ' por vez'
+             + (l.selecaoDia.descontoMin ? ', desconto ≥ ' + l.selecaoDia.descontoMin + '%' : '') : '') + '</div>'
+      + lstSelecaoHtml(l)
       + (l.ultimoDisparo ? '<div style="font-size:11px;color:var(--muted2)">último disparo: '
           + new Date(l.ultimoDisparo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
       + (sumiram ? '<div class="mon-aviso">⚠️ ' + sumiram + ' produto(s) não estão mais na vitrine e serão pulados.</div>' : '')
@@ -5965,6 +5995,26 @@ function renderListas(){
       + '<div class="btn-row" style="margin-top:12px">' + acoes + '</div>'
       + '</div>';
   }).join('');
+}
+
+// Laudo da selecao do dia: o que entrou (com o desconto medido) e o que ficou de fora.
+function lstSelecaoHtml(l){
+  var s = l.selecao;
+  if (!s || !(l.selecaoDia && l.selecaoDia.ativo)) return '';
+  var quando = new Date(s.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  var ent = (s.escolhidos || []).map(function(e){
+    return '<div>✅ ' + esc(e.nome || e.asin)
+      + (e.desconto != null ? ' <span style="color:var(--green)">' + (e.desconto > 0 ? '−' : '') + Math.abs(e.desconto) + '%</span>' : ' <span style="color:var(--muted2)">sem referência</span>')
+      + (e.preco ? ' · R$ ' + Number(e.preco).toFixed(2).replace('.', ',') : '') + '</div>';
+  }).join('');
+  var fora = (s.fora || []).map(function(f){
+    return '<div style="color:var(--muted2)">— ' + esc(f.nome || f.asin) + ': ' + esc(f.motivo) + '</div>';
+  }).join('');
+  return '<div style="font-size:11px;line-height:1.6;margin:6px 0;padding:8px 10px;border:1px solid var(--border);border-radius:8px">'
+    + '<div style="font-weight:700;margin-bottom:4px">Seleção de ' + quando + ': ' + (s.escolhidos || []).length + ' de ' + s.avaliados + ' produto(s)</div>'
+    + (ent || '<div style="color:var(--muted2)">Nenhum produto atrativo — nada foi enviado.</div>')
+    + (fora ? '<div style="margin-top:4px">' + fora + '</div>' : '')
+    + '</div>';
 }
 
 /* ── Produtos do disparo (expandir card) ── */
@@ -6447,7 +6497,22 @@ function novaLista(){
   document.getElementById('lst-ag-ativo').classList.remove('on');
   document.getElementById('lst-ag-hora').value = '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml([]);
+  lstSelecaoPreencher(null);
   abrirFormLista();
+}
+
+function lstSelecaoPreencher(sd){
+  document.getElementById('lst-sd-ativo').classList.toggle('on', !!(sd && sd.ativo));
+  document.getElementById('lst-sd-max').value = (sd && sd.maxItens) || 10;
+  document.getElementById('lst-sd-desc').value = (sd && sd.descontoMin) || 0;
+  document.getElementById('lst-sd-piores').classList.toggle('on', !sd || sd.excluirPiores !== false);
+}
+function lstSelecaoLer(){
+  if (!document.getElementById('lst-sd-ativo').classList.contains('on')) return null;
+  return { ativo: true,
+           maxItens: Math.max(1, Math.round(Number(document.getElementById('lst-sd-max').value) || 10)),
+           descontoMin: Math.max(0, Number(document.getElementById('lst-sd-desc').value) || 0),
+           excluirPiores: document.getElementById('lst-sd-piores').classList.contains('on') };
 }
 
 // Atalho da base de produtos: o que esta marcado ja entra no formulario, na
@@ -6483,6 +6548,7 @@ function editarLista(id){
   document.getElementById('lst-ag-ativo').classList.toggle('on', !!(l.agenda && l.agenda.ativo));
   document.getElementById('lst-ag-hora').value = (l.agenda && l.agenda.hora) || '09:00';
   document.getElementById('lst-ag-dias').innerHTML = lstDiasHtml((l.agenda && l.agenda.diasSemana) || []);
+  lstSelecaoPreencher(l.selecaoDia || null);
   abrirFormLista();
   if (l.cupomModo === 'fixo') { document.getElementById('lst-cupom-codigo').value = l.cupomCodigo || ''; renderLstSel(); }
 }
@@ -7040,6 +7106,7 @@ function salvarLista(){
       roteamento: roteamento,
       efemera: false,
       agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
+      selecaoDia: lstSelecaoLer(),
       janelas: lstJanelasEscolhidas(),
     })
   })
@@ -7080,14 +7147,19 @@ function dispararLista(id){
   var l = LST_CACHE.find(function(x){ return x.id === id; });
   if (!l) return;
   var horas = Math.round((l.produtos.length - 1) * l.intervaloMin / 60 * 10) / 10;
-  lstCheckCobertura(l.produtos).then(function(sc){
-    if (!confirm('Disparar "' + l.nome + '"?\n\n' + l.produtos.length + ' produto(s), um a cada '
-      + l.intervaloMin + ' min — cerca de ' + horas + 'h até o último.'
+  var sd = l.selecaoDia && l.selecaoDia.ativo;
+  (sd ? Promise.resolve([]) : lstCheckCobertura(l.produtos)).then(function(sc){
+    if (!confirm('Disparar "' + l.nome + '"?\n\n' + (sd
+        ? 'Seleção do dia ligada: o servidor confere o preço dos ' + l.produtos.length
+          + ' produto(s) e manda até ' + l.selecaoDia.maxItens + ' dos mais atrativos, um a cada ' + l.intervaloMin + ' min.'
+        : l.produtos.length + ' produto(s), um a cada ' + l.intervaloMin + ' min — cerca de ' + horas + 'h até o último.')
       + lstTextoCobertura(sc))) return;
     fetch(SERVER + '/listas/' + encodeURIComponent(id) + '/disparar', { method:'POST' })
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (!d.ok) throw new Error(d.erro || 'falhou');
+        if (d.vazia) alert(d.aviso || 'Nenhum produto atrativo agora. Nada foi enviado.');
+        LST_ABERTAS[id] = false;
         carregarListas();
       })
       .catch(function(e){ alert('Não foi possível disparar: ' + e.message); });
@@ -7973,14 +8045,17 @@ function vitFiltrados(){
   var q    = valorCampo('vit-busca').trim().toLowerCase();
   var loja = valorCampo('vit-loja');
   var nic  = valorCampo('vit-filtro-nicho');
+  var etq  = valorCampo('vit-filtro-etiqueta');
   return VIT_CACHE.filter(function(i){
+    if (etq === '__sem' && (i.etiqueta || '')) return false;
+    if (etq && etq !== '__sem' && (i.etiqueta || '') !== etq) return false;
     if (loja && (i.loja || 'Amazon') !== loja) return false;
     // '__sem' = os que ainda dependem do classificador. E a lista de trabalho da
     // curadoria: o que falta marcar.
     if (nic === '__sem' && (i.nicho || '')) return false;
     if (nic && nic !== '__sem' && (i.nicho || '') !== nic) return false;
     if (!q) return true;
-    return ((i.nome || '') + ' ' + (i.asin || '') + ' ' + (i.cupom || '') + ' ' + (i.loja || ''))
+    return ((i.nome || '') + ' ' + (i.asin || '') + ' ' + (i.cupom || '') + ' ' + (i.loja || '') + ' ' + (i.etiqueta || ''))
       .toLowerCase().indexOf(q) >= 0;
   });
 }
@@ -7994,7 +8069,26 @@ function vitVerMais(todos){
   renderVitrine();
 }
 
+// Etiquetas existentes, em ordem alfabetica, com a contagem — filtro da base e
+// sugestoes do campo de cadastro.
+function montarFiltroEtiquetaVitrine(){
+  var cont = {};
+  VIT_CACHE.forEach(function(i){ if (i.etiqueta) cont[i.etiqueta] = (cont[i.etiqueta] || 0) + 1; });
+  var nomes = Object.keys(cont).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+  var sel = document.getElementById('vit-filtro-etiqueta');
+  if (sel) {
+    var atual = sel.value;
+    sel.innerHTML = '<option value="">Todas as etiquetas</option>'
+      + nomes.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + ' (' + cont[n] + ')</option>'; }).join('')
+      + '<option value="__sem">Sem etiqueta</option>';
+    if (atual && (atual === '__sem' || nomes.indexOf(atual) >= 0)) sel.value = atual;
+  }
+  var dl = document.getElementById('vit-etiquetas-dl');
+  if (dl) dl.innerHTML = nomes.map(function(n){ return '<option value="' + esc(n) + '"></option>'; }).join('');
+}
+
 function montarFiltroLojaVitrine(){
+  montarFiltroEtiquetaVitrine();
   var sel = document.getElementById('vit-loja'); if (!sel) return;
   var atual = sel.value, lojas = {};
   VIT_CACHE.forEach(function(i){ var l = i.loja || 'Amazon'; lojas[l] = (lojas[l] || 0) + 1; });
@@ -8061,7 +8155,8 @@ function renderVitrine(){
         + '<div class="vit-nome" title="' + esc(i.nome) + '">' + esc(i.nome)
           + (nomeProvisorio(i.nome) ? ' <span style="color:var(--red);font-weight:700;font-size:10px">nome não lido</span>' : '') + '</div>'
         + '<div class="vit-meta">' + esc(i.loja || 'Amazon') + ' · ' + esc(i.asin) + (i.ultimoDisparo ? ' · disparado em ' + new Date(i.ultimoDisparo).toLocaleDateString('pt-BR') : '')
-          + (i.nicho ? ' · <span style="color:#22c55e;font-weight:600">' + esc(rotuloNicho(i.nicho)) + '</span>' : '') + '</div>'
+          + (i.nicho ? ' · <span style="color:#22c55e;font-weight:600">' + esc(rotuloNicho(i.nicho)) + '</span>' : '')
+          + (i.etiqueta ? ' · <span style="color:var(--accent,#FA5150);font-weight:600">🔖 ' + esc(i.etiqueta) + '</span>' : '') + '</div>'
       + '</div>'
       + precoVitrine(i)
       + (i.cupom ? '<span class="vit-cupom">' + esc(i.cupom) + '</span>' : '')
@@ -8101,6 +8196,11 @@ function atualizarBarraVitrine(){
   if (bx) {
     bx.disabled = !n;
     bx.textContent = n ? '🗑 Excluir selecionados (' + n + ')' : '🗑 Excluir selecionados';
+  }
+  var be = document.getElementById('vit-btn-etiqueta');
+  if (be) {
+    be.disabled = !n;
+    be.textContent = n ? '🔖 Etiqueta (' + n + ')' : '🔖 Etiqueta dos selecionados';
   }
   var bn = document.getElementById('vit-btn-nicho');
   if (bn) {
@@ -8185,7 +8285,8 @@ function cadastrarVitrine(destino){
       if (lotesCad.length > 1) ok.textContent = 'Resolvendo lote ' + (idx + 1) + ' de ' + lotesCad.length + '…';
       return fetch(SERVER + '/vitrine', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ texto: txt, cupom: cupom, cupomModo: modoCupom, nicho: nichoCad })
+        body: JSON.stringify({ texto: txt, cupom: cupom, cupomModo: modoCupom, nicho: nichoCad,
+                               etiqueta: valorCampo('vit-etiqueta').trim() })
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -8489,6 +8590,37 @@ function removerVitrine(btn){
 // aceita a lista inteira), e nao um PUT por item: sao 221 produtos na base e o
 // vitrine.json e o mesmo arquivo — requisicoes paralelas colidiriam por SHA no
 // commit, que e exatamente o problema que a exclusao em serie ja contorna.
+function marcarEtiquetaSelecionados(){
+  var asins = Object.keys(VIT_SEL);
+  if (!asins.length) return;
+  var existentes = {};
+  VIT_CACHE.forEach(function(i){ if (i.etiqueta) existentes[i.etiqueta] = 1; });
+  var lista = Object.keys(existentes).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+  var resp = prompt('Etiqueta para ' + asins.length + ' produto(s) (ex: Promo Marca X).\n'
+    + (lista.length ? '\nJá existentes: ' + lista.join(', ') + '\n' : '')
+    + '\nDeixe em branco para limpar a etiqueta.');
+  if (resp === null) return;
+  var etiqueta = String(resp).trim().slice(0, 60);
+  var st = document.getElementById('vit-status');
+  st.textContent = 'Aplicando etiqueta a ' + asins.length + ' produto(s)…';
+  fetch(SERVER + '/vitrine/etiqueta', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins: asins, etiqueta: etiqueta })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok === false) { alert('Não deu certo: ' + (d.erro || 'erro desconhecido')); return; }
+    VIT_SEL = {};
+    return carregarVitrine().then(function(){
+      document.getElementById('vit-status').textContent = d.atualizados + ' produto(s) '
+        + (etiqueta ? 'com a etiqueta "' + etiqueta + '"' : 'sem etiqueta')
+        + (d.faltando && d.faltando.length ? ' · ' + d.faltando.length + ' não estavam mais na base' : '');
+    });
+  })
+  .catch(function(e){ alert('Erro: ' + e.message); })
+  .then(function(){ atualizarBarraVitrine(); });
+}
+
 function marcarNichoSelecionados(){
   var asins = Object.keys(VIT_SEL);
   if (!asins.length) return;
