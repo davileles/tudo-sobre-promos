@@ -7135,12 +7135,31 @@ function lstCheckCobertura(produtos){
 }
 function lstTextoCobertura(sc){
   if (!sc || !sc.length) return '';
-  var nomes = sc.slice(0, 8).map(function(x){ return '• ' + (x.nome || x.asin); }).join('\n');
-  return '\n\nℹ️ ' + sc.length + ' produto(s) do Mercado Livre são anúncio clássico:\n'
+  // O aviso listava so os nomes e chamava tudo de "anuncio classico" — parecia
+  // produto sem preco. Agora cada linha leva o ultimo preco que o monitor leu
+  // (LST_COMP, o mesmo comparativo da montagem) e o motivo certo: link /p/ ou
+  // /up/ e catalogo sem oferta na API oficial agora, nao anuncio classico.
+  var hoje = Date.now();
+  var linha = function(x){
+    var c = LST_COMP[x.asin], a = c && c.atual;
+    var it = (VIT_CACHE || []).filter(function(v){ return v.asin === x.asin; })[0] || {};
+    var cat = /\/(p|up)\/MLBU?\d/i.test(String(it.url || '')) || /^MLBU?\d{5,}$/i.test(String(x.asin || ''));
+    var preco = '';
+    if (a && a.preco > 0) {
+      var dias = a.em ? Math.floor((hoje - Date.parse(a.em)) / 86400000) : null;
+      preco = ' — R$ ' + fmtBRL(a.preco)
+        + (dias == null ? '' : dias < 1 ? ' (lido hoje)' : ' (lido há ' + dias + ' dia' + (dias > 1 ? 's' : '') + (dias >= 3 ? ' ⚠️' : '') + ')');
+    } else preco = ' — sem preço lido ainda';
+    return '• ' + (x.nome || x.asin).slice(0, 70) + preco + (cat ? '' : ' [anúncio clássico]');
+  };
+  var nomes = sc.slice(0, 8).map(linha).join('\n');
+  var velhos = sc.filter(function(x){ var a = LST_COMP[x.asin] && LST_COMP[x.asin].atual;
+    return !a || !(a.preco > 0) || (a.em && hoje - Date.parse(a.em) >= 3 * 86400000); }).length;
+  return '\n\nℹ️ ' + sc.length + ' produto(s) do Mercado Livre sem preço na API oficial agora:\n'
        + nomes + (sc.length > 8 ? '\n• …e mais ' + (sc.length - 8) : '')
-       + '\n\nA API oficial não cobre esses itens — o preço vem do card do nosso perfil'
-       + '\nde afiliado no momento do disparo. Costuma funcionar; só é um caminho'
-       + '\na mais, e falha se o produto não for elegível ao programa de afiliados.';
+       + '\n\nO valor ao lado é a última leitura do monitor. No disparo o preço é relido'
+       + '\npelo card do nosso perfil de afiliado; se não vier, o item é pulado.'
+       + (velhos ? '\n⚠️ ' + velhos + ' sem leitura recente (3+ dias): pode estar sem estoque — confira antes.' : '');
 }
 
 function dispararLista(id){
