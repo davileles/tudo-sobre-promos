@@ -7145,7 +7145,8 @@ function lstTextoCobertura(sc){
     var it = (VIT_CACHE || []).filter(function(v){ return v.asin === x.asin; })[0] || {};
     var cat = /\/(p|up)\/MLBU?\d/i.test(String(it.url || '')) || /^MLBU?\d{5,}$/i.test(String(x.asin || ''));
     var preco = '';
-    if (a && a.preco > 0) {
+    if (x.semOferta) preco = ' — ⛔ indisponível na loja (será pulado)';
+    else if (a && a.preco > 0) {
       var dias = a.em ? Math.floor((hoje - Date.parse(a.em)) / 86400000) : null;
       preco = ' — R$ ' + fmtBRL(a.preco)
         + (dias == null ? '' : dias < 1 ? ' (lido hoje)' : ' (lido há ' + dias + ' dia' + (dias > 1 ? 's' : '') + (dias >= 3 ? ' ⚠️' : '') + ')');
