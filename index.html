@@ -2669,7 +2669,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <span id="rt-status">Carregando...</span>
     <div class="fila-acoes">
       <input type="date" id="rt-de" onchange="carregarRastreio()" style="width:auto;padding:6px 8px;font-size:12px"/>
-      <input type="date" id="rt-ate" onchange="carregarRastreio()" style="width:auto;padding:6px 8px;font-size:12px"/>
+      <input type="date" id="rt-ate" data-data-de="rt-de" onchange="carregarRastreio()" style="width:auto;padding:6px 8px;font-size:12px"/>
       <input type="text" id="rt-busca" class="busca-mini" autocomplete="off" placeholder="Buscar produto, ref ou ID…" oninput="renderRastreio()"/>
       <select id="rt-loja" onchange="renderRastreio()" style="width:auto;padding:7px 10px;font-size:12px"></select>
       <select id="rt-retorno" onchange="renderRastreio()" style="width:auto;padding:7px 10px;font-size:12px">
@@ -15340,6 +15340,55 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else montarImportantesProntos();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { ['c','o','l'].forEach(iniciarQuando); });
 else ['c','o','l'].forEach(iniciarQuando);
+</script>
+<script>
+/* Par de datas (regra de todos os projetos): o 2º campo de um intervalo abre no mês da 1ª data.
+   Marque o 2º campo com data-data-de="id-do-1º" (vários: "a,b" → usa o 1º preenchido; ".classe" → busca no contêiner mais próximo).
+   Ao abrir o 2º campo vazio, ele recebe a 1ª data só para o calendário abrir naquele mês; se nada for escolhido, volta a ficar vazio. */
+(function(){
+  if (window.__parDatas) return; window.__parDatas = 1;
+  var TIPOS = {'date':1, 'datetime-local':1, 'month':1};
+  function origem(el){
+    var refs = (el.getAttribute('data-data-de') || '').split(',');
+    for (var i = 0; i < refs.length; i++){
+      var r = refs[i].trim(), a = null;
+      if (!r) continue;
+      if (/^[.\[]/.test(r)) { for (var p = el.parentElement; p && !a; p = p.parentElement) a = p.querySelector(r); }
+      else a = document.getElementById(r.replace(/^#/, ''));
+      if (a && a !== el && a.value) return a;
+    }
+    return null;
+  }
+  function adaptar(v, tipo){
+    if (tipo === 'month') return v.slice(0, 7);
+    var d = v.length === 7 ? v + '-01' : v.slice(0, 10);
+    return tipo === 'datetime-local' ? (v.length > 10 ? v.slice(0, 16) : d + 'T00:00') : d;
+  }
+  function preparar(e){
+    var el = e.target;
+    if (!el || el.tagName !== 'INPUT' || !TIPOS[el.type] || !el.hasAttribute('data-data-de')) return;
+    if (el.value || el.readOnly || el.disabled || el.__parAuto !== undefined) return;
+    var a = origem(el); if (!a) return;
+    var v = adaptar(a.value, el.type);
+    // Mesmo mês do atual: o calendário já abre certo, não precisa preencher
+    var hoje = new Date(), mesAtual = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+    if (v.slice(0, 7) === mesAtual) return;
+    el.value = v;
+    if (el.value !== v) return;
+    el.__parAuto = v; el.__parMexeu = false;
+  }
+  function mexeu(e){ var el = e.target; if (el && el.__parAuto !== undefined) el.__parMexeu = true; }
+  function soltar(e){
+    var el = e.target; if (!el || el.__parAuto === undefined) return;
+    if (!el.__parMexeu && el.value === el.__parAuto) el.value = '';
+    delete el.__parAuto; delete el.__parMexeu;
+  }
+  document.addEventListener('pointerdown', preparar, true);
+  document.addEventListener('focusin', preparar, true);
+  document.addEventListener('input', mexeu, true);
+  document.addEventListener('change', mexeu, true);
+  document.addEventListener('focusout', soltar, true);
+})();
 </script>
 </body>
 </html>
