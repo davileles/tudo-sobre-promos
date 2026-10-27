@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Captura Tica",
-  "version": "2.8.0",
-  "description": "Junta links para a vitrine do Tica Promos, insere os cupons do Mercado Livre na sua conta e lê a validade deles.",
+  "version": "2.9.0",
+  "description": "Junta links para a vitrine do Tica Promos, insere os cupons do Mercado Livre na sua conta, lê a validade deles e busca páginas de produto do ML para o servidor.",
   "permissions": [
     "contextMenus",
     "scripting",

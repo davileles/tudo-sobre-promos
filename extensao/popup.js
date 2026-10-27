@@ -104,6 +104,16 @@ async function mlPintar() {
     else partes.push('Validade: ainda não lida');
   }
   if (e.ultimo) partes.push('Último: ' + e.ultimo.texto.replace(/</g, '&lt;'));
+  // Leitura de páginas de produto do ML (2.9.0): fetch sem aba, pedido pelo servidor.
+  const pg = await pedir({ tipo: 'ml-paginas' });
+  if (pg) {
+    const ps = pg.servidor || {};
+    if (!ps.ok) partes.push('Páginas do ML: <span class="ruim">' + (ps.erro || 'servidor sem resposta') + '</span>');
+    else partes.push('Páginas do ML: ' + (pg.rodando ? '<span class="ok">ouvindo o servidor</span>' : '<span class="ruim">parada</span>')
+      + ' · hoje <b>' + (ps.hoje || 0) + '/' + (ps.teto || '?') + '</b>'
+      + (ps.motivo && ps.motivo !== 'extensao_offline' ? ' · ' + ps.motivo.replace(/_/g, ' ') : '')
+      + (pg.ultimo ? '<br>Última página: ' + String(pg.ultimo.texto).replace(/</g, '&lt;') : ''));
+  }
   st.innerHTML = partes.join('<br>');
 }
 

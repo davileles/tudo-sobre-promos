@@ -140,6 +140,20 @@ Rotas usadas (todas com header `X-Extensao-Token`): `GET /cupons/auto/estado`,
 `GET /cupons/auto/proximo[?espiar=1]`, `POST /cupons/auto/resultado`,
 `POST /cupons/auto/visita/fim`.
 
+## Páginas de produto do Mercado Livre (busca para o servidor)
+
+Desde a 2.9.0 o servidor pede à extensão a **página pública de produto** do ML
+que ele mesmo não consegue abrir (o IP do Railway recebe a tela de segurança).
+Funciona sem aba e sem foco: o service worker fica ouvindo o servidor
+(`/ml/pagina/proximo`), faz um `fetch()` da página **sem os seus cookies** (nada da
+sua conta vai junto) e devolve o HTML (`/ml/pagina/resultado`). Nenhuma janela
+abre; a única coisa que você vê é a linha "Páginas do ML" no popup, com o
+contador do dia.
+
+Usa o **mesmo interruptor e o mesmo token** da inserção de cupons. Volume: só o
+que o servidor precisa (anúncio clássico, cupom declarado no anúncio, sonda
+diária), com teto diário no servidor e 4–8 s entre uma página e outra.
+
 ## Aparência
 
 A janela de disparo e o popup da fila usam as mesmas variáveis, tipografia e
