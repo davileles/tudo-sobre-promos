@@ -174,7 +174,18 @@ function coletarDaPagina() {
     if (/\/(?:p|up)\/MLBU?\d{6,}/i.test(canon)) endereco = canon;
   }
 
-  return { titulo: limpar(titulo), preco, precoDe, url: endereco };
+  // Titulo da HOME da loja nao e nome de produto. A Shopee e SPA: lida antes
+  // de montar o produto, a pagina ainda diz "Shopee Brasil | Ofertas incriveis.
+  // Melhores precos do mercado" — e isso entrava na vitrine como nome. Vazio
+  // aqui faz quem chamou esperar mais ou deixar o servidor resolver pela API.
+  const generico = s => {
+    const t = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[|;:\-–]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return !t || (/ofertas incriveis/.test(t) && /melhores precos/.test(t))
+      || /^(shopee( brasil)?|mercado ?livre( brasil)?|amazon(\.com\.br)?|magazine luiza|magalu)( (frete gratis.*|compre.*|ofertas.*))?$/.test(t);
+  };
+  const final = limpar(titulo);
+  return { titulo: generico(final) ? '' : final, preco, precoDe, url: endereco };
 }
 
 // ── MONTAGEM DA LINHA ─────────────────────────────────────────────────────────
@@ -224,10 +235,20 @@ async function coletarDeLink(url) {
       }
       chrome.tabs.onUpdated.addListener(ouvinte);
     });
-    // Lojas com render tardio (Shopee) precisam de um respiro apos o 'complete'.
-    await new Promise(r => setTimeout(r, 1200));
-    const [r] = await chrome.scripting.executeScript({ target: { tabId: aba.id }, func: coletarDaPagina });
-    return r?.result || { titulo: '', preco: null, precoDe: null, url };
+    // Lojas com render tardio (Shopee) montam o produto depois do 'complete'.
+    // Em vez de um respiro fixo, rele ate aparecer um titulo de produto (a
+    // coleta devolve vazio enquanto a pagina so tem o titulo da home), com teto
+    // de ~8 s. Sem titulo no fim, vai so o link e o servidor pega o nome na API.
+    let res = null;
+    for (let i = 0; i < 8; i++) {
+      await new Promise(r => setTimeout(r, i ? 1000 : 1200));
+      try {
+        const [r] = await chrome.scripting.executeScript({ target: { tabId: aba.id }, func: coletarDaPagina });
+        if (r?.result) res = r.result;
+      } catch (_) { /* aba ainda navegando — tenta de novo */ }
+      if (res?.titulo) break;
+    }
+    return res || { titulo: '', preco: null, precoDe: null, url };
   } catch (_) {
     return { titulo: '', preco: null, precoDe: null, url };
   } finally {
