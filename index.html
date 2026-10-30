@@ -369,6 +369,10 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .sched-clear{background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);border-radius:10px;width:40px;flex-shrink:0;cursor:pointer;font-size:13px}
   .sched-clear:hover{border-color:var(--red);color:var(--red)}
   .sched-hint{display:block;font-size:11px;color:var(--muted2);margin-top:7px;line-height:1.4}
+  .prio-chk{display:flex;gap:7px;align-items:flex-start;font-size:12px;margin-top:9px;cursor:pointer;line-height:1.4}
+  .prio-chk input{margin-top:2px;accent-color:var(--accent,#FA5150)}
+  .prio-chk small{display:block;color:var(--muted2);font-size:11px}
+  .tag-prio{background:#FA5150;color:#fff;border-color:#FA5150}
   .sched-hint.agendado{color:var(--accent);font-weight:700}
   .quando-row{display:flex;gap:6px;flex-wrap:wrap}
   .quando-opt{flex:1;min-width:96px;background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -1386,6 +1390,7 @@ body.travado > *:not(#login-screen){display:none !important}
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('c')">✕</button>
         </div>
         <span class="sched-hint" id="c-sched-hint">Segue a janela de disparos configurada.</span>
+        <label class="prio-chk"><input type="checkbox" id="c-prioridade"/><span>⚡ Prioridade máxima<small>Na janela: passa na frente de tudo que está esperando na fila de publicação.</small></span></label>
       </div>
       <button class="btn btn-send" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input','c-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="c-ok"></p>
@@ -1506,6 +1511,7 @@ body.travado > *:not(#login-screen){display:none !important}
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('o')">✕</button>
         </div>
         <span class="sched-hint" id="o-sched-hint">Segue a janela de disparos configurada.</span>
+        <label class="prio-chk"><input type="checkbox" id="o-prioridade"/><span>⚡ Prioridade máxima<small>Na janela: passa na frente de tudo que está esperando na fila de publicação.</small></span></label>
       </div>
       <button class="btn btn-send" id="o-send-btn" onclick="enviarWA('o-msg','o-send-ok','o-img-input','o-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="o-ok"></p>
@@ -1587,6 +1593,7 @@ body.travado > *:not(#login-screen){display:none !important}
           <button class="sched-clear" title="Limpar agendamento" onclick="limparSched('l')">✕</button>
         </div>
         <span class="sched-hint" id="l-sched-hint">Segue a janela de disparos configurada.</span>
+        <label class="prio-chk"><input type="checkbox" id="l-prioridade"/><span>⚡ Prioridade máxima<small>Na janela: passa na frente de tudo que está esperando na fila de publicação.</small></span></label>
       </div>
       <button class="btn btn-send" id="l-send-btn" onclick="enviarWA('l-msg','l-send-ok','l-img-input','l-sched')">🕐 Enviar na janela</button>
       <p class="ok" id="l-ok"></p>
@@ -2442,6 +2449,8 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label>Intervalo entre postagens <span class="tag">minutos</span></label>
         <input type="number" id="lst-intervalo" value="20" min="1" max="720" oninput="renderLstSel()"/></div>
     </div>
+    <label class="prio-chk" style="margin:-2px 0 14px"><input type="checkbox" id="lst-prioridade"/><span>⚡ Prioridade máxima
+      <small>Cada produto passa na frente da fila de publicação e sai no intervalo exato acima, contado a partir do início. Enquanto este disparo anda, capturas dos grupos-fonte, Telegram e outras listas ficam seguradas e voltam quando ele termina.</small></span></label>
 
     <div class="g2" style="margin-bottom:12px">
       <div class="field"><label>Cupom</label>
@@ -5975,6 +5984,7 @@ function renderListas(){
       +   '<span class="card-title" style="flex:1">' + esc(l.nome)
       +     (l.ativo ? '' : ' <span style="color:var(--muted2);font-weight:500">(desativada)</span>') + '</span>'
       +   (l.efemera ? '<span class="tag">envio único</span>' : '')
+      +   (l.prioridade ? '<span class="tag tag-prio">⚡ prioridade máxima</span>' : '')
       +   (ex ? '<span class="mon-estado on">'
               + (ex.indice === 0 && !ex.pausada && ex.proximoEm > Date.now() ? 'agendado' : 'em disparo')
               + '</span>' : '')
@@ -6484,6 +6494,7 @@ function novaLista(){
   document.getElementById('lst-tipo').disabled = false;
   document.getElementById('lst-nome').value = '';
   document.getElementById('lst-intervalo').value = 20;
+  document.getElementById('lst-prioridade').checked = false;
   document.getElementById('lst-cupom-modo').value = 'nenhum';
   lstToggleCupom();
   document.getElementById('lst-roteamento').value = 'geral';
@@ -6537,6 +6548,7 @@ function editarLista(id){
   document.getElementById('lst-tipo').disabled = true;
   document.getElementById('lst-nome').value = l.nome;
   document.getElementById('lst-intervalo').value = l.intervaloMin;
+  document.getElementById('lst-prioridade').checked = !!l.prioridade;
   document.getElementById('lst-cupom-modo').value = l.cupomModo;
   document.getElementById('lst-roteamento').value = l.roteamento || 'geral';
   LST_ROT_MANUAL = true; LST_ROT_AUTO = false;   // lista salva mantem o destino dela
@@ -7058,6 +7070,8 @@ function salvarLista(){
              + lstFmtDataHora(_prev.primeiroEm) + '.'
            : '\n\n⚠️ A fila não cabe na janela de hoje: ela pausa no fechamento e continua na abertura seguinte.')
       + lstTextoCobertura(_sc)
+      + (document.getElementById('lst-prioridade').checked
+          ? '\n\n⚡ Prioridade máxima: passa na frente da fila e segura o resto até terminar.' : '')
       + '\n\nEste envio não fica salvo.')) { lstMsg(''); return; }
     lstMsg(inicioHora && !jaPassou ? 'Agendando a fila…' : 'Abrindo a fila…');
     fetch(SERVER + '/listas/disparo-unico', {
@@ -7066,6 +7080,7 @@ function salvarLista(){
                              cupomModo: modo, cupomCodigo: cupomCodigo,
                              cuponsItem: lstCuponsItem(),
                              roteamento: roteamento,
+                             prioridade: document.getElementById('lst-prioridade').checked,
                              iniciarHora: inicioHora,
                              janelas: lstJanelasEscolhidas() })
     })
@@ -7104,6 +7119,7 @@ function salvarLista(){
       cupomCodigo: cupomCodigo,
       cuponsItem: lstCuponsItem(),
       roteamento: roteamento,
+      prioridade: document.getElementById('lst-prioridade').checked,
       efemera: false,
       agenda: { ativo: agAtivo, diasSemana: dias, hora: document.getElementById('lst-ag-hora').value },
       selecaoDia: lstSelecaoLer(),
@@ -11489,8 +11505,10 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
     if (quando === 'janela') {
       // Sempre JSON: fora da janela vira agendamento, e o anexo precisa ficar
       // guardado até a hora do disparo (mesmo teto do envio agendado).
+      var _prioEl = document.getElementById(prefEnvio + '-prioridade');
       var pj = { mensagem: texto, grupo: 'tsp', tipo: tipoEnvio, quando: 'janela',
-                 trilhas: trilhasEnvio, categoria: catEnvio || null };
+                 trilhas: trilhasEnvio, categoria: catEnvio || null,
+                 prioridade: !!(_prioEl && _prioEl.checked) };
       if (file) {
         if (file.size > ANEXO_AGEND_MAX) {
           s.className='send-ok send-err';

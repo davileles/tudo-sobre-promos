@@ -295,6 +295,7 @@ $('disparar').addEventListener('click', async () => {
                    : modo === 'fixo' ? codigo : modo === 'auto' ? 'melhor disponível' : 'nenhum') + '\n'
     + (aj && (aj.preco || aj.precoDe) ? 'Valores: digitados por você\n' : '')
     + 'Início: ' + (hora || 'imediato') + '\n'
+    + ($('fPrioridade') && $('fPrioridade').checked ? 'Prioridade: ⚡ máxima\n' : '')
     + 'Texto: ' + (ed ? 'editado por você' : 'original') + '\n\n'
     + 'Não há desfazer depois que a mensagem sai.';
   if (!confirm(resumo)) return;
@@ -309,6 +310,7 @@ $('disparar').addEventListener('click', async () => {
         cupomModo: modo,
         cupomCodigo: codigo,
         iniciarHora: hora,
+        prioridade: !!($('fPrioridade') && $('fPrioridade').checked),
         edicoesItem: ed ? { [ITEM.asin]: ed } : undefined,
         ajustesItem: aj ? { [ITEM.asin]: aj } : undefined,
       }),
