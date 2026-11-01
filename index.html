@@ -6716,6 +6716,22 @@ function lstMover(asin, delta){
 // Cupom que o produto carrega da vitrine. O disparo respeita esse vinculo no
 // modo automatico e o ignora nos modos 'sempre este cupom' e 'sem cupom' —
 // mostrar aqui evita marcar um cupom no cadastro e ver outro sair no grupo.
+// Loja do produto em pilula colorida na linha da montagem (Amazon, Mercado
+// Livre, Shopee, Magalu...). A loja vem da base de produtos.
+function lstLojaPill(asin){
+  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  var loja = String((v && v.loja) || 'Amazon');
+  var l = loja.toLowerCase();
+  var cor = l.indexOf('amazon') >= 0 ? 'var(--amazon)'
+          : (l.indexOf('mercado livre') >= 0 || l === 'ml') ? 'var(--ml)'
+          : l.indexOf('shopee') >= 0 ? 'var(--shopee)'
+          : (l.indexOf('magalu') >= 0 || l.indexOf('magazine') >= 0) ? 'var(--magalu)'
+          : 'var(--muted2)';
+  return '<span title="Loja" style="display:inline-block;font-size:10px;font-weight:700;line-height:1.5;'
+    + 'padding:0 6px;margin-right:4px;border-radius:9px;border:1px solid ' + cor + ';color:' + cor + ';vertical-align:1px">'
+    + esc(loja) + '</span>';
+}
+
 function lstCupomVinculado(asin){
   var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
   return (v && v.cupom) ? v.cupom : null;
@@ -6796,7 +6812,7 @@ function renderLstSel(){
       : '')
   + LST_SEL.map(function(p, i){
     return '<div class="grp-chip lst-item">'
-      + '<span class="lst-item-nome" style="flex:1">' + (i+1) + '. ' + lstNomeComLink(p)
+      + '<span class="lst-item-nome" style="flex:1">' + (i+1) + '. ' + lstLojaPill(p.asin) + lstNomeComLink(p)
       + (function(){ if (p.cupom) return ''; var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
