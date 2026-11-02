@@ -6785,12 +6785,85 @@ function lstDefinirCupomItem(asin, codigo){
   var p = LST_SEL.find(function(x){ return x.asin === asin; });
   if (!p) return;
   p.cupom = codigo || '';
+  p.cupomManual = true;   // escolha a mao: o cupom da pagina nunca mais troca este item
   lstCompInvalidar(asin);
   renderLstSel();
 }
 
+// ── CUPOM DA PAGINA DO ML NA MONTAGEM (02/11/2026) ──
+// Para cada produto do Mercado Livre da lista, o servidor le a pagina do
+// anuncio pela extensao Captura Tica e devolve o cupom que a pagina oferece e
+// que tambem esta vigente na base. O item que ainda esta no padrao (sem
+// escolha manual) recebe esse cupom no seletor da linha.
+var LST_CUPAG = {}, LST_CUPAG_EM = 0, LST_CUPAG_TIMER = null, LST_CUPAG_BUSY = false;
+
+function lstEhMl(asin){
+  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  var l = String((v && v.loja) || '').toLowerCase();
+  return l.indexOf('mercado livre') >= 0 || l === 'ml';
+}
+
+function lstAplicarCupomPagina(){
+  var mudou = false;
+  LST_SEL.forEach(function(p){
+    var r = LST_CUPAG[p.asin];
+    if (!r || r.estado !== 'ok' || !r.codigo || p.cupomManual) return;
+    if (p.cupom === r.codigo) return;
+    if (p.cupom && p.cupom !== '__SEM__' && p.cupom !== p.cupomPagina) return;
+    p.cupom = r.codigo; p.cupomPagina = r.codigo;
+    lstCompInvalidar(p.asin);
+    mudou = true;
+  });
+  return mudou;
+}
+
+function lstCarregarCupomPagina(){
+  if (LST_CUPAG_BUSY) return;
+  var agora = Date.now();
+  var faltam = LST_SEL.map(function(p){ return p.asin; }).filter(function(a){
+    if (!lstEhMl(a)) return false;
+    var r = LST_CUPAG[a];
+    return !r || r.estado === 'lendo' || agora - (r._em || 0) > 30 * 60000;
+  });
+  if (!faltam.length) return;
+  if (LST_CUPAG_TIMER) return;
+  LST_CUPAG_BUSY = true;
+  fetch(SERVER + '/vitrine/cupons-pagina-ml', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ asins: faltam })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) throw new Error(d.erro || 'falhou');
+      var em = Date.now();
+      Object.keys(d.itens || {}).forEach(function(a){ var r = d.itens[a]; r._em = em; LST_CUPAG[a] = r; });
+    })
+    .catch(function(){ faltam.forEach(function(a){ LST_CUPAG[a] = { estado:'indisponivel', _em: Date.now() }; }); })
+    .then(function(){
+      LST_CUPAG_BUSY = false;
+      lstAplicarCupomPagina();
+      renderLstSel();
+      var lendo = LST_SEL.some(function(p){ return (LST_CUPAG[p.asin] || {}).estado === 'lendo'; });
+      if (lendo) LST_CUPAG_TIMER = setTimeout(function(){ LST_CUPAG_TIMER = null; if (LST_SEL.length) lstCarregarCupomPagina(); }, 7000);
+    });
+}
+
+function lstTagCupomPagina(p){
+  var r = LST_CUPAG[p.asin];
+  if (!r || !lstEhMl(p.asin)) return '';
+  var st = 'font-size:10.5px;margin-left:4px;';
+  if (r.estado === 'lendo') return ' <span style="' + st + 'color:var(--muted2)">⏳ lendo cupons da página…</span>';
+  if (r.estado === 'ok' && p.cupom === r.codigo && !p.cupomManual)
+    return ' <span title="Cupom oferecido na página do anúncio e cadastrado na base" style="' + st + 'color:var(--green)">🎟️ da página</span>';
+  if (r.estado === 'ok' && p.cupomManual && p.cupom !== r.codigo)
+    return ' <span title="A página oferece este cupom; você escolheu outro" style="' + st + 'color:var(--muted2)">🎟️ página: ' + esc(r.codigo) + '</span>';
+  if (r.estado === 'fora_da_base') return ' <span title="O anúncio mostra cupom, mas nenhum código vigente da base casa com ele" style="' + st + 'color:var(--muted2)">🎟️ cupom na página fora da base</span>';
+  return '';
+}
+
 function renderLstSel(){
   lstAutoRoteamento();
+  lstAplicarCupomPagina();
   var el = document.getElementById('lst-sel');
   if (!LST_SEL.length){
     el.innerHTML = '<div style="font-size:12px;color:var(--muted2);padding:6px 0">Nenhum produto ainda.</div>';
@@ -6816,6 +6889,7 @@ function renderLstSel(){
       + (function(){ if (p.cupom) return ''; var cup = lstCupomVinculado(p.asin); if (!cup) return '';
           comVinculo++;
           return ' <span style="color:var(--muted2);font-size:10.5px">&#127915; ' + esc(cup) + '</span>'; })()
+      + lstTagCupomPagina(p)
       + lstLinhaComparativo(p.asin)
       + '</span>'
       + lstSelectCupomItem(p)
@@ -6856,6 +6930,7 @@ function renderLstSel(){
     })()
   + lstResumoComparativo();
   lstCarregarComparativo();
+  lstCarregarCupomPagina();
 }
 
 // ── COMPARATIVO DE PRECO NA MONTAGEM ─────────────────────────────────────────
