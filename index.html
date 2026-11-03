@@ -199,6 +199,28 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
   .sec-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
 
   /* ══ CARD ══ */
+
+/* ── Avisos de preço (aba Catálogo > Avisos) ── */
+.av-cab{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.av-pill{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;background:var(--surface2,rgba(127,127,127,.15))}
+.av-pill.ok{color:#2fb36d}.av-pill.off{color:#e25555}
+.av-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.av-campo{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted)}
+.av-campo small{font-weight:500;font-size:11px}
+.av-dupla{display:flex;align-items:center;gap:6px}.av-dupla input{flex:1;min-width:0}
+.av-check{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:12px;flex-wrap:wrap}
+.av-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btn.av-sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+.av-msg{font-size:12px;margin-top:8px;color:var(--muted)}
+.av-resumo{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:10px}
+.av-resumo b{font-size:18px;display:block}
+.av-filtro{margin-bottom:10px}.av-filtro select{width:auto;padding:7px 10px;font-size:12px}
+.av-tab td{vertical-align:top;font-size:12px}
+.av-tab .av-prod{max-width:280px}
+.av-st{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.av-st.ativo{background:rgba(47,179,109,.15);color:#2fb36d}.av-st.aguardando{background:rgba(245,166,35,.15);color:#d18a0f}
+.av-st.fim{background:rgba(127,127,127,.15);color:var(--muted)}
+.av-mini{font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;margin:2px 2px 0 0}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;margin-bottom:14px}
   .card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent)}
   .card.mk-amazon::before{background:var(--amazon)}
@@ -1111,6 +1133,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-disparos" onclick="switchTab('disparos')">🚀 Disparos</button>
   <button class="main-tab" id="tab-vitrine" onclick="switchTab('vitrine')">🏬 Produtos</button>
   <button class="main-tab" id="tab-monprecos" onclick="switchTab('monprecos')">📉 Monitor de preços<span class="tab-badge" id="monprecos-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-avisos" onclick="switchTab('avisos')">🔔 Avisos de preço</button>
   <button class="main-tab" id="tab-cupons" onclick="switchTab('cupons')">🎫 Cupons</button>
   <button class="main-tab" id="tab-templates" onclick="switchTab('templates')">📝 Templates</button>
   <button class="main-tab" id="tab-comissao" onclick="switchTab('comissao')">💰 Comissão</button>
@@ -2572,6 +2595,53 @@ body.travado > *:not(#login-screen){display:none !important}
 <!-- ════════ TEMPLATES ════════ -->
 <!-- ════════ DESCOBERTAS ════════ -->
 <!-- ════════ RESULTADOS: LTV DOS MEMBROS ════════ -->
+<div class="panel" id="panel-avisos">
+  <div class="aviso">
+    Clientes pedem em <a href="https://ticapromos.com.br/avisos/" target="_blank" rel="noopener"><b>ticapromos.com.br/avisos</b></a>
+    o aviso de um produto que querem comprar. O pedido só vale depois que a pessoa manda a mensagem de ativação
+    para o número dos avisos; daí o servidor confere o preço algumas vezes por dia e manda no privado quando cai
+    (no máximo um aviso por pessoa por dia, só na janela). <b>SAIR</b> cancela tudo da pessoa.
+  </div>
+  <div class="card">
+    <div class="av-cab"><b>Configuração</b><span id="av-estado-conta" class="av-pill"></span></div>
+    <div class="av-grade">
+      <label class="av-campo">Número dos avisos
+        <select id="av-conta"></select>
+        <small>Use um número exclusivo com apelido <b>aviso-</b> (ex.: aviso-01). Ele nunca dispara em grupo.</small>
+      </label>
+      <label class="av-campo">Número exibido na página <small>(opcional)</small>
+        <input type="tel" id="av-numero" placeholder="Lido da conta conectada"/>
+      </label>
+      <label class="av-campo">Produtos por cliente<input type="number" id="av-limite" min="1" max="50"/></label>
+      <label class="av-campo">Avisos por pessoa por dia<input type="number" id="av-pordia" min="1" max="10"/></label>
+      <label class="av-campo">Janela de envio (horas)
+        <span class="av-dupla"><input type="number" id="av-ini" min="0" max="23"/><span>às</span><input type="number" id="av-fim" min="1" max="24"/></span>
+      </label>
+      <label class="av-campo">Sem preço desejado, avisar queda de (%)<input type="number" id="av-queda" min="1" max="80"/></label>
+    </div>
+    <label class="av-check"><input type="checkbox" id="av-parcial"/> Com preço desejado ainda não alcançado, avisar uma queda de pelo menos <input type="number" id="av-parcial-pct" min="1" max="80" style="width:64px"/> %</label>
+    <label class="av-check"><input type="checkbox" id="av-ativo"/> Avisos ligados (desligado: a página mostra "pausado" e nada é lido nem enviado)</label>
+    <div class="av-acoes">
+      <button class="btn" style="width:auto" onclick="avSalvar()">💾 Salvar</button>
+      <button class="btn av-sec" style="width:auto" onclick="avVarrer()">🔍 Conferir preços agora</button>
+    </div>
+    <div id="av-msg" class="av-msg"></div>
+  </div>
+  <div class="card">
+    <div class="av-resumo" id="av-resumo">Carregando…</div>
+    <div class="av-filtro">
+      <select id="av-filtro" onchange="avDesenhar()">
+        <option value="abertos">Aguardando e ativos</option>
+        <option value="aguardando">Aguardando ativação</option>
+        <option value="ativo">Ativos</option>
+        <option value="encerrados">Encerrados</option>
+        <option value="todos">Todos</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto"><table class="dv-tab av-tab" id="av-tab"></table></div>
+  </div>
+</div>
+
 <div class="panel" id="panel-descobertas">
   <div class="aviso">
     O que o público comprou pelos nossos links, em <b>todas as lojas</b>: venda direta (levou o
@@ -3443,7 +3513,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','avisos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
 function switchTab(name) {
   if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos('o', false);
   if (name === 'cupom' && quandoSel('c') === 'janela') carregarJanelaDisparos('c', false);
@@ -3501,6 +3571,7 @@ function switchTab(name) {
       .then(carregarListas);
   }
   if (name === 'monprecos') mpCarregar();
+  if (name === 'avisos') avCarregar();
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') { cfgAbrir(); carregarJanelaCupom(); }
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
@@ -3530,7 +3601,7 @@ var SECOES = [
   { id: 'publicar',   label: 'Publicar',   abas: ['aprov','filaenvio','agend','enviadas','divulg','cupom','oferta','disparos','livre'] },
   // id 'produtos' mantido (aba lembrada e badges); o rotulo e Catalogo:
   // material de trabalho — produtos, cupons e o que alimenta a base
-  { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','descobertas'] },
+  { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','avisos','descobertas'] },
   // quanto os envios renderam, depois quanto a audiencia custa/vale
   { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego'] },
   { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','saude'] },
@@ -3540,7 +3611,7 @@ var SECOES = [
 var ROTULO_ABA = {
   hoje: 'Hoje', alertas: 'Alertas', filaenvio: 'Fila', agend: 'Agendados', enviadas: 'Enviadas', aprov: 'Aprovação',
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
-  livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços',
+  livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços', avisos: 'Avisos de preço',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
   rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', ltv: 'LTV dos membros',
   grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', saude: 'Saúde dos grupos', conexao: 'Conexão e turnos', config: 'Automação e geral'
@@ -3645,6 +3716,11 @@ var CABECALHOS = {
     var cfg = e.config || {};
     return _n(e.monitorados) + ' vigiados · ' + _n(e.maduros) + ' maduros · '
       + mpEstadoReal(cfg).curto;
+  } },
+  avisos: { titulo: 'Avisos de preço', acoes: [{ rot: '↻ Atualizar', fn: 'avCarregar()' }], sub: function () {
+    var r = (typeof AV_ESTADO !== 'undefined' && AV_ESTADO && AV_ESTADO.resumo) || {};
+    var ps = r.porStatus || {};
+    return _n(ps.ativo) + ' ativos · ' + _n(ps.aguardando) + ' aguardando ativação · ' + _n(r.avisosHoje) + ' avisos hoje';
   } },
   cupons: { titulo: 'Cupons', acoes: [{ rot: '↻ Atualizar', fn: 'carregarCupons()' }], regras: 'cupons', sub: function () {
     return _n(_tam(typeof CUPONS_CACHE !== 'undefined' && CUPONS_CACHE)) + ' cupons na base';
@@ -3888,6 +3964,7 @@ function ckIndexar() {
     livre: 'mensagem livre texto aviso recado',
     vitrine: 'vitrine base produtos disparos asin catalogo',
     monprecos: 'monitor precos queda alerta preco cotas semeadura epc',
+    avisos: 'avisos preco clientes whatsapp privado pedido desejo alvo',
     cupons: 'base cupons cupom cadastrados janela',
     templates: 'templates modelo texto rodape',
     grupos: 'grupos trilhas destinos fontes papeis',
@@ -15538,6 +15615,123 @@ else ['c','o','l'].forEach(iniciarQuando);
   document.addEventListener('change', mexeu, true);
   document.addEventListener('focusout', soltar, true);
 })();
+</script>
+
+<script>
+/* ══════ AVISOS DE PREÇO (clientes no privado) ══════
+   Servidor: baileys-server/avisos-preco.js. Página pública: tica-site/avisos/. */
+var AV_ESTADO = null;
+function avMsg(t){ var el = document.getElementById('av-msg'); if (el) el.textContent = t || ''; }
+function avBrl(v){ var n = Number(v); return (v == null || !isFinite(n)) ? '—' : 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function avData(s){ if (!s) return '—'; try { return new Date(s).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return s; } }
+function avCarregar(){
+  return fetch(SERVER + '/avisos-preco').then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok) { document.getElementById('av-resumo').textContent = (d && d.erro) || 'Não consegui carregar os avisos.'; return; }
+    AV_ESTADO = d; avPreencherConfig(); avDesenhar();
+    if (typeof pintarCabecalho === 'function') pintarCabecalho('avisos');
+  }).catch(function(e){ document.getElementById('av-resumo').textContent = 'Falha ao carregar: ' + e.message; });
+}
+function avPreencherConfig(){
+  var c = AV_ESTADO.config || {};
+  var sel = document.getElementById('av-conta');
+  var contas = (AV_ESTADO.contasDisponiveis || []).slice().sort(function(a, b){ return a.apelido.localeCompare(b.apelido, 'pt-BR'); });
+  var h = '<option value="">Nenhum (pedidos ficam aguardando)</option>';
+  var temAtual = false;
+  contas.forEach(function(x){
+    if (x.apelido === c.conta) temAtual = true;
+    h += '<option value="' + esc(x.apelido) + '">' + esc(x.apelido) + (x.conectado ? ' ● conectado' : ' ○ desconectado') + (x.exclusiva ? ' · exclusivo' : '') + '</option>';
+  });
+  if (c.conta && !temAtual) h += '<option value="' + esc(c.conta) + '">' + esc(c.conta) + ' (não encontrado)</option>';
+  sel.innerHTML = h; sel.value = c.conta || '';
+  document.getElementById('av-numero').value = c.numeroPublico || '';
+  document.getElementById('av-limite').value = c.limitePorCliente;
+  document.getElementById('av-pordia').value = c.avisosPorDia;
+  document.getElementById('av-ini').value = c.janelaIni;
+  document.getElementById('av-fim').value = c.janelaFim;
+  document.getElementById('av-queda').value = c.quedaSemAlvoPct;
+  document.getElementById('av-parcial').checked = !!c.avisarQuedaParcial;
+  document.getElementById('av-parcial-pct').value = c.quedaParcialPct;
+  document.getElementById('av-ativo').checked = !!c.ativo;
+  var pill = document.getElementById('av-estado-conta');
+  if (!c.conta) { pill.textContent = 'sem número — ninguém recebe aviso'; pill.className = 'av-pill off'; }
+  else if (AV_ESTADO.contaConectada) { pill.textContent = c.conta + ' conectado' + (AV_ESTADO.numero ? ' · ' + AV_ESTADO.numero : ''); pill.className = 'av-pill ok'; }
+  else { pill.textContent = c.conta + ' desconectado'; pill.className = 'av-pill off'; }
+}
+function avSalvar(){
+  var conta = document.getElementById('av-conta').value;
+  if (conta && !/^aviso-/i.test(conta) && !confirm('"' + conta + '" não é um número exclusivo de avisos (aviso-*). Mandar DM em volume por um número que dispara grupo arrisca bloqueio. Usar mesmo assim?')) return;
+  var corpo = {
+    conta: conta,
+    numeroPublico: document.getElementById('av-numero').value,
+    limitePorCliente: document.getElementById('av-limite').value,
+    avisosPorDia: document.getElementById('av-pordia').value,
+    janelaIni: document.getElementById('av-ini').value,
+    janelaFim: document.getElementById('av-fim').value,
+    quedaSemAlvoPct: document.getElementById('av-queda').value,
+    avisarQuedaParcial: document.getElementById('av-parcial').checked,
+    quedaParcialPct: document.getElementById('av-parcial-pct').value,
+    ativo: document.getElementById('av-ativo').checked
+  };
+  avMsg('Salvando…');
+  fetch(SERVER + '/avisos-preco/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ avMsg(d && d.ok ? '✅ Salvo.' : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
+function avVarrer(){
+  avMsg('Conferindo preços… pode levar alguns minutos.');
+  fetch(SERVER + '/avisos-preco/varrer', { method: 'POST' }).then(function(r){ return r.json(); })
+    .then(function(d){ avMsg(d && d.ok ? '✅ ' + (d.lidos || 0) + ' preço(s) lido(s), ' + (d.avisos || 0) + ' aviso(s) na fila.' : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
+function avAcao(id, acao){
+  if (acao === 'remover' && !confirm('Remover este pedido? A pessoa deixa de receber o aviso deste produto.')) return;
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/' + acao, { method: 'POST' })
+    .then(function(r){ return r.json(); }).then(function(){ return avCarregar(); });
+}
+function avDesenhar(){
+  if (!AV_ESTADO) return;
+  var r = AV_ESTADO.resumo || {}, ps = r.porStatus || {};
+  document.getElementById('av-resumo').innerHTML =
+    '<span><b>' + (ps.aguardando || 0) + '</b>aguardando ativação</span>'
+    + '<span><b>' + (ps.ativo || 0) + '</b>ativos</span>'
+    + '<span><b>' + (r.contatos || 0) + '</b>pessoas ativadas</span>'
+    + '<span><b>' + (r.produtos || 0) + '</b>produtos vigiados</span>'
+    + '<span><b>' + (r.avisosHoje || 0) + '</b>avisos hoje</span>'
+    + '<span><b>' + (r.avisos7d || 0) + '</b>avisos em 7 dias</span>';
+  var f = document.getElementById('av-filtro').value;
+  var fim = { cancelado: 1, expirado: 1, encerrado: 1, removido: 1 };
+  var lista = (AV_ESTADO.pedidos || []).filter(function(p){
+    if (f === 'todos') return true;
+    if (f === 'encerrados') return !!fim[p.status];
+    if (f === 'abertos') return !fim[p.status];
+    return p.status === f;
+  });
+  var rot = { aguardando: 'aguardando', ativo: 'ativo', cancelado: 'saiu (SAIR)', expirado: 'não ativou', encerrado: 'encerrado', removido: 'removido' };
+  var h = '<tr><th>Produto</th><th>Cliente</th><th>Situação</th><th>Preços</th><th>Avisos</th><th></th></tr>';
+  if (!lista.length) h += '<tr><td colspan="6" style="color:var(--muted)">Nenhum pedido aqui.</td></tr>';
+  lista.forEach(function(p){
+    var st = '<span class="av-st ' + (fim[p.status] ? 'fim' : p.status) + '">' + esc(rot[p.status] || p.status) + (p.pausado ? ' · pausado' : '') + '</span>'
+      + '<div style="color:var(--muted);margin-top:4px">pedido ' + esc(p.codigo) + ' · ' + avData(p.criadoEm) + '</div>'
+      + (p.motivoFim ? '<div style="color:var(--muted)">' + esc(p.motivoFim) + '</div>' : '');
+    var precos = 'pediu: ' + avBrl(p.precoInicial) + '<br>alvo: ' + (p.precoAlvo ? avBrl(p.precoAlvo) : 'qualquer queda')
+      + '<br>agora: <b>' + avBrl(p.precoAtual) + '</b>' + (p.lidoEm ? ' <span style="color:var(--muted)">(' + avData(p.lidoEm) + ')</span>' : '')
+      + (p.falhaMotivo ? '<br><span style="color:#e25555">⚠️ ' + esc(p.falhaMotivo) + '</span>' : '');
+    var av = (p.avisos || 0) + (p.ultimoAvisoEm ? '<br><span style="color:var(--muted)">último ' + avData(p.ultimoAvisoEm) + ' a ' + avBrl(p.ultimoAvisoPreco) + '</span>' : '')
+      + (p.alvoAtingidoEm ? '<br>🎯 alvo atingido' : '');
+    var acoes = '';
+    if (!fim[p.status]) {
+      acoes += p.pausado ? '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'retomar\')">▶ Retomar</button>'
+                         : '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'pausar\')">⏸ Pausar</button>';
+      acoes += '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'remover\')">🗑</button>';
+    }
+    h += '<tr><td class="av-prod"><span style="color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase">' + esc(p.loja) + '</span><br>'
+      + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.titulo || p.id) + '</a>' : esc(p.titulo || p.id)) + '</td>'
+      + '<td>' + esc(p.nome) + '<br><span style="color:var(--muted)">' + esc(p.telefone) + '</span></td>'
+      + '<td>' + st + '</td><td>' + precos + '</td><td>' + av + '</td><td>' + acoes + '</td></tr>';
+  });
+  document.getElementById('av-tab').innerHTML = h;
+}
 </script>
 </body>
 </html>
