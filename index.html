@@ -5280,6 +5280,19 @@ function fmtTelefoneConta(n) {
   return '+' + s;
 }
 
+// Motor de envio em grupo (wa-envio): aparelho vinculado SEPARADO do QR normal.
+// Conta ligada no motor e deslogada nele envia pelo Baileys (mais "Aguardando
+// mensagem") — este campo deixa isso visivel e o botao "QR do envio" pareia.
+function motorEnvioCampo(c) {
+  var m = c && c.motorEnvio;
+  if (!m || !m.ligado) return '';
+  var txt, cor;
+  if (!m.sondado) { txt = 'sem leitura do motor'; cor = '#767D93'; }
+  else if (m.conectado) { txt = m.quarentena ? 'conectado (em quarentena)' : 'conectado'; cor = '#4ade80'; }
+  else { txt = 'desconectado — use "QR do envio"' + (m.ultimoErro ? ' (' + m.ultimoErro + ')' : ''); cor = '#f87171'; }
+  return '<div class="mon-campo"><label>Envio em grupo</label><span style="font-size:12px;color:' + cor + '">' + esc(txt) + '</span></div>';
+}
+
 function renderContas() {
   var linhas = [CONTAS_CACHE.principal || { id:'principal' }].concat(CONTAS_CACHE.extras || []);
   document.getElementById('contas-lista').innerHTML = linhas.map(function(c){
@@ -5301,10 +5314,15 @@ function renderContas() {
       + '<div class="mon-linha">'
         + (c.ultimoEnvio ? '<div class="mon-campo"><label>Último envio</label><span style="font-size:12px">' + esc(new Date(c.ultimoEnvio).toLocaleString('pt-BR')) + '</span></div>' : '')
         + (c.ultimoErro ? '<div class="mon-campo"><label>Último erro</label><span style="font-size:12px;color:#f87171">' + esc(c.ultimoErro) + '</span></div>' : '')
+        + motorEnvioCampo(c)
         + '<div class="mon-campo" style="justify-content:flex-end"><div style="display:flex;gap:8px;flex-wrap:wrap">'
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
             + urlComToken(SERVER + (ehPrinc ? '/qr' : '/contas/' + encodeURIComponent(c.id) + '/qr')) + '">QR</a>'
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="reparearConta(\'' + esc(c.id) + '\')">Reparear</button>')
+          + (!ehPrinc && c.motorEnvio && c.motorEnvio.ligado
+              ? '<a class="btn btn-sm" style="margin-top:0;text-decoration:none;text-align:center' + (c.motorEnvio.conectado ? ';opacity:.7' : '') + '" target="_blank" href="'
+                + urlComToken(SERVER + '/contas/' + encodeURIComponent(c.id) + '/motor/parear') + '">QR do envio</a>'
+              : '')
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="conferirGruposConta(\'' + esc(c.id) + '\')">Conferir grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-copy btn-sm" style="margin-top:0" onclick="gerenciarGruposConta(\'' + esc(c.id) + '\')">Gerenciar grupos</button>')
           + (ehPrinc ? '' : '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="excluirConta(\'' + esc(c.id) + '\')">Excluir</button>')
