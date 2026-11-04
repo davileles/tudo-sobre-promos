@@ -2634,6 +2634,7 @@ body.travado > *:not(#login-screen){display:none !important}
         <option value="abertos">Aguardando e ativos</option>
         <option value="aguardando">Aguardando ativação</option>
         <option value="ativo">Ativos</option>
+        <option value="pornome">Pedidos pelo nome (avaliar)</option>
         <option value="encerrados">Encerrados</option>
         <option value="todos">Todos</option>
       </select>
@@ -15689,12 +15690,22 @@ function avAcao(id, acao){
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/' + acao, { method: 'POST' })
     .then(function(r){ return r.json(); }).then(function(){ return avCarregar(); });
 }
+function avVincular(id){
+  var url = prompt('Cole o link do produto (Amazon, Mercado Livre ou Shopee) para este pedido:');
+  if (!url) return;
+  avMsg('Lendo o link…');
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/vincular', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim() }) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ avMsg(d && d.ok ? '✅ Vinculado: ' + d.titulo + (d.preco ? ' (' + avBrl(d.preco) + ')' : '') : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
 function avDesenhar(){
   if (!AV_ESTADO) return;
   var r = AV_ESTADO.resumo || {}, ps = r.porStatus || {};
   document.getElementById('av-resumo').innerHTML =
     '<span><b>' + (ps.aguardando || 0) + '</b>aguardando ativação</span>'
     + '<span><b>' + (ps.ativo || 0) + '</b>ativos</span>'
+    + '<span><b>' + (AV_ESTADO.pedidos || []).filter(function(p){ return p.porNome && !{cancelado:1,expirado:1,encerrado:1,removido:1}[p.status]; }).length + '</b>pelo nome (avaliar)</span>'
     + '<span><b>' + (r.contatos || 0) + '</b>pessoas ativadas</span>'
     + '<span><b>' + (r.produtos || 0) + '</b>produtos vigiados</span>'
     + '<span><b>' + (r.avisosHoje || 0) + '</b>avisos hoje</span>'
@@ -15705,6 +15716,7 @@ function avDesenhar(){
     if (f === 'todos') return true;
     if (f === 'encerrados') return !!fim[p.status];
     if (f === 'abertos') return !fim[p.status];
+    if (f === 'pornome') return p.porNome && !fim[p.status];
     return p.status === f;
   });
   var rot = { aguardando: 'aguardando', ativo: 'ativo', cancelado: 'saiu (SAIR)', expirado: 'não ativou', encerrado: 'encerrado', removido: 'removido' };
@@ -15720,13 +15732,19 @@ function avDesenhar(){
     var av = (p.avisos || 0) + (p.ultimoAvisoEm ? '<br><span style="color:var(--muted)">último ' + avData(p.ultimoAvisoEm) + ' a ' + avBrl(p.ultimoAvisoPreco) + '</span>' : '')
       + (p.alvoAtingidoEm ? '<br>🎯 alvo atingido' : '');
     var acoes = '';
+    if (p.porNome && !fim[p.status]) acoes += '<button class="av-mini" onclick="avVincular(\'' + esc(p.id) + '\')">🔗 Vincular link</button>';
     if (!fim[p.status]) {
       acoes += p.pausado ? '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'retomar\')">▶ Retomar</button>'
                          : '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'pausar\')">⏸ Pausar</button>';
       acoes += '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'remover\')">🗑</button>';
     }
-    h += '<tr><td class="av-prod"><span style="color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase">' + esc(p.loja) + '</span><br>'
-      + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.titulo || p.id) + '</a>' : esc(p.titulo || p.id)) + '</td>'
+    var prodHtml = p.porNome
+      ? '<span style="color:#d18a0f;font-size:10px;font-weight:800;text-transform:uppercase">📝 pelo nome · avaliar</span><br>' + esc(p.titulo || p.id)
+        + (p.linkInformado ? '<br><a href="' + esc(p.linkInformado) + '" target="_blank" rel="noopener" style="font-size:11px">link enviado (não lido)</a>' : '')
+      : '<span style="color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase">' + esc(p.loja) + '</span><br>'
+        + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.titulo || p.id) + '</a>' : esc(p.titulo || p.id))
+        + (p.textoOriginal ? '<br><span style="color:var(--muted);font-size:11px">pedido como: ' + esc(p.textoOriginal) + '</span>' : '');
+    h += '<tr><td class="av-prod">' + prodHtml + '</td>'
       + '<td>' + esc(p.nome) + '<br><span style="color:var(--muted)">' + esc(p.telefone) + '</span></td>'
       + '<td>' + st + '</td><td>' + precos + '</td><td>' + av + '</td><td>' + acoes + '</td></tr>';
   });
