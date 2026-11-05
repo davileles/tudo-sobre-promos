@@ -220,6 +220,9 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
 .av-st{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .av-st.ativo{background:rgba(47,179,109,.15);color:#2fb36d}.av-st.aguardando{background:rgba(245,166,35,.15);color:#d18a0f}
 .av-st.fim{background:rgba(127,127,127,.15);color:var(--muted)}
+.av-lojas{margin-top:6px;padding:6px 8px;border:1px dashed var(--border);border-radius:8px;font-size:11px}
+.av-lojas .av-lj{margin:3px 0;line-height:1.35}
+.av-lojas .av-lj.off{opacity:.45;text-decoration:line-through}
 .av-mini{font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;margin:2px 2px 0 0}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;margin-bottom:14px}
   .card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--accent)}
@@ -2624,6 +2627,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="av-acoes">
       <button class="btn" style="width:auto" onclick="avSalvar()">💾 Salvar</button>
       <button class="btn av-sec" style="width:auto" onclick="avVarrer()">🔍 Conferir preços agora</button>
+      <button class="btn av-sec" style="width:auto" onclick="avOutrasLojas()">🏪 Procurar outras lojas e cupons agora</button>
     </div>
     <div id="av-msg" class="av-msg"></div>
   </div>
@@ -15704,6 +15708,70 @@ function avVincular(id){
     .then(function(d){ avMsg(d && d.ok ? '✅ Vinculado: ' + d.titulo + (d.preco ? ' (' + avBrl(d.preco) + ')' : '') : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
     .catch(function(e){ avMsg('❌ ' + e.message); });
 }
+// Mesmo produto em outras lojas + cupom do ML (o servidor procura sozinho;
+// aqui se confere, troca, remove ou acrescenta link).
+function avBlocoLojas(pr){
+  var q = function(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); };
+  var k = q(pr.chave);
+  var cupomTxt = function(o){
+    var cm = o.cupomMl; if (o.loja !== 'Mercado Livre') return '';
+    if (!cm) return ' · 🎟️ cupom ainda não conferido';
+    if (cm.estado === 'ok') return ' · 🎟️ <b>' + esc(cm.codigo) + '</b> −' + avBrl(cm.desconto) + ' (' + avData(cm.em) + ')';
+    return ' · 🎟️ ' + ({ sem_cupom: 'sem cupom na página', fora_da_base: 'cupom da página fora da base' }[cm.estado] || cm.estado) + ' (' + avData(cm.em) + ')';
+  };
+  var h = '<div class="av-lojas">';
+  if (pr.melhor) h += '<div class="av-lj">🏆 Menor agora: <b>' + avBrl(pr.melhor.preco) + '</b> na ' + esc(pr.melhor.loja) + (pr.melhor.cupom ? ' com ' + esc(pr.melhor.cupom) : '') + '</div>';
+  h += '<div class="av-lj">📍 ' + esc(pr.loja) + ': ' + avBrl(pr.preco) + cupomTxt(pr)
+    + (pr.loja === 'Mercado Livre' ? ' <button class="av-mini" onclick="avEquiv(\'' + k + '\',\'cupom\')">conferir cupom</button>' : '') + '</div>';
+  (pr.equivalentes || []).forEach(function(e){
+    var c = q(e.chave);
+    h += '<div class="av-lj' + (e.ativo ? '' : ' off') + '">' + (e.origem === 'manual' ? '✋' : '🤖') + ' '
+      + (e.url ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.loja) + '</a>' : esc(e.loja)) + ': '
+      + avBrl(e.preco) + (e.disponivel === false ? ' ⛔' : '') + cupomTxt(e)
+      + (e.confianca != null && e.origem !== 'manual' ? ' · ' + e.confianca + '% igual' : '')
+      + '<br><span style="color:var(--muted)">' + esc(e.titulo || '') + (e.motivo ? ' — ' + esc(e.motivo) : '') + (e.falha ? ' · ⚠️ ' + esc(e.falha) : '') + '</span>';
+    if (e.ativo) h += '<br><button class="av-mini" onclick="avEquiv(\'' + k + '\',\'trocar\',\'' + c + '\')">✏️ Trocar link</button>'
+      + '<button class="av-mini" onclick="avEquiv(\'' + k + '\',\'remover\',\'' + c + '\')">✖ Não é o mesmo</button>'
+      + (e.loja === 'Mercado Livre' ? '<button class="av-mini" onclick="avEquiv(\'' + k + '\',\'cupom\',\'' + c + '\')">conferir cupom</button>' : '');
+    h += '</div>';
+  });
+  var b = pr.busca;
+  if (b) {
+    var lj = Object.keys(b.lojas || {}).map(function(x){ return x + ': ' + b.lojas[x]; }).join(' · ');
+    h += '<div class="av-lj" style="color:var(--muted)">Busca ' + avData(b.em) + (lj ? ' — ' + esc(lj) : '') + (b.erro ? ' — ' + esc(b.erro) : '') + '</div>';
+  } else h += '<div class="av-lj" style="color:var(--muted)">Outras lojas ainda não procuradas (o servidor faz sozinho, 2 produtos a cada 15 min).</div>';
+  h += '<button class="av-mini" onclick="avEquiv(\'' + k + '\',\'adicionar\')">➕ Link de outra loja</button>'
+    + '<button class="av-mini" onclick="avEquiv(\'' + k + '\',\'buscar\')">🔍 Procurar de novo</button></div>';
+  return h;
+}
+function avEquiv(produto, acao, chave){
+  var corpo = { produto: produto, acao: acao, chave: chave || null };
+  if (acao === 'trocar' || acao === 'adicionar') {
+    var url = prompt(acao === 'trocar' ? 'Cole o link certo do mesmo produto nesta loja (ou em outra):' : 'Cole o link do mesmo produto em outra loja (Amazon, Mercado Livre ou Shopee):');
+    if (!url) return;
+    corpo.url = url.trim();
+  }
+  if (acao === 'remover' && !confirm('Tirar este link? Ele deixa de contar no menor preço e a busca automática não traz de volta.')) return;
+  avMsg(acao === 'buscar' ? 'Procurando nas outras lojas…' : acao === 'cupom' ? 'Conferindo o cupom na página (pela extensão)…' : 'Salvando…');
+  fetch(SERVER + '/avisos-preco/equivalente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok) { avMsg('❌ ' + ((d && d.erro) || 'falhou')); return; }
+      var t = '✅ Feito.';
+      if (acao === 'buscar' && d.busca) t = '✅ Busca feita: ' + (d.busca.achados || 0) + ' equivalente(s) encontrado(s).' + (d.busca.erro ? ' ' + d.busca.erro : '');
+      if (acao === 'cupom') t = d.cupom ? '🎟️ ' + (d.cupom.estado === 'ok' ? 'Cupom ' + d.cupom.codigo + ' vale (−' + avBrl(d.cupom.desconto) + ')' : d.cupom.estado + (d.cupom.motivo ? ' (' + d.cupom.motivo + ')' : '')) : 'Sem resposta da página.';
+      avMsg(t);
+      return avCarregar();
+    })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
+function avOutrasLojas(){
+  avMsg('Procurando outras lojas e cupons (até 2 produtos e 4 cupons por vez)…');
+  fetch(SERVER + '/avisos-preco/outras-lojas', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ avMsg(d && d.ok ? (d.pulado ? 'Pulado: ' + d.pulado : '✅ ' + (d.buscas || 0) + ' busca(s) e ' + (d.cupons || 0) + ' cupom(ns) conferido(s).') : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
 function avDesenhar(){
   if (!AV_ESTADO) return;
   var r = AV_ESTADO.resumo || {}, ps = r.porStatus || {};
@@ -15749,6 +15817,7 @@ function avDesenhar(){
       : '<span style="color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase">' + esc(p.loja) + '</span><br>'
         + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.titulo || p.id) + '</a>' : esc(p.titulo || p.id))
         + (p.textoOriginal ? '<br><span style="color:var(--muted);font-size:11px">pedido como: ' + esc(p.textoOriginal) + '</span>' : '');
+    if (!p.porNome && p.produto && AV_ESTADO.produtos && AV_ESTADO.produtos[p.produto]) prodHtml += avBlocoLojas(AV_ESTADO.produtos[p.produto]);
     h += '<tr><td class="av-prod">' + prodHtml + '</td>'
       + '<td>' + esc(p.nome) + '<br><span style="color:var(--muted)">' + esc(p.telefone) + '</span></td>'
       + '<td>' + st + '</td><td>' + precos + '</td><td>' + av + '</td><td>' + acoes + '</td></tr>';
