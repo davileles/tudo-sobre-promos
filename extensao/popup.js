@@ -111,9 +111,13 @@ async function mlPintar() {
     if (!ps.ok) partes.push('Páginas do ML: <span class="ruim">' + (ps.erro || 'servidor sem resposta') + '</span>');
     else partes.push('Páginas do ML: ' + (pg.rodando ? '<span class="ok">ouvindo o servidor</span>' : '<span class="ruim">parada</span>')
       + ' · hoje <b>' + (ps.hoje || 0) + '/' + (ps.teto || '?') + '</b>'
-      + (ps.motivo && ps.motivo !== 'extensao_offline' ? ' · ' + ps.motivo.replace(/_/g, ' ') : '')
+      + (ps.motivo && ps.motivo !== 'extensao_offline' && ps.motivo !== 'aguardando_verificacao' ? ' · ' + ps.motivo.replace(/_/g, ' ') : '')
+      + (ps.verificacao ? '<br><span class="ruim">ML pediu verificação.</span> Abra o link do aviso no WhatsApp neste Chrome, resolva e clique em <b>Já resolvi</b>.'
+          + ' Teste automático às ' + new Date(ps.verificacao.proximoTesteEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '')
       + (pg.ultimo ? '<br>Última página: ' + String(pg.ultimo.texto).replace(/</g, '&lt;') : ''));
   }
+  const bt = mlEl('ml-resolvi');
+  if (bt) bt.style.display = (pg && pg.servidor && pg.servidor.verificacao) ? '' : 'none';
   st.innerHTML = partes.join('<br>');
 }
 
@@ -129,6 +133,13 @@ mlEl('ml-agora').addEventListener('click', async () => {
   mlEl('ml-status').textContent = 'Verificando…';
   await pedir({ tipo: 'ml-agora' });
   mlPintar();
+});
+mlEl('ml-resolvi').addEventListener('click', async () => {
+  mlEl('ml-status').textContent = 'Testando a página no ML…';
+  const r = await pedir({ tipo: 'ml-paginas-testar' });
+  await mlPintar();
+  if (r && r.ok && r.liberada === false) mlEl('ml-status').insertAdjacentHTML('afterbegin', '<span class="ruim">O ML ainda pede verificação. Abra o link, resolva e tente de novo.</span><br>');
+  else if (r && !r.ok) mlEl('ml-status').insertAdjacentHTML('afterbegin', '<span class="ruim">Não deu para testar: ' + String(r.erro || r.motivo || 'sem resposta').replace(/</g, '&lt;') + '</span><br>');
 });
 
 mlPintar();

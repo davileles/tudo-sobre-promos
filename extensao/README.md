@@ -145,10 +145,18 @@ Rotas usadas (todas com header `X-Extensao-Token`): `GET /cupons/auto/estado`,
 Desde a 2.9.0 o servidor pede à extensão a **página pública de produto** do ML
 que ele mesmo não consegue abrir (o IP do Railway recebe a tela de segurança).
 Funciona sem aba e sem foco: o service worker fica ouvindo o servidor
-(`/ml/pagina/proximo`), faz um `fetch()` da página **sem os seus cookies** (nada da
-sua conta vai junto) e devolve o HTML (`/ml/pagina/resultado`). Nenhuma janela
-abre; a única coisa que você vê é a linha "Páginas do ML" no popup, com o
-contador do dia.
+(`/ml/pagina/proximo`), faz um `fetch()` da página **com os cookies deste Chrome**
+(desde a 2.10.0; sem cookie, cada busca parecia um aparelho novo e o ML passou a
+responder a todas com a tela de verificação) e devolve o HTML
+(`/ml/pagina/resultado`). Nenhuma janela abre; a única coisa que você vê é a
+linha "Páginas do ML" no popup, com o contador do dia.
+
+**Quando o ML pede verificação** (captcha ou "acesse sua conta"), o servidor
+para a leitura na primeira tela — insistir só endurece o bloqueio — e manda um
+aviso no grupo do operador com o link do anúncio. Abra o link **neste Chrome**,
+resolva o que o ML pedir e clique em **Já resolvi a verificação** no popup (ou
+espere: o servidor testa a mesma página a cada 15 min). Quem resolve o captcha
+é sempre uma pessoa. Enquanto isso, as ofertas do ML seguem pela API oficial.
 
 Usa o **mesmo interruptor e o mesmo token** da inserção de cupons. Volume: só o
 que o servidor precisa (anúncio clássico, cupom declarado no anúncio, sonda
