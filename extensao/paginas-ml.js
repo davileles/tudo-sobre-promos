@@ -2,23 +2,31 @@
 // Desde 11/10/2026 a página pública de produto do ML responde ao IP do Railway
 // com a tela "Seguridad" (/captcha/wall). O servidor (baileys-server) passou a
 // pedir a página AQUI: este módulo fica em long-poll em /ml/pagina/proximo e,
-// quando chega um pedido, faz um fetch() da página a partir do Chrome do
-// operador — IP residencial, TLS de navegador, COM os cookies deste Chrome
-// (desde 2.10.0) e SEM aba: nenhuma janela abre, nada muda na tela.
-// Sem cookie (até 2.9.x) cada busca era um "aparelho novo" para o ML, que
-// passou a responder a todas com a tela de verificação. Quando a verificação
-// aparece, o servidor para a leitura e avisa no WhatsApp: você abre o link no
-// Chrome, resolve, e clica em "Já resolvi" no popup. O HTML volta em /ml/pagina/resultado e quem interpreta é o
-// servidor. Usa a mesma configuração dos cupons (mlAuto: ligado, token,
-// servidor): um interruptor só para as duas coisas.
+// quando chega um pedido, abre a página de verdade no Chrome do operador e
+// devolve o HTML em /ml/pagina/resultado; quem interpreta é o servidor.
 //
-// Carregado pelo background.js via importScripts(), depois de cupons-ml.js
-// (usa mlCfg e mlChamar de lá). Estado em chrome.storage:
-//   mlPaginas { em, texto, hoje }   — última linha de status (popup)
+// Como a página é aberta (2.11.0, 05/11/2026): numa JANELA PRÓPRIA,
+// MINIMIZADA, criada pela extensão e reaproveitada para todas as leituras —
+// navegação real, igual a uma pessoa abrindo o anúncio. Não abre aba no meio
+// das suas e não rouba o foco; fecha sozinha após PG_OCIOSO_MS sem pedidos.
+// Até a 2.10.0 era um fetch() do service worker: com ou sem cookie, o ML
+// passou a responder a todo pedido desse tipo com a tela de verificação,
+// enquanto a mesma página abria normal numa aba.
+// Quando o ML pede verificação, o servidor para e avisa no WhatsApp; você
+// resolve neste Chrome e clica em "Já resolvi" no popup.
+//
+// Usa a mesma configuração dos cupons (mlAuto: ligado, token, servidor): um
+// interruptor só para as duas coisas. Carregado pelo background.js via
+// importScripts(), depois de cupons-ml.js (usa mlCfg e mlChamar de lá).
+// Estado em chrome.storage:
+//   local.mlPaginas   { em, texto, hoje } — última linha de status (popup)
+//   session.pgJanela  { win, tab, usoEm } — a janela minimizada em uso
 
 const PG_ALARME = 'tica-paginas-ml';
 const PG_ESPERA_S = 25;                   // quanto o servidor segura o long-poll
-const PG_FETCH_MS = 20000;                // prazo da busca da página
+const PG_CARGA_MS = 25000;                // prazo para a página carregar
+const PG_FIRMAR_MS = 1500;                // depois de carregar, o ML ainda pode redirecionar
+const PG_OCIOSO_MS = 5 * 60000;           // janela fecha sozinha após 5 min sem pedidos
 const PG_ESPACO_MS = [4000, 8000];        // pausa entre páginas, como uma pessoa navegando
 let pgRodando = false;                    // laço de long-poll vivo NESTE service worker
 
@@ -28,20 +36,69 @@ async function pgStatus(texto, extra) {
   await chrome.storage.local.set({ mlPaginas: Object.assign({}, mlPaginas, extra || {}, { em: Date.now(), texto: String(texto).slice(0, 200) }) });
 }
 
-// ── Busca de UMA página ──────────────────────────────────────────────────────
-async function pgBuscar(url) {
-  const r = await fetch(url, {
-    credentials: 'include',
-    redirect: 'follow',
-    cache: 'no-store',
-    headers: {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9',
-    },
-    signal: AbortSignal.timeout(PG_FETCH_MS),
+// ── Janela minimizada própria ────────────────────────────────────────────────
+async function pgJanelaGuardada() {
+  const { pgJanela } = await chrome.storage.session.get({ pgJanela: null });
+  if (!pgJanela) return null;
+  try {
+    const aba = await chrome.tabs.get(pgJanela.tab);
+    if (aba && aba.windowId === pgJanela.win) return pgJanela;
+  } catch (_) {}
+  await chrome.storage.session.remove('pgJanela');
+  return null;
+}
+
+async function pgAbaDeLeitura() {
+  const j = await pgJanelaGuardada();
+  if (j) return j;
+  const w = await chrome.windows.create({ url: 'about:blank', state: 'minimized', focused: false, type: 'normal' });
+  const tab = w.tabs && w.tabs[0] ? w.tabs[0].id : (await chrome.tabs.query({ windowId: w.id }))[0].id;
+  const nova = { win: w.id, tab, usoEm: Date.now() };
+  await chrome.storage.session.set({ pgJanela: nova });
+  return nova;
+}
+
+async function pgFecharSeOciosa() {
+  const j = await pgJanelaGuardada();
+  if (!j || Date.now() - (j.usoEm || 0) < PG_OCIOSO_MS) return;
+  await chrome.storage.session.remove('pgJanela');
+  try { await chrome.windows.remove(j.win); } catch (_) {}
+}
+
+function pgEsperarCarga(tabId, ms) {
+  return new Promise(resolve => {
+    let timer = null;
+    const fim = ok => { clearTimeout(timer); chrome.tabs.onUpdated.removeListener(ouvir); resolve(ok); };
+    const ouvir = (id, info) => { if (id === tabId && info.status === 'complete') fim(true); };
+    chrome.tabs.onUpdated.addListener(ouvir);
+    timer = setTimeout(() => fim(false), ms);
   });
-  const html = await r.text();
-  return { url: r.url || url, status: r.status, html };
+}
+
+// ── Leitura de UMA página ────────────────────────────────────────────────────
+async function pgBuscar(url) {
+  const j = await pgAbaDeLeitura();
+  j.usoEm = Date.now();
+  await chrome.storage.session.set({ pgJanela: j });
+  const carregou = pgEsperarCarga(j.tab, PG_CARGA_MS);
+  await chrome.tabs.update(j.tab, { url });
+  let ok = await carregou;
+  // Redirecionamento por script depois do "complete" (tela de verificação):
+  // espera firmar e, se voltou a carregar, aguarda de novo uma vez.
+  await pgDormir(PG_FIRMAR_MS);
+  try {
+    const aba = await chrome.tabs.get(j.tab);
+    if (aba.status === 'loading') ok = await pgEsperarCarga(j.tab, PG_CARGA_MS);
+  } catch (_) {}
+  const [r] = await chrome.scripting.executeScript({
+    target: { tabId: j.tab },
+    func: () => ({ url: location.href, html: document.documentElement.outerHTML }),
+  });
+  const v = r && r.result;
+  if (!v || !v.html) throw new Error(ok ? 'página sem conteúdo' : 'página não carregou no prazo');
+  j.usoEm = Date.now();
+  await chrome.storage.session.set({ pgJanela: j });
+  return { url: v.url || url, status: 200, html: v.html };
 }
 
 // ── Laço de long-poll ────────────────────────────────────────────────────────
@@ -76,7 +133,7 @@ async function pgLaco() {
       catch (e) { await pgStatus('Falha ao devolver a página: ' + e.message); }
       const { mlPaginas } = await chrome.storage.local.get({ mlPaginas: null });
       const hoje = (mlPaginas && mlPaginas.dia === new Date().toDateString() ? mlPaginas.hoje : 0) + 1;
-      await pgStatus((resultado.erro ? 'Falhou: ' + resultado.erro : (v && v.veredito === 'bloqueada' ? 'ML pediu verificação — resolva pelo link do aviso no WhatsApp' : 'Página lida'))
+      await pgStatus((resultado.erro ? 'Falhou: ' + resultado.erro : (v && v.veredito === 'bloqueada' ? 'ML pediu verificação — resolva na janela minimizada "Captura Tica" ou pelo link do aviso' : 'Página lida'))
         + ' · ' + (p.motivo === 'sonda' ? 'sonda' : p.motivo === 'teste' ? 'teste da verificação' : 'leitura'), { hoje, dia: new Date().toDateString() });
       await pgDormir(PG_ESPACO_MS[0] + Math.random() * (PG_ESPACO_MS[1] - PG_ESPACO_MS[0]));
     }
@@ -96,7 +153,11 @@ async function pgArmarAlarme() {
     await chrome.alarms.clear(PG_ALARME);
   }
 }
-chrome.alarms.onAlarm.addListener(a => { if (a.name === PG_ALARME) pgLaco().catch(e => pgStatus('Erro: ' + e.message)); });
+chrome.alarms.onAlarm.addListener(a => {
+  if (a.name !== PG_ALARME) return;
+  pgFecharSeOciosa().catch(() => {});
+  pgLaco().catch(e => pgStatus('Erro: ' + e.message));
+});
 chrome.runtime.onInstalled.addListener(() => { pgArmarAlarme(); });
 chrome.runtime.onStartup.addListener(() => { pgArmarAlarme(); });
 // Interruptor/token salvos no popup: acompanha sem precisar de mensagem própria.
