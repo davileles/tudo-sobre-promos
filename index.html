@@ -321,6 +321,10 @@ a.av-titulo:hover{text-decoration:underline}
 .av-msgc.cli{align-self:flex-end;background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.3)}
 .av-msgc.aviso{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .av-msgc.falhou{opacity:.75;border-style:dashed}
+.av-disp-estado{font-size:13px;line-height:1.45;padding:9px 12px;border-radius:10px;background:var(--card-deep);border:1px solid var(--border)}
+.av-disp-estado.andando{border-color:#60a5fa}
+.av-disp-estado.ok{border-color:#34d399;background:rgba(52,211,153,.12)}
+.av-disp-estado.erro{border-color:var(--accent);background:rgba(250,81,80,.12)}
 .av-msgc-pe{font-size:11px;color:var(--muted);margin-top:5px}
 @media (max-width:600px){
   .av-opcao{grid-template-columns:18px 1fr}
@@ -15878,33 +15882,102 @@ function avAcao(id, acao){
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/' + acao, { method: 'POST' })
     .then(function(r){ return r.json(); }).then(function(){ return avCarregar(); });
 }
-function avAvisar(t){ avMsg(t); try { alert(t); } catch (e) {} }
+// Disparar agora (06/11/2026): abre uma janela com a prévia da mensagem; só
+// dispara no botão da janela, e o andamento (relendo preço, fila, enviado,
+// erro) aparece ali mesmo. A prévia exata vem de POST .../previa no servidor;
+// se a rota ainda não existir, mostra o resumo do que vai sair.
+var AV_DISP = null;
+function avDispPedido(id){ var p = null; (AV_ESTADO && AV_ESTADO.pedidos || []).forEach(function(x){ if (x.id === id) p = x; }); return p; }
+function avDispFmt(s){ return esc(s || '').replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>').replace(/~([^~\n]+)~/g, '<s>$1</s>').replace(/\n/g, '<br>'); }
+function avDispEstado(html, cls){
+  var el = document.getElementById('av-disp-estado'); if (!el) return false;
+  el.className = 'av-disp-estado' + (cls ? ' ' + cls : ''); el.innerHTML = html; return true;
+}
+function avDispFechar(){ var m = document.getElementById('av-modal-disp'); if (m) m.remove(); }
 function avDisparar(id){
-  if (!confirm('Disparar o aviso agora para este cliente? O preço é relido na loja na hora e a mensagem sai mesmo fora da janela e do limite diário.')) return;
+  var p = avDispPedido(id);
+  avDispFechar();
+  AV_DISP = { id: id };
+  var m = document.createElement('div');
+  m.id = 'av-modal-disp'; m.className = 'av-modal';
+  m.onclick = function(e){ if (e.target === m) avDispFechar(); };
+  m.innerHTML = '<div class="av-modal-caixa"><div class="av-modal-cab"><div><b>📤 Disparar aviso agora</b><div class="av-sub">'
+    + (p ? '👤 ' + esc(p.nome || 'sem nome') + ' · ' + esc(p.telefone || '') + ' · pedido ' + esc(p.codigo || '') + '<br>' + esc(p.titulo || '') : '') + '</div></div>'
+    + '<button class="av-b" onclick="avDispFechar()">✕ Fechar</button></div>'
+    + '<div class="av-chat" id="av-disp-chat"><div class="av-vazio">Montando a prévia… (o preço é relido na loja)</div></div>'
+    + '<div class="av-resp"><div id="av-disp-estado" class="av-disp-estado">A mensagem sai mesmo fora da janela de horário e do limite diário.</div>'
+    + '<div class="av-resp-pe"><button class="av-b" id="av-disp-cancelar" onclick="avDispFechar()">Cancelar</button>'
+    + '<button class="av-b forte" id="av-disp-bt" onclick="avDispConfirmar()" disabled>📤 Disparar agora</button></div></div></div>';
+  document.body.appendChild(m);
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/previa', { method: 'POST' })
+    .then(function(r){ return r.status === 404 ? null : r.json(); })
+    .catch(function(){ return null; })
+    .then(function(d){
+      if (!AV_DISP || AV_DISP.id !== id) return;
+      var chat = document.getElementById('av-disp-chat'); if (!chat) return;
+      var bt = document.getElementById('av-disp-bt');
+      if (d && d.ok && d.texto) {
+        chat.innerHTML = '<div class="av-msgc tico aviso">' + (d.imagem ? '<img src="' + esc(d.imagem) + '" alt="" style="max-width:100%;border-radius:8px;margin-bottom:6px">' : '')
+          + '<div class="av-msgc-txt">' + avDispFmt(d.texto) + '</div><div class="av-msgc-pe">Prévia · ' + esc(d.loja || '') + (d.cupom ? ' · cupom ' + esc(d.cupom) : '') + '</div></div>';
+        avDispEstado('Confira a mensagem. Na hora do disparo o preço é relido de novo; se mudar, sai com o preço novo.');
+      } else if (d && !d.ok && d.erro) {
+        chat.innerHTML = '<div class="av-vazio">❌ ' + esc(d.erro) + '</div>';
+        avDispEstado('Não dá para disparar agora.', 'erro'); return;
+      } else {
+        var pr = p && p.produto && AV_ESTADO.produtos ? AV_ESTADO.produtos[p.produto] : null;
+        var mel = pr && pr.melhor ? pr.melhor : (p && p.precoAtual != null ? { preco: p.precoAtual, loja: p.loja } : null);
+        chat.innerHTML = '<div class="av-msgc tico aviso"><div class="av-msgc-txt"><b>Resumo do aviso</b><br>'
+          + esc((p && p.titulo) || '') + '<br>Menor preço lido: <b>' + avBrl(mel && mel.preco) + '</b>' + (mel && mel.loja ? ' na ' + esc(mel.loja) : '') + (mel && mel.cupom ? ' com o cupom <b>' + esc(mel.cupom) + '</b>' : '')
+          + (p && p.precoAlvo ? '<br>Preço desejado: ' + avBrl(p.precoAlvo) : '') + '</div>'
+          + '<div class="av-msgc-pe">O texto exato ainda não tem prévia no servidor: sai no modelo de sempre, com o link de afiliado da loja mais barata.</div></div>';
+        avDispEstado('O preço é relido na loja na hora do disparo.');
+      }
+      if (bt) bt.disabled = false;
+    });
+}
+function avDispConfirmar(){
+  if (!AV_DISP) return;
+  var id = AV_DISP.id, bt = document.getElementById('av-disp-bt');
+  if (bt) { bt.disabled = true; bt.textContent = 'Disparando…'; }
+  var p = avDispPedido(id), antes = p ? (p.ultimoAvisoEm || null) : null;
+  avDispEstado('⏳ Relendo o preço na loja e montando o aviso…', 'andando');
   avMsg('Relendo o preço e montando o aviso…');
-  var antes = null;
-  (AV_ESTADO && AV_ESTADO.pedidos || []).forEach(function(p){ if (p.id === id) antes = p.ultimoAvisoEm || null; });
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/disparar', { method: 'POST' })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (!d || !d.ok) { avAvisar('❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); }
-      avMsg('📤 Aviso na fila: ' + avBrl(d.preco) + ' (' + d.loja + (d.cupom ? ', cupom ' + d.cupom : '') + '). Acompanhando o envio…');
+      if (!d || !d.ok) { avAvisar('❌ ' + ((d && d.erro) || 'falhou'), id); if (bt) { bt.disabled = false; bt.textContent = '📤 Tentar de novo'; } return avCarregar(); }
+      if (d.texto) { var chat = document.getElementById('av-disp-chat'); if (chat) chat.innerHTML = '<div class="av-msgc tico aviso"><div class="av-msgc-txt">' + avDispFmt(d.texto) + '</div><div class="av-msgc-pe">Mensagem que vai sair</div></div>'; }
+      var t = '📤 Aviso na fila: ' + avBrl(d.preco) + ' (' + esc(d.loja || '') + (d.cupom ? ', cupom ' + esc(d.cupom) : '') + '). Acompanhando o envio…';
+      avDispEstado(t, 'andando'); avMsg(t.replace(/<[^>]+>/g, ''));
+      var c = document.getElementById('av-disp-cancelar'); if (c) c.textContent = 'Fechar (o envio continua)';
+      if (bt) bt.textContent = 'Na fila…';
       return avCarregar().then(function(){ avAcompanharEnvio(id, antes, 0); });
     })
-    .catch(function(e){ avAvisar('❌ ' + e.message); });
+    .catch(function(e){ avAvisar('❌ ' + e.message, id); if (bt) { bt.disabled = false; bt.textContent = '📤 Tentar de novo'; } });
+}
+// Resultado final: na janela, se aberta; senão, na linha de status e num alerta.
+function avAvisar(t, id){
+  avMsg(t);
+  var ok = /^✅/.test(t), erro = /^❌/.test(t);
+  if (id && AV_DISP && AV_DISP.id === id && avDispEstado(esc(t), ok ? 'ok' : erro ? 'erro' : 'andando')) {
+    var bt = document.getElementById('av-disp-bt'); if (bt && ok) { bt.textContent = '✅ Enviado'; bt.disabled = true; }
+    var c = document.getElementById('av-disp-cancelar'); if (c) c.textContent = 'Fechar';
+    return;
+  }
+  try { alert(t); } catch (e) {}
 }
 // Relê o estado a cada 8 s (até ~4 min) e avisa quando o aviso sai ou falha.
 function avAcompanharEnvio(id, antes, n){
   setTimeout(function(){
     avCarregar().then(function(){
-      var p = null;
-      (AV_ESTADO && AV_ESTADO.pedidos || []).forEach(function(x){ if (x.id === id) p = x; });
+      var p = avDispPedido(id);
       if (!p) return;
-      if (p.ultimoAvisoEm && p.ultimoAvisoEm !== antes) return avAvisar('✅ Aviso enviado para ' + (p.nome || 'o cliente') + ' às ' + avData(p.ultimoAvisoEm) + ' (' + avBrl(p.ultimoAvisoPreco) + ').');
-      if (p.ultimaFalhaEnvio && (!antes || Date.parse(p.ultimaFalhaEnvio.em) > Date.parse(antes)) && !p.naFila) return avAvisar('❌ O aviso não foi entregue: ' + (p.ultimaFalhaEnvio.erro || 'erro desconhecido'));
-      if (!p.naFila) return avAvisar('⚠️ O aviso saiu da fila sem confirmação de envio. Abra a 💬 Conversa do pedido para conferir.');
-      if (n >= 30) return avAvisar('⏳ O aviso continua na fila (' + p.naFila.posicao + 'º)' + (p.contaAvisosConectada ? '.' : ': o número dos alertas está desconectado.'));
-      avMsg('📤 Aviso na fila (' + p.naFila.posicao + 'º de ' + p.naFila.total + ')' + (p.contaAvisosConectada ? '… acompanhando.' : ' — número dos alertas desconectado.'));
+      if (p.ultimoAvisoEm && p.ultimoAvisoEm !== antes) return avAvisar('✅ Aviso enviado para ' + (p.nome || 'o cliente') + ' às ' + avData(p.ultimoAvisoEm) + ' (' + avBrl(p.ultimoAvisoPreco) + ').', id);
+      if (p.ultimaFalhaEnvio && (!antes || Date.parse(p.ultimaFalhaEnvio.em) > Date.parse(antes)) && !p.naFila) return avAvisar('❌ O aviso não foi entregue: ' + (p.ultimaFalhaEnvio.erro || 'erro desconhecido'), id);
+      if (!p.naFila) return avAvisar('⚠️ O aviso saiu da fila sem confirmação de envio. Abra a 💬 Conversa do pedido para conferir.', id);
+      if (n >= 30) return avAvisar('⏳ O aviso continua na fila (' + p.naFila.posicao + 'º)' + (p.contaAvisosConectada ? '.' : ': o número dos alertas está desconectado.'), id);
+      var t = '📤 Aviso na fila (' + p.naFila.posicao + 'º de ' + p.naFila.total + ')' + (p.contaAvisosConectada ? '… acompanhando (' + (n + 1) * 8 + ' s).' : ' — número dos alertas desconectado: sai quando ele voltar.');
+      avMsg(t); avDispEstado(esc(t), p.contaAvisosConectada ? 'andando' : 'erro');
       avAcompanharEnvio(id, antes, n + 1);
     });
   }, 8000);
