@@ -15918,11 +15918,11 @@ function avDisparar(id){
       var bt = document.getElementById('av-disp-bt');
       if (d && d.ok && d.texto) {
         chat.innerHTML = '<div class="av-msgc tico aviso">' + (d.imagem ? '<img src="' + esc(d.imagem) + '" alt="" style="max-width:100%;border-radius:8px;margin-bottom:6px">' : '')
-          + '<div class="av-msgc-txt">' + avDispFmt(d.texto) + '</div><div class="av-msgc-pe">Prévia · ' + esc(d.loja || '') + (d.cupom ? ' · cupom ' + esc(d.cupom) : '') + '</div></div>';
+          + '<div class="av-msgc-txt">' + avDispFmt(d.texto) + '</div><div class="av-msgc-pe">Prévia · ' + esc(d.loja || '') + (d.cupom ? ' · cupom ' + esc(d.cupom) : '') + (d.imagem && d.imagemModo === 'cartao' ? ' · a foto vai num cartão com o preço e o texto como legenda' : d.imagem ? ' · foto com o texto como legenda' : '') + '</div></div>';
         avDispEstado('Confira a mensagem. Na hora do disparo o preço é relido de novo; se mudar, sai com o preço novo.');
       } else if (d && !d.ok && d.erro) {
-        chat.innerHTML = '<div class="av-vazio">❌ ' + esc(d.erro) + '</div>';
-        avDispEstado('Não dá para disparar agora.', 'erro'); return;
+        chat.innerHTML = '<div class="av-vazio">' + (d.naoEnviado ? '⏸ ' : '❌ ') + esc(d.erro) + '</div>';
+        avDispEstado(d.naoEnviado ? 'Com o preço de agora, o aviso não sairia. Nada foi enviado.' : 'Não dá para disparar agora.', 'erro'); return;
       } else {
         var pr = p && p.produto && AV_ESTADO.produtos ? AV_ESTADO.produtos[p.produto] : null;
         var mel = pr && pr.melhor ? pr.melhor : (p && p.precoAtual != null ? { preco: p.precoAtual, loja: p.loja } : null);
