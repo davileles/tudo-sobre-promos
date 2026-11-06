@@ -2624,6 +2624,11 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <label class="av-check"><input type="checkbox" id="av-parcial"/> Com preço desejado ainda não alcançado, avisar uma queda de pelo menos <input type="number" id="av-parcial-pct" min="1" max="80" style="width:64px"/> %</label>
     <label class="av-check"><input type="checkbox" id="av-cardgrupos"/> Quando o alerta chegar no preço (ou cair de verdade), mandar também um card 🔔 para o @ticopromosbot, para enviar aos grupos</label>
+    <label class="av-campo" style="max-width:420px">Imagem do aviso no WhatsApp<select id="av-imagem">
+      <option value="cartao">Cartão de preço (foto + faixa com o preço)</option>
+      <option value="texto">Sem imagem (só texto)</option>
+      <option value="foto">Só a foto do produto</option>
+    </select></label>
     <label class="av-check"><input type="checkbox" id="av-ativo"/> Avisos ligados (desligado: a página mostra "pausado" e nada é lido nem enviado)</label>
     <div class="av-acoes">
       <button class="btn" style="width:auto" onclick="avSalvar()">💾 Salvar</button>
@@ -15662,6 +15667,7 @@ function avPreencherConfig(){
   document.getElementById('av-queda').value = c.quedaSemAlvoPct;
   document.getElementById('av-parcial').checked = !!c.avisarQuedaParcial;
   document.getElementById('av-cardgrupos').checked = c.cardGrupos !== false;
+  document.getElementById('av-imagem').value = c.imagemAviso || 'cartao';
   document.getElementById('av-parcial-pct').value = c.quedaParcialPct;
   document.getElementById('av-ativo').checked = !!c.ativo;
   var pill = document.getElementById('av-estado-conta');
@@ -15682,6 +15688,7 @@ function avSalvar(){
     quedaSemAlvoPct: document.getElementById('av-queda').value,
     avisarQuedaParcial: document.getElementById('av-parcial').checked,
     cardGrupos: document.getElementById('av-cardgrupos').checked,
+    imagemAviso: document.getElementById('av-imagem').value,
     quedaParcialPct: document.getElementById('av-parcial-pct').value,
     ativo: document.getElementById('av-ativo').checked
   };
