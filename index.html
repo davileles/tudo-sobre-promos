@@ -284,6 +284,16 @@ a.av-titulo:hover{text-decoration:underline}
 .av-config>summary::after{content:'▾';margin-left:auto;color:var(--muted)}
 .av-config[open]>summary::after{content:'▴'}
 .av-config-corpo{padding:0 18px 18px}
+.av-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}
+.av-modal-caixa{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(560px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.av-modal-cab{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.av-chat{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:var(--card-deep)}
+.av-msgc{max-width:85%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word}
+.av-msgc.tico{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}
+.av-msgc.cli{align-self:flex-end;background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.3)}
+.av-msgc.aviso{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.av-msgc.falhou{opacity:.75;border-style:dashed}
+.av-msgc-pe{font-size:11px;color:var(--muted);margin-top:5px}
 @media (max-width:600px){
   .av-card-top{flex-wrap:wrap}
   .av-card-acoes{width:100%;justify-content:flex-start}
@@ -15881,12 +15891,23 @@ function avOutrasLojas(){
     .then(function(d){ avMsg(d && d.ok ? (d.pulado ? 'Pulado: ' + d.pulado : '✅ ' + (d.buscas || 0) + ' busca(s) e ' + (d.cupons || 0) + ' cupom(ns) conferido(s).') : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
     .catch(function(e){ avMsg('❌ ' + e.message); });
 }
+// Pedido cujo menor preço de agora já está no preço desejado (ou, sem alvo, caiu o bastante).
+function avNoPreco(p){
+  if (AV_FIM[p.status] || p.porNome || !p.produto) return false;
+  var pr = (AV_ESTADO.produtos || {})[p.produto];
+  var agora = pr && pr.melhor ? Number(pr.melhor.preco) : (p.precoAtual != null ? Number(p.precoAtual) : null);
+  if (agora == null || !isFinite(agora)) return false;
+  if (p.precoAlvo) return agora <= Number(p.precoAlvo);
+  var q = ((AV_ESTADO.config || {}).quedaSemAlvoPct || 10) / 100;
+  return !!p.precoInicial && agora <= p.precoInicial * (1 - q);
+}
 function avAtencao(p){ return !AV_FIM[p.status] && (!!p.avisoPendente || !!p.porNome || !!p.falhaMotivo); }
 function avFiltrar(p, f){
   if (f === 'todos') return true;
   if (f === 'encerrados') return !!AV_FIM[p.status];
   if (f === 'abertos') return !AV_FIM[p.status];
   if (f === 'atencao') return avAtencao(p);
+  if (f === 'nopreco') return avNoPreco(p);
   if (f === 'pornome') return p.porNome && !AV_FIM[p.status];
   return p.status === f;
 }
@@ -15910,6 +15931,7 @@ function avCartao(p){
     + (p.motivoFim ? ' · ' + esc(p.motivoFim) : '') + '</div>'
     + (p.textoOriginal ? '<div class="av-sub">Escreveu: “' + esc(p.textoOriginal) + '”</div>' : '')
     + '</div><div class="av-card-acoes">';
+  if (p.status !== 'aguardando') h += '<button class="av-b" onclick="avConversa(\'' + id + '\')">💬 Conversa</button>';
   if (!fim) {
     h += p.pausado ? '<button class="av-b" onclick="avAcao(\'' + id + '\',\'retomar\')">▶ Retomar</button>'
                    : '<button class="av-b" onclick="avAcao(\'' + id + '\',\'pausar\')">⏸ Pausar</button>';
@@ -15959,6 +15981,48 @@ function avCartao(p){
   if (pr) h += avBlocoLojas(pr);
   return h + '</article>';
 }
+// Conversa com o cliente: mensagens do Tico e da pessoa, avisos destacados.
+function avFecharConversa(){ var m = document.getElementById('av-modal'); if (m) m.remove(); }
+function avConversa(id){
+  avFecharConversa();
+  var m = document.createElement('div');
+  m.id = 'av-modal'; m.className = 'av-modal';
+  m.onclick = function(e){ if (e.target === m) avFecharConversa(); };
+  m.innerHTML = '<div class="av-modal-caixa"><div class="av-modal-cab"><div><b>Conversa</b><div class="av-sub" id="av-modal-sub">Carregando…</div></div>'
+    + '<button class="av-b" onclick="avFecharConversa()">✕ Fechar</button></div><div class="av-chat" id="av-chat"></div></div>';
+  document.body.appendChild(m);
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/mensagens').then(function(r){ return r.json(); }).then(function(d){
+    var chat = document.getElementById('av-chat'); if (!chat) return;
+    if (!d || !d.ok) { chat.innerHTML = '<div class="av-vazio">' + esc((d && d.erro) || 'Não consegui carregar.') + '</div>'; return; }
+    document.getElementById('av-modal-sub').innerHTML = esc(d.pedido.nome || '') + ' · pedido ' + esc(d.pedido.codigo) + ' · ' + esc(d.pedido.titulo || '');
+    var itens = (d.mensagens || []).map(function(x){ return { em: x.em, de: x.de, texto: x.texto, aviso: x.aviso && x.pedido === d.pedido.id, outroPedido: x.aviso && x.pedido && x.pedido !== d.pedido.id, imagem: x.imagem, manual: x.manual, falhou: x.falhou }; });
+    // Avisos de antes do histórico existir: entram como registro, sem o texto.
+    (d.avisos || []).forEach(function(a){
+      var t = Date.parse(a.em);
+      var tem = itens.some(function(x){ return x.de === 'tico' && Math.abs(Date.parse(x.em) - t) < 3 * 60000; });
+      if (!tem) itens.push({ em: a.em, de: 'tico', registro: true, aviso: true, manual: a.manual,
+        texto: (a.tipo === 'alvo' ? '🔔 Aviso: chegou no preço desejado' : a.tipo === 'parcial' ? '🔔 Aviso: queda parcial' : '🔔 Aviso: baixou o preço') + ' — ' + avBrl(a.preco) + (a.loja ? ' na ' + a.loja : '') + (a.cupom ? ' com o cupom ' + a.cupom : '') });
+    });
+    itens.sort(function(a, b){ return Date.parse(a.em) - Date.parse(b.em); });
+    var fmt = function(s){ return esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>').replace(/\n/g, '<br>'); };
+    var h = '';
+    if (!itens.length) h = '<div class="av-vazio">Nenhuma mensagem registrada ainda.</div>';
+    itens.forEach(function(x){
+      var etq = [];
+      if (x.aviso) etq.push(x.manual ? 'aviso disparado à mão' : 'aviso automático');
+      if (x.outroPedido) etq.push('aviso de outro pedido');
+      if (x.imagem) etq.push('com imagem');
+      if (x.registro) etq.push('texto não guardado (antes do histórico)');
+      h += '<div class="av-msgc ' + (x.de === 'cliente' ? 'cli' : 'tico') + (x.aviso ? ' aviso' : '') + (x.falhou ? ' falhou' : '') + '">'
+        + '<div class="av-msgc-txt">' + fmt(x.texto || '') + '</div>'
+        + '<div class="av-msgc-pe">' + (x.de === 'cliente' ? 'Cliente' : 'Tico') + ' · ' + avQuando(x.em) + (etq.length ? ' · ' + esc(etq.join(' · ')) : '')
+        + (x.falhou ? '<br>⚠️ Não foi entregue: ' + esc(x.falhou) : '') + '</div></div>';
+    });
+    h += '<div class="av-sub" style="text-align:center;margin-top:8px">Histórico guardado a partir de 06/11/2026' + (d.historicoDesde ? '' : '') + '. Mensagens de antes disso aparecem só como registro do aviso.</div>';
+    chat.innerHTML = h;
+    chat.scrollTop = chat.scrollHeight;
+  }).catch(function(e){ var chat = document.getElementById('av-chat'); if (chat) chat.innerHTML = '<div class="av-vazio">Falha: ' + esc(e.message) + '</div>'; });
+}
 function avDesenhar(){
   if (!AV_ESTADO) return;
   var r = AV_ESTADO.resumo || {}, ps = r.porStatus || {};
@@ -15970,7 +16034,7 @@ function avDesenhar(){
     + kpi(nAt, 'precisam de atenção', nAt ? 'atencao' : '')
     + kpi(r.produtos || 0, 'produtos vigiados') + kpi(r.contatos || 0, 'pessoas ativadas')
     + kpi(r.avisosHoje || 0, 'avisos hoje') + kpi(r.avisos7d || 0, 'avisos em 7 dias');
-  var filtros = [['abertos', 'Abertos'], ['atencao', 'Precisam de atenção'], ['ativo', 'Ativos'], ['aguardando', 'Aguardando ativação'], ['pornome', 'Pelo nome'], ['encerrados', 'Encerrados'], ['todos', 'Todos']];
+  var filtros = [['abertos', 'Abertos'], ['nopreco', 'No preço'], ['atencao', 'Precisam de atenção'], ['ativo', 'Ativos'], ['aguardando', 'Aguardando ativação'], ['pornome', 'Pelo nome'], ['encerrados', 'Encerrados'], ['todos', 'Todos']];
   document.getElementById('av-filtros').innerHTML = filtros.map(function(f){
     var n = todos.filter(function(p){ return avFiltrar(p, f[0]); }).length;
     return '<button class="av-chipf' + (AV_FILTRO === f[0] ? ' on' : '') + '" onclick="avFiltro(\'' + f[0] + '\')">' + f[1] + '<span>' + n + '</span></button>';
