@@ -16143,6 +16143,7 @@ function avCartao(p){
       + '<div class="av-pc"><span>Quando pediu</span><b>' + avBrl(p.precoInicial) + '</b><small>' + esc(p.loja || '') + '</small></div>'
       + '<div class="av-pc"><span>Preço desejado</span><b>' + (alvo ? avBrl(alvo) : 'Qualquer queda') + '</b><small>' + (alvo && p.precoInicial ? Math.round((1 - alvo / p.precoInicial) * 100) + '% abaixo do pedido' : 'avisa com queda real') + '</small></div>'
       + '<div class="av-pc' + (alvo && agora != null && agora <= alvo ? ' bom' : '') + '"><span>Menor preço agora</span><b>' + avBrl(agora) + '</b><small>'
+        + (melhor && melhor.precoCartao && Number(melhor.precoCartao) - Number(melhor.preco) >= 0.01 ? 'no Pix · ' + avBrl(melhor.precoCartao) + ' no cartão · ' : '')
         + (melhor ? 'na ' + esc(melhor.loja || '') + (melhor.cupom ? ' com ' + esc(melhor.cupom) : '') : '') + (p.lidoEm ? ' · lido ' + avQuando(p.lidoEm) : '') + '</small></div>'
       + '<div class="av-pc ' + sitCls + '"><span>Situação</span>' + sit + '</div>'
       + '</div>';
