@@ -15960,11 +15960,33 @@ function avEquiv(produto, acao, chave){
       if (!d || !d.ok) { avMsg('❌ ' + ((d && d.erro) || 'falhou')); return; }
       var t = '✅ Feito.';
       if (acao === 'buscar' && d.busca) t = '✅ Busca feita: ' + (d.busca.achados || 0) + ' equivalente(s) encontrado(s).' + (d.busca.erro ? ' ' + d.busca.erro : '');
-      if (acao === 'cupom') t = d.cupom ? '🎟️ ' + (d.cupom.estado === 'ok' ? 'Cupom ' + d.cupom.codigo + ' vale (−' + avBrl(d.cupom.desconto) + ')' : d.cupom.estado + (d.cupom.motivo ? ' (' + d.cupom.motivo + ')' : '')) : 'Sem resposta da página.';
+      if (acao === 'cupom') return avCupomResultado(d.cupom);
       avMsg(t);
       return avCarregar();
     })
     .catch(function(e){ avMsg('❌ ' + e.message); });
+}
+// Resultado do "conferir cupom" (06/11/2026): antes ia só para a linha de
+// mensagem no topo da aba e, quando a página não era lida, parecia que nada
+// tinha acontecido. Agora aparece numa janela, com o motivo real da leitura.
+var AV_MOTIVO_PAG = {
+  teto: 'o limite diário de páginas do Mercado Livre lidas pela extensão já foi atingido hoje',
+  extensao_offline: 'a extensão Captura Tica não está ligada no Chrome',
+  aguardando_verificacao: 'o Mercado Livre pediu verificação (captcha) e a leitura está parada até você resolver',
+  fora_da_janela: 'está fora do horário de leitura de páginas',
+  desligada: 'a leitura de páginas pela extensão está desligada'
+};
+function avCupomResultado(cp){
+  var fim = function(t){ avMsg(t); try { alert(t); } catch (e) {} return avCarregar(); };
+  if (!cp) return fim('🎟️ Sem resposta da página do Mercado Livre.');
+  if (cp.estado === 'ok') return fim('🎟️ Cupom ' + cp.codigo + ' vale para este produto (−' + avBrl(cp.desconto) + ').');
+  if (cp.estado === 'sem_cupom') return fim('🎟️ Conferido: a página do anúncio não tem cupom que valha para este preço.');
+  if (cp.estado === 'fora_da_base') return fim('🎟️ Conferido: a página mostra um cupom, mas ele não está vigente na nossa base (ou não deu para saber qual é).');
+  return fetch(SERVER + '/ml/pagina/estado').then(function(r){ return r.json(); }).catch(function(){ return null; }).then(function(e){
+    var por = e && e.motivo ? (AV_MOTIVO_PAG[e.motivo] || e.motivo) : (cp.motivo || 'a página não respondeu a tempo');
+    var extra = e && e.motivo === 'teto' ? ' (' + e.hoje + ' de ' + e.teto + ')' : '';
+    return fim('🎟️ Não consegui conferir o cupom agora: ' + por + extra + '. Nada foi alterado no alerta.');
+  });
 }
 function avOutrasLojas(){
   avMsg('Procurando outras lojas e cupons (até 2 produtos e 4 cupons por vez)…');
