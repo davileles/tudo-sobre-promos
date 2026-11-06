@@ -15865,13 +15865,36 @@ function avAcao(id, acao){
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/' + acao, { method: 'POST' })
     .then(function(r){ return r.json(); }).then(function(){ return avCarregar(); });
 }
+function avAvisar(t){ avMsg(t); try { alert(t); } catch (e) {} }
 function avDisparar(id){
   if (!confirm('Disparar o aviso agora para este cliente? O preço é relido na loja na hora e a mensagem sai mesmo fora da janela e do limite diário.')) return;
   avMsg('Relendo o preço e montando o aviso…');
+  var antes = null;
+  (AV_ESTADO && AV_ESTADO.pedidos || []).forEach(function(p){ if (p.id === id) antes = p.ultimoAvisoEm || null; });
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/disparar', { method: 'POST' })
     .then(function(r){ return r.json(); })
-    .then(function(d){ avMsg(d && d.ok ? '✅ Aviso na fila de envio: ' + avBrl(d.preco) + ' (' + d.loja + (d.cupom ? ', cupom ' + d.cupom : '') + '). Sai em instantes.' : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
-    .catch(function(e){ avMsg('❌ ' + e.message); });
+    .then(function(d){
+      if (!d || !d.ok) { avAvisar('❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); }
+      avMsg('📤 Aviso na fila: ' + avBrl(d.preco) + ' (' + d.loja + (d.cupom ? ', cupom ' + d.cupom : '') + '). Acompanhando o envio…');
+      return avCarregar().then(function(){ avAcompanharEnvio(id, antes, 0); });
+    })
+    .catch(function(e){ avAvisar('❌ ' + e.message); });
+}
+// Relê o estado a cada 8 s (até ~4 min) e avisa quando o aviso sai ou falha.
+function avAcompanharEnvio(id, antes, n){
+  setTimeout(function(){
+    avCarregar().then(function(){
+      var p = null;
+      (AV_ESTADO && AV_ESTADO.pedidos || []).forEach(function(x){ if (x.id === id) p = x; });
+      if (!p) return;
+      if (p.ultimoAvisoEm && p.ultimoAvisoEm !== antes) return avAvisar('✅ Aviso enviado para ' + (p.nome || 'o cliente') + ' às ' + avData(p.ultimoAvisoEm) + ' (' + avBrl(p.ultimoAvisoPreco) + ').');
+      if (p.ultimaFalhaEnvio && (!antes || Date.parse(p.ultimaFalhaEnvio.em) > Date.parse(antes)) && !p.naFila) return avAvisar('❌ O aviso não foi entregue: ' + (p.ultimaFalhaEnvio.erro || 'erro desconhecido'));
+      if (!p.naFila) return avAvisar('⚠️ O aviso saiu da fila sem confirmação de envio. Abra a 💬 Conversa do pedido para conferir.');
+      if (n >= 30) return avAvisar('⏳ O aviso continua na fila (' + p.naFila.posicao + 'º)' + (p.contaAvisosConectada ? '.' : ': o número dos alertas está desconectado.'));
+      avMsg('📤 Aviso na fila (' + p.naFila.posicao + 'º de ' + p.naFila.total + ')' + (p.contaAvisosConectada ? '… acompanhando.' : ' — número dos alertas desconectado.'));
+      avAcompanharEnvio(id, antes, n + 1);
+    });
+  }, 8000);
 }
 function avVincular(id){
   var url = prompt('Cole o link do produto (Amazon, Mercado Livre ou Shopee) para este pedido:');
@@ -16052,7 +16075,15 @@ function avCartao(p){
       + '<small>Enquanto não tiver link, o preço não é vigiado.' + (p.linkInformado ? ' O cliente mandou <a href="' + esc(p.linkInformado) + '" target="_blank" rel="noopener">este link</a>, que não deu para ler.' : '') + '</small></div>'
       + '<button class="av-b forte" onclick="avVincular(\'' + id + '\')">🔗 Vincular link</button></div>';
   }
-  var ap = p.avisoPendente;
+  // Situação do envio (06/11/2026): o "Disparar agora" não dizia se saiu.
+  if (p.naFila && !fim) {
+    h += '<div class="av-aviso"><div class="av-aviso-txt"><b>📤 Aviso na fila de envio (' + p.naFila.posicao + 'º de ' + p.naFila.total + ').</b>'
+      + '<small>' + (p.contaAvisosConectada ? 'Sai em instantes; as mensagens são espaçadas.' : 'O número dos alertas está desconectado: o aviso sai quando ele voltar.') + '</small></div></div>';
+  } else if (p.ultimaFalhaEnvio && (!p.ultimoAvisoEm || Date.parse(p.ultimaFalhaEnvio.em) > Date.parse(p.ultimoAvisoEm)) && !fim) {
+    h += '<div class="av-aviso"><div class="av-aviso-txt"><b>❌ O último aviso não foi entregue (' + avData(p.ultimaFalhaEnvio.em) + ').</b>'
+      + '<small>Erro: ' + esc(p.ultimaFalhaEnvio.erro || '') + '</small></div></div>';
+  }
+  var ap = p.naFila ? null : p.avisoPendente;
   if (ap && !fim) {
     h += '<div class="av-aviso"><div class="av-aviso-txt"><b>⏳ ' + (ap.tipo === 'alvo' ? 'Chegou no preço desejado' : 'Caiu de preço') + ': ' + avBrl(ap.preco) + ' na ' + esc(ap.loja || '') + (ap.cupom ? ' com o cupom ' + esc(ap.cupom) : '') + '. Ainda não avisado.</b>'
       + '<small>Motivo: ' + esc(ap.motivo || '') + '. Disparar relê o preço na loja antes de mandar.</small></div>'
