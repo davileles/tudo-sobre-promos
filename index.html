@@ -290,6 +290,13 @@ a.av-titulo:hover{text-decoration:underline}
 .av-chat{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:var(--card-deep)}
 .av-msgc{max-width:85%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.45;word-break:break-word}
 .av-msgc.tico{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}
+.av-msgc.oper{background:rgba(96,165,250,.14);border-color:rgba(96,165,250,.35)}
+.av-chip.nova{background:rgba(96,165,250,.16);color:var(--blue)}
+.av-chip.atend{background:rgba(96,165,250,.16);color:var(--blue)}
+.av-resp{border-top:1px solid var(--border);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.av-resp-estado{font-size:12px;color:var(--muted);line-height:1.45}
+.av-resp textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:52px;font:inherit;font-size:13px;padding:10px 12px;border-radius:10px;border:1px solid var(--border-ctrl,var(--border));background:var(--card-deep);color:var(--text)}
+.av-resp-pe{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .av-msgc.cli{align-self:flex-end;background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.3)}
 .av-msgc.aviso{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .av-msgc.falhou{opacity:.75;border-style:dashed}
@@ -15901,7 +15908,9 @@ function avNoPreco(p){
   var q = ((AV_ESTADO.config || {}).quedaSemAlvoPct || 10) / 100;
   return !!p.precoInicial && agora <= p.precoInicial * (1 - q);
 }
-function avAtencao(p){ return !AV_FIM[p.status] && (!!p.avisoPendente || !!p.porNome || !!p.falhaMotivo); }
+// Cliente escreveu por último (nas últimas 48 h) e ninguém respondeu ainda.
+function avMsgNova(p){ var u = p.ultimaMensagem; return !!(u && u.de === 'cliente' && Date.now() - Date.parse(u.em) < 48 * 3600000); }
+function avAtencao(p){ return !AV_FIM[p.status] && (!!p.avisoPendente || !!p.porNome || !!p.falhaMotivo || avMsgNova(p)); }
 function avFiltrar(p, f){
   if (f === 'todos') return true;
   if (f === 'encerrados') return !!AV_FIM[p.status];
@@ -15924,6 +15933,8 @@ function avCartao(p){
     + '<div class="av-id"><div class="av-chips">'
     + '<span class="av-chip ' + (fim ? '' : esc(p.status)) + '">' + esc(AV_ROT[p.status] || p.status) + '</span>'
     + (p.pausado ? '<span class="av-chip pausado">pausado</span>' : '')
+    + (avMsgNova(p) ? '<span class="av-chip nova">💬 cliente escreveu ' + avQuando(p.ultimaMensagem.em) + '</span>' : '')
+    + (p.atendimentoAte ? '<span class="av-chip atend">🙋 em atendimento</span>' : '')
     + (p.porNome ? '<span class="av-chip pornome">pedido pelo nome</span>' : avChipLoja(p.loja)) + '</div>'
     + (p.url && !p.porNome ? '<a class="av-titulo" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.titulo || p.id) + '</a>' : '<div class="av-titulo">' + esc(p.titulo || p.id) + '</div>')
     + '<div class="av-sub">👤 <b>' + esc(p.nome || 'sem nome') + '</b> · ' + esc(p.telefone || '') + '<br>Pedido ' + esc(p.codigo) + ' · criado ' + avQuando(p.criadoEm)
@@ -15931,7 +15942,7 @@ function avCartao(p){
     + (p.motivoFim ? ' · ' + esc(p.motivoFim) : '') + '</div>'
     + (p.textoOriginal ? '<div class="av-sub">Escreveu: “' + esc(p.textoOriginal) + '”</div>' : '')
     + '</div><div class="av-card-acoes">';
-  if (p.status !== 'aguardando') h += '<button class="av-b" onclick="avConversa(\'' + id + '\')">💬 Conversa</button>';
+  if (p.status !== 'aguardando') h += '<button class="av-b' + (avMsgNova(p) ? ' forte' : '') + '" onclick="avConversa(\'' + id + '\')">💬 Conversa</button>';
   if (!fim) {
     h += p.pausado ? '<button class="av-b" onclick="avAcao(\'' + id + '\',\'retomar\')">▶ Retomar</button>'
                    : '<button class="av-b" onclick="avAcao(\'' + id + '\',\'pausar\')">⏸ Pausar</button>';
@@ -15982,15 +15993,51 @@ function avCartao(p){
   return h + '</article>';
 }
 // Conversa com o cliente: mensagens do Tico e da pessoa, avisos destacados.
-function avFecharConversa(){ var m = document.getElementById('av-modal'); if (m) m.remove(); }
-function avConversa(id){
+var AV_CONVERSA = null;
+function avFecharConversa(){
+  var m = document.getElementById('av-modal'); if (m) m.remove();
+  if (AV_CONVERSA && AV_CONVERSA.timer) clearInterval(AV_CONVERSA.timer);
+  var mudou = AV_CONVERSA && AV_CONVERSA.mudou; AV_CONVERSA = null;
+  if (mudou) avCarregar();
+}
+function avEnviarOperador(){
+  if (!AV_CONVERSA) return;
+  var ta = document.getElementById('av-resp'), t = (ta.value || '').trim();
+  if (!t) return;
+  var bt = document.getElementById('av-resp-bt'); bt.disabled = true; bt.textContent = 'Enviando…';
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(AV_CONVERSA.id) + '/mensagem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: t }) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      bt.disabled = false; bt.textContent = 'Enviar';
+      if (!d || !d.ok) { document.getElementById('av-resp-msg').textContent = '❌ ' + ((d && d.erro) || 'falhou'); return; }
+      ta.value = ''; AV_CONVERSA.mudou = true;
+      document.getElementById('av-resp-msg').textContent = '✅ Na fila de envio. Sai em segundos pelo número dos avisos.';
+      setTimeout(avAtualizarConversa, 4000);
+    }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar'; document.getElementById('av-resp-msg').textContent = '❌ ' + e.message; });
+}
+function avDevolverTico(){
+  if (!AV_CONVERSA) return;
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(AV_CONVERSA.id) + '/atendimento/encerrar', { method: 'POST' })
+    .then(function(r){ return r.json(); }).then(function(){ AV_CONVERSA.mudou = true; avAtualizarConversa(); });
+}
+function avAtualizarConversa(){ if (AV_CONVERSA) avConversa(AV_CONVERSA.id, true); }
+function avConversa(id, soAtualizar){
+  if (soAtualizar && document.getElementById('av-modal')) { avDesenharConversa(id); return; }
   avFecharConversa();
+  AV_CONVERSA = { id: id, timer: setInterval(avAtualizarConversa, 15000), n: -1 };
   var m = document.createElement('div');
   m.id = 'av-modal'; m.className = 'av-modal';
   m.onclick = function(e){ if (e.target === m) avFecharConversa(); };
   m.innerHTML = '<div class="av-modal-caixa"><div class="av-modal-cab"><div><b>Conversa</b><div class="av-sub" id="av-modal-sub">Carregando…</div></div>'
-    + '<button class="av-b" onclick="avFecharConversa()">✕ Fechar</button></div><div class="av-chat" id="av-chat"></div></div>';
+    + '<button class="av-b" onclick="avFecharConversa()">✕ Fechar</button></div><div class="av-chat" id="av-chat"></div>'
+    + '<div class="av-resp"><div class="av-resp-estado" id="av-resp-estado"></div>'
+    + '<textarea id="av-resp" rows="2" placeholder="Escreva para o cliente… (Enter envia, Shift+Enter quebra linha)"></textarea>'
+    + '<div class="av-resp-pe"><span id="av-resp-msg" class="av-sub"></span><button class="av-b forte" id="av-resp-bt" onclick="avEnviarOperador()">Enviar</button></div></div></div>';
   document.body.appendChild(m);
+  document.getElementById('av-resp').addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); avEnviarOperador(); } });
+  avDesenharConversa(id);
+}
+function avDesenharConversa(id){
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/mensagens').then(function(r){ return r.json(); }).then(function(d){
     var chat = document.getElementById('av-chat'); if (!chat) return;
     if (!d || !d.ok) { chat.innerHTML = '<div class="av-vazio">' + esc((d && d.erro) || 'Não consegui carregar.') + '</div>'; return; }
@@ -16013,14 +16060,23 @@ function avConversa(id){
       if (x.outroPedido) etq.push('aviso de outro pedido');
       if (x.imagem) etq.push('com imagem');
       if (x.registro) etq.push('texto não guardado (antes do histórico)');
-      h += '<div class="av-msgc ' + (x.de === 'cliente' ? 'cli' : 'tico') + (x.aviso ? ' aviso' : '') + (x.falhou ? ' falhou' : '') + '">'
+      h += '<div class="av-msgc ' + (x.de === 'cliente' ? 'cli' : x.de === 'operador' ? 'tico oper' : 'tico') + (x.aviso ? ' aviso' : '') + (x.falhou ? ' falhou' : '') + '">'
         + '<div class="av-msgc-txt">' + fmt(x.texto || '') + '</div>'
-        + '<div class="av-msgc-pe">' + (x.de === 'cliente' ? 'Cliente' : 'Tico') + ' · ' + avQuando(x.em) + (etq.length ? ' · ' + esc(etq.join(' · ')) : '')
+        + '<div class="av-msgc-pe">' + (x.de === 'cliente' ? 'Cliente' : x.de === 'operador' ? 'Você (pelo painel)' : 'Tico') + ' · ' + avQuando(x.em) + (etq.length ? ' · ' + esc(etq.join(' · ')) : '')
         + (x.falhou ? '<br>⚠️ Não foi entregue: ' + esc(x.falhou) : '') + '</div></div>';
     });
     h += '<div class="av-sub" style="text-align:center;margin-top:8px">Histórico guardado a partir de 06/11/2026' + (d.historicoDesde ? '' : '') + '. Mensagens de antes disso aparecem só como registro do aviso.</div>';
+    var perto = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 60;
     chat.innerHTML = h;
-    chat.scrollTop = chat.scrollHeight;
+    if (!AV_CONVERSA || AV_CONVERSA.n !== itens.length || perto) chat.scrollTop = chat.scrollHeight;
+    if (AV_CONVERSA) AV_CONVERSA.n = itens.length;
+    var est = document.getElementById('av-resp-estado');
+    if (est) {
+      if (!d.pedido.ativo) est.innerHTML = '⚠️ O cliente ainda não ativou o pedido: não dá para mandar mensagem.';
+      else if (!d.contaConectada) est.innerHTML = '⚠️ Número dos avisos desconectado: a mensagem fica esperando.';
+      else if (d.atendimentoAte) est.innerHTML = '🙋 <b>Você está atendendo.</b> O Tico não responde sozinho até ' + avHora(d.atendimentoAte) + ' (renova a cada mensagem). <button class="av-b leve" onclick="avDevolverTico()">↩ Devolver para o Tico</button>';
+      else est.innerHTML = 'Ao enviar, você assume a conversa por 2 horas e o Tico deixa de responder sozinho. SAIR continua funcionando.';
+    }
   }).catch(function(e){ var chat = document.getElementById('av-chat'); if (chat) chat.innerHTML = '<div class="av-vazio">Falha: ' + esc(e.message) + '</div>'; });
 }
 function avDesenhar(){
