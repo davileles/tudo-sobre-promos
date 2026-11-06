@@ -2702,7 +2702,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <div class="av-intro">
     Clientes pedem em <a href="https://ticapromos.com.br/avisos/" target="_blank" rel="noopener"><b>ticapromos.com.br/avisos</b></a>
     (ou mandando o link no WhatsApp) o aviso de um produto. O pedido só vale depois que a pessoa fala com o número dos avisos;
-    daí o preço é conferido algumas vezes por dia, em todas as lojas vigiadas, e o aviso sai no privado (no máximo um por pessoa por dia).
+    daí o preço é conferido algumas vezes por dia, em todas as lojas vigiadas, e o aviso sai no privado. Cada alerta avisa uma vez a cada preço e volta a avisar quando o preço cai mais.
     <b>SAIR</b> cancela tudo da pessoa.
   </div>
   <div class="av-topo">
@@ -2737,10 +2737,6 @@ body.travado > *:not(#login-screen){display:none !important}
       <label class="av-campo"><span class="av-rot">Produtos por cliente</span>
         <input type="number" id="av-limite" min="1" max="50"/>
         <small>Máximo de alertas abertos por pessoa.</small>
-      </label>
-      <label class="av-campo"><span class="av-rot">Avisos por dia</span>
-        <input type="number" id="av-pordia" min="1" max="10"/>
-        <small>Por pessoa, somando todos os alertas.</small>
       </label>
       <label class="av-campo"><span class="av-rot">Janela de envio</span>
         <span class="av-dupla"><input type="number" id="av-ini" min="0" max="23"/><span class="av-sep">às</span><input type="number" id="av-fim" min="1" max="24"/></span>
@@ -15790,7 +15786,6 @@ function avPreencherConfig(){
   sel.innerHTML = h; sel.value = c.conta || '';
   document.getElementById('av-numero').value = c.numeroPublico || '';
   document.getElementById('av-limite').value = c.limitePorCliente;
-  document.getElementById('av-pordia').value = c.avisosPorDia;
   document.getElementById('av-ini').value = c.janelaIni;
   document.getElementById('av-fim').value = c.janelaFim;
   document.getElementById('av-queda').value = c.quedaSemAlvoPct;
@@ -15811,7 +15806,6 @@ function avSalvar(){
     conta: conta,
     numeroPublico: document.getElementById('av-numero').value,
     limitePorCliente: document.getElementById('av-limite').value,
-    avisosPorDia: document.getElementById('av-pordia').value,
     janelaIni: document.getElementById('av-ini').value,
     janelaFim: document.getElementById('av-fim').value,
     quedaSemAlvoPct: document.getElementById('av-queda').value,
