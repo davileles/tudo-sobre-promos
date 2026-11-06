@@ -16011,7 +16011,9 @@ function avCupomTxt(o){
   var cm = o.cupomMl;
   if (!cm) return '🎟️ Cupom da página ainda não conferido';
   if (cm.estado === 'ok') {
-    var linha = '🎟️ Cupom <b>' + esc(cm.codigo) + '</b> vale −' + avBrl(cm.desconto) + ' · conferido ' + avQuando(cm.em);
+    var linha = (cm.codigo ? '🎟️ Cupom <b>' + esc(cm.codigo) + '</b>' : '🎟️ Cupom <b>' + esc(cm.rotulo || '') + '</b> do anúncio (sem código)')
+      + ' vale −' + avBrl(cm.desconto) + ' · conferido ' + avQuando(cm.em)
+      + (cm.alternativa && cm.alternativa.codigo ? '<br>🎟️ Com código: <b>' + esc(cm.alternativa.codigo) + '</b> −' + avBrl(cm.alternativa.desconto) : '');
     // Preço final como a página mostra: cupom sobre o preço no cartão e, com Pix declarado, o do Pix.
     var base = Number(o.preco);
     if (base > 0) {
@@ -16133,7 +16135,12 @@ var AV_MOTIVO_PAG = {
 function avCupomResultado(cp){
   var fim = function(t, bom){ avMsg(t); avProgresso(bom ? 'ok' : 'erro', t); return avCarregar(); };
   if (!cp) return fim('🎟️ Sem resposta da página do Mercado Livre.');
-  if (cp.estado === 'ok') return fim('✅ 🎟️ Cupom ' + cp.codigo + ' vale para este produto (−' + avBrl(cp.desconto) + ').', true);
+  if (cp.estado === 'ok') {
+    // Cupom sem código (resgate na página, 06/11/2026): conta para o preço-alvo.
+    var nome = cp.codigo ? 'Cupom ' + cp.codigo : 'Cupom ' + (cp.rotulo || '') + ' do anúncio (sem código, resgate na página)';
+    var alt = cp.alternativa && cp.alternativa.codigo ? ' Com código, o melhor é ' + cp.alternativa.codigo + ' (−' + avBrl(cp.alternativa.desconto) + ').' : '';
+    return fim('✅ 🎟️ ' + nome + ' vale para este produto (−' + avBrl(cp.desconto) + ').' + alt, true);
+  }
   if (cp.estado === 'sem_cupom') return fim('✅ 🎟️ Conferido: a página do anúncio não tem cupom que valha para este preço.', true);
   if (cp.estado === 'fora_da_base') return fim('✅ 🎟️ Conferido: a página mostra um cupom, mas ele não está vigente na nossa base (ou não deu para saber qual é).', true);
   return fetch(SERVER + '/ml/pagina/estado').then(function(r){ return r.json(); }).catch(function(){ return null; }).then(function(e){
