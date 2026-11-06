@@ -15702,6 +15702,14 @@ function avAcao(id, acao){
   fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/' + acao, { method: 'POST' })
     .then(function(r){ return r.json(); }).then(function(){ return avCarregar(); });
 }
+function avDisparar(id){
+  if (!confirm('Disparar o aviso agora para este cliente? O preço é relido na loja na hora e a mensagem sai mesmo fora da janela e do limite diário.')) return;
+  avMsg('Relendo o preço e montando o aviso…');
+  fetch(SERVER + '/avisos-preco/pedido/' + encodeURIComponent(id) + '/disparar', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ avMsg(d && d.ok ? '✅ Aviso na fila de envio: ' + avBrl(d.preco) + ' (' + d.loja + (d.cupom ? ', cupom ' + d.cupom : '') + '). Sai em instantes.' : '❌ ' + ((d && d.erro) || 'falhou')); return avCarregar(); })
+    .catch(function(e){ avMsg('❌ ' + e.message); });
+}
 function avVincular(id){
   var url = prompt('Cole o link do produto (Amazon, Mercado Livre ou Shopee) para este pedido:');
   if (!url) return;
@@ -15807,8 +15815,10 @@ function avDesenhar(){
       + '<br>agora: <b>' + avBrl(p.precoAtual) + '</b>' + (p.lidoEm ? ' <span style="color:var(--muted)">(' + avData(p.lidoEm) + ')</span>' : '')
       + (p.falhaMotivo ? '<br><span style="color:#e25555">⚠️ ' + esc(p.falhaMotivo) + '</span>' : '');
     var av = (p.avisos || 0) + (p.ultimoAvisoEm ? '<br><span style="color:var(--muted)">último ' + avData(p.ultimoAvisoEm) + ' a ' + avBrl(p.ultimoAvisoPreco) + '</span>' : '')
-      + (p.alvoAtingidoEm ? '<br>🎯 alvo atingido' : '');
+      + (p.alvoAtingidoEm ? '<br>🎯 alvo atingido' : '')
+      + (p.avisoPendente ? '<br><span style="color:#d18a0f;font-weight:700">⏳ ' + (p.avisoPendente.tipo === 'alvo' ? 'chegou no alvo' : 'caiu de preço') + ' (' + avBrl(p.avisoPendente.preco) + ') e ainda não avisado</span><br><span style="color:var(--muted)">' + esc(p.avisoPendente.motivo) + '</span>' : '');
     var acoes = '';
+    if (p.status === 'ativo' && !p.porNome && p.produto) acoes += '<button class="av-mini"' + (p.avisoPendente ? ' style="border-color:#d18a0f;color:#d18a0f;font-weight:800"' : '') + ' onclick="avDisparar(\'' + esc(p.id) + '\')">📤 Disparar agora</button>';
     if (p.porNome && !fim[p.status]) acoes += '<button class="av-mini" onclick="avVincular(\'' + esc(p.id) + '\')">🔗 Vincular link</button>';
     if (!fim[p.status]) {
       acoes += p.pausado ? '<button class="av-mini" onclick="avAcao(\'' + esc(p.id) + '\',\'retomar\')">▶ Retomar</button>'
