@@ -269,6 +269,11 @@ a.av-titulo:hover{text-decoration:underline}
 .av-b.perigo{color:var(--red)}.av-b.perigo:hover{border-color:var(--red)}
 .av-b.forte{background:var(--accent);border-color:var(--accent);color:#fff}
 .av-b.leve{border-color:transparent;color:var(--muted);padding:5px 8px}.av-b.leve:hover{color:var(--text);border-color:var(--border)}
+.av-b[disabled]{opacity:.65;cursor:progress}
+.av-giro{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;flex:none}
+#av-progresso{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;max-width:min(560px,calc(100vw - 32px));display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;background:var(--card,#1e1e24);color:var(--text,#fff);border:1px solid var(--border,#444);box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:13px;line-height:1.4}
+#av-progresso.ok{border-color:#2e9e5b}#av-progresso.erro{border-color:#d9534f}#av-progresso .av-giro{margin-top:3px}
+#av-progresso .av-pg-x{margin-left:auto;background:none;border:0;color:inherit;font-size:16px;cursor:pointer;padding:0 2px;line-height:1}
 .av-aviso{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.45;background:rgba(251,191,36,.12);color:var(--text)}
 .av-aviso .av-aviso-txt{flex:1;min-width:200px}
 .av-aviso small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
@@ -15946,7 +15951,7 @@ function avLinhaLoja(pr, o, ehPedida, melhorChave){
   if (o.falha) h += '<div class="av-erro">⚠️ Última leitura falhou: ' + esc(o.falha) + '</div>';
   h += '</div><div class="av-loja-acoes">';
   if (o.url) h += '<a class="av-b leve" href="' + esc(o.url) + '" target="_blank" rel="noopener">↗ Abrir</a>';
-  if (o.loja === 'Mercado Livre' && o.ativo !== false) h += '<button class="av-b leve" onclick="avEquiv(\'' + k + '\',\'cupom\'' + (ehPedida ? '' : ',\'' + c + '\'') + ')">🎟️ Conferir cupom</button>';
+  if (o.loja === 'Mercado Livre' && o.ativo !== false) h += '<button class="av-b leve" onclick="avEquiv(\'' + k + '\',\'cupom\',' + (ehPedida ? 'null' : '\'' + c + '\'') + ',this)">🎟️ Conferir cupom</button>';
   if (!ehPedida && o.ativo !== false) h += '<button class="av-b leve" onclick="avEquiv(\'' + k + '\',\'trocar\',\'' + c + '\')">✏️ Trocar link</button>'
     + '<button class="av-b leve perigo" onclick="avEquiv(\'' + k + '\',\'remover\',\'' + c + '\')">✖ Não é o mesmo</button>';
   return h + '</div></div>';
@@ -15965,10 +15970,39 @@ function avBlocoLojas(pr){
   if (pr.cardGrupo) rod += '<br>🔔 Card para os grupos ' + avQuando(pr.cardGrupo.em) + (pr.cardGrupo.pulado ? ' (pulado: ' + esc(pr.cardGrupo.pulado) + ')' : ' a ' + avBrl(pr.cardGrupo.preco));
   h += '<div class="av-lojas-rodape"><div class="av-rod-txt">' + rod + '</div>'
     + '<button class="av-b" onclick="avEquiv(\'' + k + '\',\'adicionar\')">➕ Link de outra loja</button>'
-    + '<button class="av-b" onclick="avEquiv(\'' + k + '\',\'buscar\')">🔍 Procurar de novo</button></div>';
+    + '<button class="av-b" onclick="avEquiv(\'' + k + '\',\'buscar\',null,this)">🔍 Procurar de novo</button></div>';
   return h + '</div>';
 }
-function avEquiv(produto, acao, chave){
+// Progresso visível (06/11/2026): o "Conferir cupom" e o "Procurar de novo"
+// demoram (a extensão lê a página) e o aviso ia só para a linha do topo da aba,
+// fora da vista. Agora o botão gira e uma faixa fixa no rodapé mostra o tempo
+// passando e, no fim, o resultado (fica até fechar).
+var AV_PG = { timer: null };
+function avProgresso(estado, texto, btn){
+  var el = document.getElementById('av-progresso');
+  if (!el) { el = document.createElement('div'); el.id = 'av-progresso'; document.body.appendChild(el); }
+  clearInterval(AV_PG.timer); AV_PG.timer = null;
+  if (AV_PG.btn && AV_PG.btn !== btn) { try { AV_PG.btn.disabled = false; AV_PG.btn.innerHTML = AV_PG.btnHtml; } catch (e) {} AV_PG.btn = null; }
+  if (estado === 'fechar') { el.remove(); return; }
+  el.className = estado === 'rodando' ? '' : estado;
+  var fechar = '<button class="av-pg-x" title="Fechar" onclick="avProgresso(\'fechar\')">✕</button>';
+  if (estado === 'rodando') {
+    var t0 = Date.now();
+    if (btn) { AV_PG.btn = btn; AV_PG.btnHtml = btn.innerHTML; btn.disabled = true; }
+    var pinta = function(){
+      var s = Math.round((Date.now() - t0) / 1000);
+      el.innerHTML = '<span class="av-giro"></span><div>' + esc(texto) + '<br><small style="opacity:.7">' + s + ' s · pode levar até 1 min, não precisa clicar de novo</small></div>';
+      if (AV_PG.btn) AV_PG.btn.innerHTML = '<span class="av-giro"></span> ' + s + ' s';
+    };
+    pinta(); AV_PG.timer = setInterval(pinta, 1000);
+  } else {
+    if (AV_PG.btn) { try { AV_PG.btn.disabled = false; AV_PG.btn.innerHTML = AV_PG.btnHtml; } catch (e) {} AV_PG.btn = null; }
+    el.innerHTML = '<div>' + esc(texto) + '</div>' + fechar;
+  }
+}
+function avEquiv(produto, acao, chave, btn){
+  if (btn && btn.disabled) return;
+  var lento = acao === 'cupom' || acao === 'buscar';
   var corpo = { produto: produto, acao: acao, chave: chave || null };
   if (acao === 'trocar' || acao === 'adicionar') {
     var url = prompt(acao === 'trocar' ? 'Cole o link certo do mesmo produto nesta loja (ou em outra):' : 'Cole o link do mesmo produto em outra loja (Amazon, Mercado Livre ou Shopee):');
@@ -15976,18 +16010,21 @@ function avEquiv(produto, acao, chave){
     corpo.url = url.trim();
   }
   if (acao === 'remover' && !confirm('Tirar este link? Ele deixa de contar no menor preço e a busca automática não traz de volta.')) return;
-  avMsg(acao === 'buscar' ? 'Procurando nas outras lojas…' : acao === 'cupom' ? 'Conferindo o cupom na página (pela extensão)…' : 'Salvando…');
+  var tIni = acao === 'buscar' ? 'Procurando nas outras lojas…' : acao === 'cupom' ? '🎟️ Conferindo o cupom na página do Mercado Livre (pela extensão)…' : 'Salvando…';
+  avMsg(tIni);
+  if (lento) avProgresso('rodando', tIni, btn);
   fetch(SERVER + '/avisos-preco/equivalente', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (!d || !d.ok) { avMsg('❌ ' + ((d && d.erro) || 'falhou')); return; }
+      if (!d || !d.ok) { var er = '❌ ' + ((d && d.erro) || 'falhou'); avMsg(er); if (lento) avProgresso('erro', er); return; }
       var t = '✅ Feito.';
       if (acao === 'buscar' && d.busca) t = '✅ Busca feita: ' + (d.busca.achados || 0) + ' equivalente(s) encontrado(s).' + (d.busca.erro ? ' ' + d.busca.erro : '');
       if (acao === 'cupom') return avCupomResultado(d.cupom);
       avMsg(t);
+      if (lento) avProgresso(/^❌/.test(t) ? 'erro' : 'ok', t);
       return avCarregar();
     })
-    .catch(function(e){ avMsg('❌ ' + e.message); });
+    .catch(function(e){ var er = '❌ ' + e.message; avMsg(er); if (lento) avProgresso('erro', er); });
 }
 // Resultado do "conferir cupom" (06/11/2026): antes ia só para a linha de
 // mensagem no topo da aba e, quando a página não era lida, parecia que nada
@@ -16000,11 +16037,11 @@ var AV_MOTIVO_PAG = {
   desligada: 'a leitura de páginas pela extensão está desligada'
 };
 function avCupomResultado(cp){
-  var fim = function(t){ avMsg(t); try { alert(t); } catch (e) {} return avCarregar(); };
+  var fim = function(t, bom){ avMsg(t); avProgresso(bom ? 'ok' : 'erro', t); return avCarregar(); };
   if (!cp) return fim('🎟️ Sem resposta da página do Mercado Livre.');
-  if (cp.estado === 'ok') return fim('🎟️ Cupom ' + cp.codigo + ' vale para este produto (−' + avBrl(cp.desconto) + ').');
-  if (cp.estado === 'sem_cupom') return fim('🎟️ Conferido: a página do anúncio não tem cupom que valha para este preço.');
-  if (cp.estado === 'fora_da_base') return fim('🎟️ Conferido: a página mostra um cupom, mas ele não está vigente na nossa base (ou não deu para saber qual é).');
+  if (cp.estado === 'ok') return fim('✅ 🎟️ Cupom ' + cp.codigo + ' vale para este produto (−' + avBrl(cp.desconto) + ').', true);
+  if (cp.estado === 'sem_cupom') return fim('✅ 🎟️ Conferido: a página do anúncio não tem cupom que valha para este preço.', true);
+  if (cp.estado === 'fora_da_base') return fim('✅ 🎟️ Conferido: a página mostra um cupom, mas ele não está vigente na nossa base (ou não deu para saber qual é).', true);
   return fetch(SERVER + '/ml/pagina/estado').then(function(r){ return r.json(); }).catch(function(){ return null; }).then(function(e){
     var por = e && e.motivo ? (AV_MOTIVO_PAG[e.motivo] || e.motivo) : (cp.motivo || 'a página não respondeu a tempo');
     var extra = e && e.motivo === 'teto' ? ' (' + e.hoje + ' de ' + e.teto + ')' : '';
