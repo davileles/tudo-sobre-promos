@@ -15937,7 +15937,19 @@ function avCupomTxt(o){
   if (o.loja !== 'Mercado Livre') return '';
   var cm = o.cupomMl;
   if (!cm) return '🎟️ Cupom da página ainda não conferido';
-  if (cm.estado === 'ok') return '🎟️ Cupom <b>' + esc(cm.codigo) + '</b> vale −' + avBrl(cm.desconto) + ' · conferido ' + avQuando(cm.em);
+  if (cm.estado === 'ok') {
+    var linha = '🎟️ Cupom <b>' + esc(cm.codigo) + '</b> vale −' + avBrl(cm.desconto) + ' · conferido ' + avQuando(cm.em);
+    // Preço final como a página mostra: cupom sobre o preço no cartão e, com Pix declarado, o do Pix.
+    var base = Number(o.preco);
+    if (base > 0) {
+      var d = cm.pct > 0 ? base * cm.pct / 100 : Number(cm.desconto) || 0;
+      if (cm.pct > 0 && cm.teto) d = Math.min(d, cm.teto);
+      var cartao = Math.round((base - d) * 100) / 100;
+      if (cm.pix && cm.pix.pct > 0) linha += '<br>💰 Com o cupom: <b>' + avBrl(Math.round(cartao * (1 - cm.pix.pct / 100) * 100) / 100) + ' no Pix</b> · ' + avBrl(cartao) + ' no cartão';
+      else linha += '<br>💰 Com o cupom: <b>' + avBrl(cartao) + '</b>';
+    }
+    return linha;
+  }
   return '🎟️ ' + ({ sem_cupom: 'Sem cupom na página', fora_da_base: 'Cupom da página fora da base' }[cm.estado] || esc(cm.estado)) + ' · conferido ' + avQuando(cm.em);
 }
 function avLinhaLoja(pr, o, ehPedida, melhorChave){
@@ -15945,6 +15957,7 @@ function avLinhaLoja(pr, o, ehPedida, melhorChave){
   var melhor = o.chave === melhorChave && (pr.equivalentes || []).some(function(e){ return e.ativo; });
   var h = '<div class="av-loja' + (melhor ? ' melhor' : '') + (o.ativo === false ? ' off' : '') + '">' + avChipLoja(o.loja)
     + '<div class="av-loja-info"><div><span class="av-loja-preco">' + avBrl(o.preco) + '</span>'
+    + (o.loja === 'Mercado Livre' && o.cupomMl && o.cupomMl.estado === 'ok' ? '<span class="av-tag" style="background:transparent;color:var(--muted)">sem cupom</span>' : '')
     + (o.disponivel === false ? '<span class="av-tag" style="background:rgba(248,113,113,.15);color:var(--red)">indisponível</span>' : '')
     + (melhor ? '<span class="av-tag">mais barata</span>' : '') + '</div>';
   if (ehPedida) h += '<div>Loja que o cliente pediu' + (o.lidoEm ? ' · lido ' + avQuando(o.lidoEm) : '') + '</div>';
@@ -16111,6 +16124,7 @@ function avCartao(p){
   if (!fim) {
     h += p.pausado ? '<button class="av-b" onclick="avAcao(\'' + id + '\',\'retomar\')">▶ Retomar</button>'
                    : '<button class="av-b" onclick="avAcao(\'' + id + '\',\'pausar\')">⏸ Pausar</button>';
+    if (p.status === 'ativo' && !p.porNome && !p.avisoPendente) h += '<button class="av-b" onclick="avDisparar(\'' + id + '\')">📤 Disparar agora</button>';
     if (p.status === 'ativo') h += '<button class="av-b" onclick="if(confirm(\'Marcar este alerta como comprado? Os avisos dele param.\'))avAcao(\'' + id + '\',\'comprado\')">🛒 Comprou</button>';
     h += '<button class="av-b perigo" onclick="avAcao(\'' + id + '\',\'remover\')">🗑 Remover</button>';
   }
