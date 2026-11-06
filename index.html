@@ -2747,6 +2747,26 @@ body.travado > *:not(#login-screen){display:none !important}
         <small>Para quem não definiu preço: avisa a partir desta queda.</small>
       </label>
     </div>
+    <div class="av-bloco-tit">Leitura de preços</div>
+    <div class="av-grade av-grade4">
+      <label class="av-campo"><span class="av-rot">Horário de leitura</span>
+        <span class="av-dupla"><input type="number" id="av-lini" min="0" max="23"/><span class="av-sep">às</span><input type="number" id="av-lfim" min="1" max="24"/></span>
+        <small>Horas do dia em que as lojas são lidas (horário de Brasília).</small>
+      </label>
+      <label class="av-campo"><span class="av-rot">Amazon</span>
+        <span class="av-unid"><input type="number" id="av-int-amazon" min="1" max="24"/><span>h</span></span>
+        <small>Lê o preço a cada X horas.</small>
+      </label>
+      <label class="av-campo"><span class="av-rot">Mercado Livre</span>
+        <span class="av-unid"><input type="number" id="av-int-ml" min="1" max="24"/><span>h</span></span>
+        <small>Lê o preço a cada X horas.</small>
+      </label>
+      <label class="av-campo"><span class="av-rot">Shopee</span>
+        <span class="av-unid"><input type="number" id="av-int-shopee" min="1" max="24"/><span>h</span></span>
+        <small>Lê o preço a cada X horas.</small>
+      </label>
+    </div>
+    <small style="display:block;color:var(--muted);margin:-4px 0 12px">As outras lojas vinculadas a um alerta são lidas junto com a loja do link do cliente, no intervalo dela.</small>
     <div class="av-grade">
       <label class="av-campo"><span class="av-rot">Imagem do aviso no WhatsApp</span>
         <select id="av-imagem">
@@ -15789,6 +15809,12 @@ function avPreencherConfig(){
   document.getElementById('av-ini').value = c.janelaIni;
   document.getElementById('av-fim').value = c.janelaFim;
   document.getElementById('av-queda').value = c.quedaSemAlvoPct;
+  var ih = c.intervaloHoras || {};
+  document.getElementById('av-lini').value = c.leituraIni != null ? c.leituraIni : 7;
+  document.getElementById('av-lfim').value = c.leituraFim != null ? c.leituraFim : 23;
+  document.getElementById('av-int-amazon').value = ih['Amazon'] || 3;
+  document.getElementById('av-int-ml').value = ih['Mercado Livre'] || 4;
+  document.getElementById('av-int-shopee').value = ih['Shopee'] || 3;
   document.getElementById('av-parcial').checked = !!c.avisarQuedaParcial;
   document.getElementById('av-cardgrupos').checked = c.cardGrupos !== false;
   document.getElementById('av-imagem').value = c.imagemAviso || 'cartao';
@@ -15809,6 +15835,13 @@ function avSalvar(){
     janelaIni: document.getElementById('av-ini').value,
     janelaFim: document.getElementById('av-fim').value,
     quedaSemAlvoPct: document.getElementById('av-queda').value,
+    leituraIni: document.getElementById('av-lini').value,
+    leituraFim: document.getElementById('av-lfim').value,
+    intervaloHoras: {
+      'Amazon': document.getElementById('av-int-amazon').value,
+      'Mercado Livre': document.getElementById('av-int-ml').value,
+      'Shopee': document.getElementById('av-int-shopee').value
+    },
     avisarQuedaParcial: document.getElementById('av-parcial').checked,
     cardGrupos: document.getElementById('av-cardgrupos').checked,
     imagemAviso: document.getElementById('av-imagem').value,
