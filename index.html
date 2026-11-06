@@ -2788,6 +2788,10 @@ body.travado > *:not(#login-screen){display:none !important}
         <span class="av-opcao-txt"><b>Avisar queda parcial</b><small>Quem definiu preço desejado e ainda não chegou nele recebe aviso quando o preço cair pelo menos esta porcentagem.</small></span>
         <span class="av-unid av-opcao-num"><input type="number" id="av-parcial-pct" min="1" max="80"/><span>%</span></span>
       </label>
+      <label class="av-opcao"><input type="checkbox" id="av-pergunta"/>
+        <span class="av-opcao-txt"><b>Perguntar se comprou</b><small>Depois de um aviso sem resposta, o Tico pergunta se a pessoa conseguiu comprar. SIM encerra o alerta como comprado; NÃO mantém. Uma pergunta por aviso, no máximo uma por pessoa por dia, só na janela.</small></span>
+        <span class="av-unid av-opcao-num"><input type="number" id="av-pergunta-h" min="1" max="48"/><span>h depois</span></span>
+      </label>
       <label class="av-opcao"><input type="checkbox" id="av-cardgrupos"/>
         <span class="av-opcao-txt"><b>Card para os grupos</b><small>Quando o alerta chega no preço (ou cai de verdade), manda também um card 🔔 para o @ticopromosbot, para você enviar aos grupos.</small></span>
       </label>
@@ -15822,6 +15826,8 @@ function avPreencherConfig(){
   document.getElementById('av-int-shopee').value = ih['Shopee'] || 3;
   document.getElementById('av-parcial').checked = !!c.avisarQuedaParcial;
   document.getElementById('av-cardgrupos').checked = c.cardGrupos !== false;
+  document.getElementById('av-pergunta').checked = c.perguntaCompra !== false;
+  document.getElementById('av-pergunta-h').value = c.perguntaCompraHoras || 8;
   document.getElementById('av-imagem').value = c.imagemAviso || 'cartao';
   document.getElementById('av-parcial-pct').value = c.quedaParcialPct;
   document.getElementById('av-ativo').checked = !!c.ativo;
@@ -15849,6 +15855,8 @@ function avSalvar(){
     },
     avisarQuedaParcial: document.getElementById('av-parcial').checked,
     cardGrupos: document.getElementById('av-cardgrupos').checked,
+    perguntaCompra: document.getElementById('av-pergunta').checked,
+    perguntaCompraHoras: document.getElementById('av-pergunta-h').value,
     imagemAviso: document.getElementById('av-imagem').value,
     quedaParcialPct: document.getElementById('av-parcial-pct').value,
     ativo: document.getElementById('av-ativo').checked
@@ -15913,8 +15921,8 @@ function avVincular(id){
 // Mesmo produto em outras lojas + cupom do ML (o servidor procura sozinho;
 // aqui se confere, troca, remove ou acrescenta link). Layout em cartões (06/11/2026).
 var AV_FILTRO = 'abertos';
-var AV_FIM = { cancelado: 1, expirado: 1, encerrado: 1, removido: 1 };
-var AV_ROT = { aguardando: 'aguardando ativação', ativo: 'ativo', cancelado: 'saiu (SAIR)', expirado: 'não ativou', encerrado: 'encerrado', removido: 'removido' };
+var AV_FIM = { cancelado: 1, comprado: 1, expirado: 1, encerrado: 1, removido: 1 };
+var AV_ROT = { aguardando: 'aguardando ativação', ativo: 'ativo', comprado: '🛒 comprou', cancelado: 'saiu (SAIR)', expirado: 'não ativou', encerrado: 'encerrado', removido: 'removido' };
 function avQ(s){ return esc(String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 function avLojaCls(l){ return l === 'Amazon' ? 'amz' : l === 'Mercado Livre' ? 'ml' : l === 'Shopee' ? 'shp' : ''; }
 function avChipLoja(l){ return '<span class="av-chip ' + avLojaCls(l) + '">' + esc(l || '—') + '</span>'; }
@@ -16103,6 +16111,7 @@ function avCartao(p){
   if (!fim) {
     h += p.pausado ? '<button class="av-b" onclick="avAcao(\'' + id + '\',\'retomar\')">▶ Retomar</button>'
                    : '<button class="av-b" onclick="avAcao(\'' + id + '\',\'pausar\')">⏸ Pausar</button>';
+    if (p.status === 'ativo') h += '<button class="av-b" onclick="if(confirm(\'Marcar este alerta como comprado? Os avisos dele param.\'))avAcao(\'' + id + '\',\'comprado\')">🛒 Comprou</button>';
     h += '<button class="av-b perigo" onclick="avAcao(\'' + id + '\',\'remover\')">🗑 Remover</button>';
   }
   h += '</div></div>';
@@ -16154,7 +16163,15 @@ function avCartao(p){
       ? '🔔 <b>' + p.avisos + ' aviso' + (p.avisos > 1 ? 's' : '') + ' enviado' + (p.avisos > 1 ? 's' : '') + '</b> · último ' + avQuando(p.ultimoAvisoEm) + ' a ' + avBrl(p.ultimoAvisoPreco)
         + (p.alvoAtingidoEm ? ' · 🎯 chegou no preço desejado ' + avQuando(p.alvoAtingidoEm) : '')
         + (p.ultimoAvisoPreco && !fim ? ' · próximo aviso só abaixo de ' + avBrl(p.ultimoAvisoPreco * (1 - ((AV_ESTADO.config || {}).novaQuedaPct || 3) / 100)) : '')
-      : 'Nenhum aviso enviado ainda.') + '</div>';
+      : 'Nenhum aviso enviado ainda.')
+    + (function(){
+        var rc = p.respostaCompra, via = { comando: 'pelo COMPREI', pergunta: 'respondendo à pergunta', ia: 'na conversa', painel: 'marcado no painel' };
+        if (rc && rc.resposta === 'comprou') return '<br>🛒 <b>Comprou</b> ' + avQuando(rc.em) + ' (' + esc(via[rc.via] || rc.via || '') + ')' + (rc.precoUltimoAviso ? ' · último aviso a ' + avBrl(rc.precoUltimoAviso) : '');
+        var t = '';
+        if (p.perguntaCompraEm) t += '<br>❓ Perguntou se comprou ' + avQuando(p.perguntaCompraEm) + (p.perguntaCompraRespondida ? '' : ' · sem resposta');
+        if (rc && rc.resposta === 'nao_comprou') t += (t ? ' · ' : '<br>') + '⏳ Ainda não comprou (' + avQuando(rc.em) + ')';
+        return t;
+      })() + '</div>';
   if (pr) h += avBlocoLojas(pr);
   return h + '</article>';
 }
@@ -16255,8 +16272,10 @@ function avDesenhar(){
     kpi(ps.ativo || 0, 'alertas ativos') + kpi(ps.aguardando || 0, 'aguardando ativação')
     + kpi(nAt, 'precisam de atenção', nAt ? 'atencao' : '')
     + kpi(r.produtos || 0, 'produtos vigiados') + kpi(r.contatos || 0, 'pessoas ativadas')
-    + kpi(r.avisosHoje || 0, 'avisos hoje') + kpi(r.avisos7d || 0, 'avisos em 7 dias');
-  var filtros = [['abertos', 'Abertos'], ['nopreco', 'No preço'], ['atencao', 'Precisam de atenção'], ['ativo', 'Ativos'], ['aguardando', 'Aguardando ativação'], ['pornome', 'Pelo nome'], ['encerrados', 'Encerrados'], ['todos', 'Todos']];
+    + kpi(r.avisosHoje || 0, 'avisos hoje') + kpi(r.avisos7d || 0, 'avisos em 7 dias')
+    + (function(cp){ return kpi(cp.comprou || 0, 'compraram' + (cp.taxa != null ? ' (' + String(cp.taxa).replace('.', ',') + '% dos avisados)' : ''))
+        + kpi(cp.perguntas || 0, 'perguntas "comprou?"' + (cp.naoComprou ? ' · ' + cp.naoComprou + ' ainda não' : '')); })(r.compra || {});
+  var filtros = [['abertos', 'Abertos'], ['nopreco', 'No preço'], ['atencao', 'Precisam de atenção'], ['ativo', 'Ativos'], ['aguardando', 'Aguardando ativação'], ['pornome', 'Pelo nome'], ['comprado', 'Compraram'], ['encerrados', 'Encerrados'], ['todos', 'Todos']];
   document.getElementById('av-filtros').innerHTML = filtros.map(function(f){
     var n = todos.filter(function(p){ return avFiltrar(p, f[0]); }).length;
     return '<button class="av-chipf' + (AV_FILTRO === f[0] ? ' on' : '') + '" onclick="avFiltro(\'' + f[0] + '\')">' + f[1] + '<span>' + n + '</span></button>';
