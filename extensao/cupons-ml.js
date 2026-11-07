@@ -238,7 +238,7 @@ async function mlRodarVisita(visita) {
         visita.feitos = i + 1;
         await mlSalvarVisita(visita);
         // Um erro encerra a visita: insistir em seguida e assinatura de robo.
-        if (['problema', 'sem_login', 'pagina_mudou', 'erro'].includes(res.veredito)) { motivoFim = res.veredito; break; }
+        if (['problema', 'verificacao', 'sem_login', 'pagina_mudou', 'erro'].includes(res.veredito)) { motivoFim = res.veredito; break; }
         if (i < visita.lote.length - 1) await mlEsperarVivo(rnd(tempos.entreCuponsS) * 1000);
       }
       if (motivoFim === 'concluida') await mlEsperarVivo(rnd(tempos.antesDeFecharS) * 1000);
@@ -267,12 +267,16 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
       const bruto = await mlInserirUmPassos(tabId, codigo, sel, tempos);
       if (!bruto) return { veredito: 'erro', mensagem: 'sem retorno da página' };
       if (bruto.veredito) return bruto;                      // pagina_mudou etc.
-      return mlClassificar(bruto.resp, bruto.textoTela);
+      return mlClassificar(bruto.resp, bruto.textoTela, bruto.urlTela);
     } catch (e) {
       const m = String(e && e.message || e);
       if (!ML_FRAME_SUMIU.test(m)) return { veredito: 'erro', mensagem: 'extensão: ' + m.slice(0, 120) };
       // A pagina recarregou (ou navegou). Espera assentar e le o que ficou.
-      try { await mlPrepararPagina(tabId, sel); }
+      try {
+        const aba = await chrome.tabs.get(tabId).catch(() => null);
+        if (aba && ML_RE_ANTIBOT_URL.test(aba.url || '')) return { veredito: 'verificacao', mensagem: 'o ML pediu verificação (captcha) — a aba foi para a tela de verificação' };
+        await mlPrepararPagina(tabId, sel);
+      }
       catch (e2) { return { veredito: 'erro', mensagem: 'extensão: ' + String(e2.message || e2).slice(0, 120) }; }
       await mlEsperarVivo(1500);
       const guardado = await mlInjetar(tabId, mlLerGuardado, [sel, codigo], null, 15000).catch(() => null);
@@ -286,17 +290,38 @@ async function mlInserirComRecarga(tabId, codigo, sel, tempos) {
 
 async function mlReportarCupom(visita, c, res) {
   if (res.veredito === 'inserido') visita.inseridos = (visita.inseridos || 0) + 1;
-  await mlReportar('/cupons/auto/resultado', { visitaId: visita.id, chave: c.chave, veredito: res.veredito,
-    rc: res.rc || null, status: res.status || null, mensagem: res.mensagem || '', venceuEm: res.venceuEm || null });
+  const corpo = { visitaId: visita.id, chave: c.chave, veredito: res.veredito,
+    rc: res.rc || null, status: res.status || null, mensagem: res.mensagem || '', venceuEm: res.venceuEm || null };
+  const r = await mlReportar('/cupons/auto/resultado', corpo);
+  // Servidor antigo nao conhece 'verificacao': manda como erro do ML (403), que
+  // abre o disjuntor do mesmo jeito, com a mensagem dizendo que foi verificacao.
+  if (res.veredito === 'verificacao' && r && r.ok === false && /veredito/i.test(String(r.erro || ''))) {
+    await mlReportar('/cupons/auto/resultado', { ...corpo, veredito: 'problema', status: 403 });
+  }
   await mlStatus((ML_ROTULO[res.veredito] || res.veredito) + ' ' + c.codigo + (res.mensagem ? ' — ' + String(res.mensagem).slice(0, 80) : ''));
 }
 
 function mlSemAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
 
+// 07/11/2026: o input-code respondeu 403 com uma pagina HTML e a mensagem
+// enviada ao servidor foi o menu de categorias do site (texto da tela). Tela de
+// verificacao (captcha) e restricao da conta tem o mesmo 403 — so o conteudo da
+// pagina (ou a URL da aba) separa as duas.
+const ML_RE_ANTIBOT = /abuse-captcha|suspicious-traffic|\/gz\/account-verification|\/captcha\/wall|Para continuar, confirme que/i;
+const ML_RE_ANTIBOT_URL = /\/captcha\/wall|\/gz\/account-verification/i;
+
 // Espelho de ativarCupomMl() do servidor: response_code manda, texto e reserva.
-function mlClassificar(resp, textoTela) {
+function mlClassificar(resp, textoTela, urlTela) {
   let corpo = null; try { corpo = JSON.parse(resp ? resp.texto : ''); } catch (_) {}
   const status = resp ? resp.status : 0;
+  const antibot = (resp && (resp.antibot || (!corpo && ML_RE_ANTIBOT.test(resp.texto || '')))) || ML_RE_ANTIBOT_URL.test(urlTela || '');
+  if (antibot) return { rc: '', status, mensagem: 'o ML pediu verificação (captcha)' + (status ? ' — HTTP ' + status : ''), veredito: 'verificacao' };
+  if (resp && !corpo) {
+    // Corpo nao-JSON: a pagina devolvida e o diagnostico, nao o texto da tela.
+    const tit = String(resp.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    return { rc: '', status, veredito: 'problema',
+      mensagem: 'HTTP ' + (status || '?') + ' com página HTML no lugar da resposta' + (tit ? ' «' + tit + '»' : ' (sem título)') };
+  }
   const rc = (corpo && corpo.tracking && corpo.tracking.event && corpo.tracking.event.eventData && corpo.tracking.event.eventData.response_code) || '';
   const msg = (corpo && corpo.responseMessage) || {};
   const texto = String(msg.text || textoTela || '').trim();
@@ -391,7 +416,7 @@ async function mlLerCupons(urls) {
 }
 
 const ML_ROTULO = { inserido: '✅ inserido', ja_tinha: '☑️ já estava', esgotado: '🗑 esgotado', vencido: '🗑 vencido',
-  inexistente: '🗑 inexistente', problema: '⚠️ o ML respondeu com erro', sem_login: '🔒 ML deslogado', pagina_mudou: '🧩 página mudou', erro: '❌ erro' };
+  inexistente: '🗑 inexistente', problema: '⚠️ o ML respondeu com erro', verificacao: '🧩 ML pediu verificação', sem_login: '🔒 ML deslogado', pagina_mudou: '🧩 página mudou', erro: '❌ erro' };
 
 // Popup: ler/gravar configuracao e estado.
 chrome.runtime.onMessage.addListener((msg, _r, responder) => {
@@ -440,7 +465,11 @@ function mlInstalarEscuta(caminhoApi) {
   window.__ticaEscuta = true;
   const guardar = (status, texto) => {
     try {
-      const v = JSON.stringify({ status, texto: String(texto).slice(0, 4000), em: Date.now() });
+      const t = String(texto || '');
+      const html = /^\s*</.test(t);
+      const m = html ? /<title[^>]*>([^<]{0,200})/i.exec(t) : null;
+      const antibot = html && /abuse-captcha|suspicious-traffic|\/gz\/account-verification|\/captcha\/wall|Para continuar, confirme que/i.test(t);
+      const v = JSON.stringify({ status, texto: t.slice(0, 4000), em: Date.now(), html, antibot, titulo: m ? m[1].trim() : '' });
       document.documentElement.setAttribute('data-tica-resp', v);
       sessionStorage.setItem('tica-resp', v);
     } catch (_) {}
@@ -647,7 +676,8 @@ async function mlInserirUmPassos(tabId, codigo, sel, tempos) {
   const resp = await esperar(() => inj(mlPassoLerResposta, []), rnd(tempos.aposClicarS) * 1000 + 8000, 300);
   await dorme(rnd([600, 1500]));
   const textoTela = await inj(mlPassoTexto, [sel]).catch(() => '');
+  const estTela = await inj(mlPassoEstado, [sel]).catch(() => null);
   await dorme(rnd([300, 900]));
-  await inj(mlPassoClicar, [sel, 'fechar']).catch(() => {});   // fecha o modal para o proximo
-  return { resp, textoTela };
+  if (!(estTela && ML_RE_ANTIBOT_URL.test(estTela.url || ''))) await inj(mlPassoClicar, [sel, 'fechar']).catch(() => {});   // fecha o modal para o proximo
+  return { resp, textoTela, urlTela: estTela ? estTela.url : '' };
 }
