@@ -12689,6 +12689,9 @@ async function carregarAprovacao() {
             : '✓ Aprovar e enviar') + '</button>'
         +'<button class="btn btn-rej" style="margin-top:0;flex:1" onclick="rejeitarItem('+o.id+')">✕ Rejeitar</button>'
         +'</div>'
+        +(ehConteudoTspAprov(o)
+            ? '<label class="prio-chk" style="margin-top:0"><input type="checkbox" id="fila-prio-'+o.id+'"/><span>⚡ Prioridade máxima<small>Passa na frente de tudo que está esperando na fila de publicação.</small></span></label>'
+            : '')
         +'<div class="fila-fb" id="fila-fb-'+o.id+'"></div>'
         +'</div>'
         +'</div>';
@@ -12760,13 +12763,24 @@ async function postTrilhasAprov(id, corpo, btn) {
 function alternarTrilhaAprov(id, trilha, btn) { postTrilhasAprov(id, { alternar: trilha }, btn); }
 function trilhaAutoAprov(id, btn) { postTrilhasAprov(id, { automatico: true }, btn); }
 
+// Cupom e oferta de loja passam pelo portão de publicação — só eles têm a caixa
+// de prioridade (passagem do CDV vai pela fila própria, fora do portão).
+function ehConteudoTspAprov(o) {
+  var t = String((o && o.tipoConteudo) || '');
+  return t === 'cupom_tsp' || t.indexOf('oferta_') === 0;
+}
+
 async function aprovarItem(id) {
   var msg = document.getElementById('fila-msg-'+id).value;
   var fb = document.getElementById('fila-fb-'+id);
-  fb.className = 'fila-fb'; fb.textContent = 'Enviando aos grupos... (o espaçamento entre grupos pode levar alguns minutos)';
+  var prioEl = document.getElementById('fila-prio-'+id);
+  var prio = !!(prioEl && prioEl.checked);
+  fb.className = 'fila-fb'; fb.textContent = (prio ? '⚡ Prioridade máxima — ' : '') + 'Enviando aos grupos... (o espaçamento entre grupos pode levar alguns minutos)';
   try {
+    var corpoAprov = {mensagem: msg};
+    if (prio) corpoAprov.prioridade = true;
     var r = await fetch(SERVER+'/painel/aprovar/'+id, {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mensagem: msg})
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpoAprov)
     });
     var d = await r.json();
     if (d.ok) {
