@@ -1506,6 +1506,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <button class="img-clear" onclick="limparImg('c')">✕</button>
     </div>
   </div>
+  <label class="prio-chk" style="margin:0 0 10px"><input type="checkbox" id="c-restrito"/><span>🎯 Só produtos específicos<small>O cupom vai para a base marcado: fica fora da escolha automática de cupom, do combo "Cupons ativos" e do site público.</small></span></label>
   <button class="btn" onclick="gerarCupom()">Gerar mensagem</button>
   <div class="result-card" id="c-result">
     <div class="result-header"><span>Mensagem gerada</span><div class="dot"></div></div>
@@ -1528,6 +1529,7 @@ body.travado > *:not(#login-screen){display:none !important}
         <label class="prio-chk"><input type="checkbox" id="c-prioridade"/><span>⚡ Prioridade máxima<small>Na janela: passa na frente de tudo que está esperando na fila de publicação.</small></span></label>
       </div>
       <button class="btn btn-send" id="c-send-btn" onclick="enviarWA('c-msg','c-send-ok','c-img-input','c-sched')">🕐 Enviar na janela</button>
+      <button class="btn btn-copy" type="button" onclick="cupomSoBase()">🗂 Só cadastrar na base</button>
       <p class="ok" id="c-ok"></p>
       <p class="send-ok" id="c-send-ok"></p>
     </div>
@@ -10120,13 +10122,37 @@ function trilhasGeraisIds() {
   return TRILHAS_CFG.filter(function(t){ return !t.categoria; }).map(function(t){ return t.id; });
 }
 
-// Sem escolha explicita, vale o comportamento antigo: so os grupos gerais.
+// DESTINO AUTOMATICO (08/11/2026, regra do Davi: site, extensao e bot iguais).
+// Padrao = "🤖 Automatico": o servidor roteia como faz sozinho — cupom vai aos
+// gerais + so-cupons + nichos onde ele serve; oferta buscada por link vai aos
+// gerais + nicho reconhecido do produto; mensagem livre, so aos gerais. Tocar
+// numa trilha passa para a escolha manual, a partir do que estava marcado.
+var TRILHA_AUTO     = {};   // prefixo -> false quando o operador escolheu a mao
+var TRILHA_AUTO_CAT = {};   // prefixo -> categoria de nicho reconhecida (oferta buscada)
+function trilhaEhAuto(pref) { return TRILHA_AUTO[pref] !== false; }
+function trilhasAutoIds(pref) {
+  var ids = trilhasGeraisIds();
+  var cat = TRILHA_AUTO_CAT[pref];
+  if (cat) TRILHAS_CFG.forEach(function(t){ if (t.categoria === cat && ids.indexOf(t.id) < 0) ids.push(t.id); });
+  return ids;
+}
+
 function trilhasSel(pref) {
+  if (trilhaEhAuto(pref)) return trilhasAutoIds(pref);
   if (!TRILHA_SEL[pref]) TRILHA_SEL[pref] = trilhasGeraisIds();
   return TRILHA_SEL[pref];
 }
+// O que vai ao servidor: null = automatico.
+function trilhasDoEnvio(pref) { return trilhaEhAuto(pref) ? null : trilhasSel(pref).slice(); }
+
+function trilhaAuto(pref) {
+  TRILHA_AUTO[pref] = true;
+  pintarTrilhas(pref);
+  pintarRodapeAplicado(pref + '-msg');
+}
 
 function trilhaToggle(pref, id) {
+  if (trilhaEhAuto(pref)) { TRILHA_SEL[pref] = trilhasAutoIds(pref); TRILHA_AUTO[pref] = false; }
   var sel = trilhasSel(pref);
   var k = sel.indexOf(id);
   if (k >= 0) sel.splice(k, 1); else sel.push(id);
@@ -10138,6 +10164,7 @@ function trilhaToggle(pref, id) {
 // duas, dizer ao servidor que a mensagem e 'bebidas' seria mentira, e a regra
 // de rodape por categoria entraria no grupo errado.
 function categoriaSel(pref) {
+  if (trilhaEhAuto(pref)) return TRILHA_AUTO_CAT[pref] || '';
   var ids = trilhasSel(pref);
   var cats = TRILHAS_CFG
     .filter(function(t){ return ids.indexOf(t.id) >= 0 && t.categoria; })
@@ -10164,14 +10191,23 @@ function pintarTrilhas(pref) {
       return;
     }
     var sel = trilhasSel(pref);
+    var auto = trilhaEhAuto(pref);
+    var notaAuto = pref === 'c'
+      ? 'Automático: grupos gerais + só cupons + grupos de nicho onde o cupom serve.'
+      : (pref === 'o' && TRILHA_AUTO_CAT.o)
+      ? 'Automático: grupos gerais + o nicho do produto.'
+      : 'Automático: grupos gerais.';
     box.innerHTML = '<span class="trilha-lbl">Enviar para</span>'
+      + '<button type="button" class="cat-chip' + (auto ? ' on' : '') + '" onclick="trilhaAuto(\'' + pref + '\')">🤖 Automático</button>'
       + TRILHAS_CFG.map(function(t){
           var on = sel.indexOf(t.id) >= 0;
           var n  = (t.destinos || []).length;
-          return '<button type="button" class="cat-chip' + (on ? ' on' : '') + '" onclick="trilhaToggle(\'' + pref + '\',\'' + t.id + '\')">'
+          return '<button type="button" class="cat-chip' + (on ? ' on' : '') + '"' + (auto ? ' style="opacity:.55"' : '')
+               + ' onclick="trilhaToggle(\'' + pref + '\',\'' + t.id + '\')">'
                + esc(t.nome || t.id) + ' <span class="trilha-n">' + n + '</span></button>';
         }).join('')
-      + (sel.length ? '' : '<span class="trilha-vazio">Nada marcado — o envio cai nos grupos gerais.</span>');
+      + (auto ? '<span class="trilha-vazio">' + notaAuto + '</span>'
+          : (sel.length ? '' : '<span class="trilha-vazio">Nada marcado — o envio cai nos grupos gerais.</span>'));
   });
 }
 
@@ -10949,6 +10985,42 @@ function toggleLimite() {
 }
 
 /* ══════ GERADORES ══════ */
+// true so quando a mensagem atual saiu do "Gerar mensagem" com os campos da
+// tela; combos (Shopee, Cupons ativos) nao registram cupom nenhum.
+var _cupomDosCampos = false;
+// Campos do cupom da tela (mesmos do /cupons/montar), para registrar na base.
+function dadosCupomTela() {
+  return {
+    loja:    getLoja('c'),
+    tipo:    document.getElementById('c-tipo').value === 'pct' ? 'pct' : 'reais',
+    valor:   document.getElementById('c-valor').value.trim(),
+    minimo:  document.getElementById('c-minimo').value.trim(),
+    maximo:  document.getElementById('c-maximo').value.trim(),
+    limite:  document.getElementById('c-limite').value.trim(),
+    codigo:  document.getElementById('c-cupom').value.trim(),
+    gatilho: document.getElementById('c-gatilho').value.trim(),
+    aviso:   document.getElementById('c-importante').value.trim(),
+    link:    document.getElementById('c-link').value.trim(),
+    restrito: !!(document.getElementById('c-restrito') && document.getElementById('c-restrito').checked)
+  };
+}
+
+// "🗂 Só cadastrar na base" — igual ao do bot: grava sem enviar e sem entrar na fila.
+async function cupomSoBase() {
+  var s = document.getElementById('c-send-ok');
+  var corpo = dadosCupomTela();
+  if (!corpo.codigo) { s.className='send-ok send-err'; s.textContent='Cupom sem código não vai para a base.'; return; }
+  corpo.soBase = true;
+  s.className='send-ok'; s.textContent='Gravando na base...';
+  try {
+    var r = await fetch(SERVER + '/cupons/registrar-criado', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falhou');
+    s.textContent = '🗂 ' + (d.codigo || corpo.codigo) + ' gravado na base de ' + corpo.loja + ' — não foi enviado.'
+      + (corpo.restrito ? ' 🎯 Só produtos específicos.' : '');
+  } catch (e) { s.className='send-ok send-err'; s.textContent='Não gravou: ' + e.message; }
+}
+
 function gerarCupom() {
   var gatilho = document.getElementById('c-gatilho').value.trim();
   var cImportante = document.getElementById('c-importante').value.trim();
@@ -10960,7 +11032,7 @@ function gerarCupom() {
     msgC += 'Acesse o link abaixo para resgatar os cupons disponíveis.\n\n';
     if (cImportante) msgC += '⚠️ *IMPORTANTE* '+cImportante+'\n\n';
     msgC += '🔗 *RESGATE O CUPOM AQUI* '+linksMap['Shopee_sem'];
-    mostrar('c-msg','c-result','c-ok', msgC);
+    _cupomDosCampos = false; mostrar('c-msg','c-result','c-ok', msgC);
     return;
   }
 
@@ -10990,6 +11062,7 @@ function gerarCupom() {
   .then(function(d){
     if (!d.ok) throw new Error(d.erro || 'falhou');
     st.textContent = '';
+    _cupomDosCampos = true;
     mostrar('c-msg','c-result','c-ok', d.mensagem);
   })
   .catch(function(e){
@@ -11039,7 +11112,7 @@ async function montarCombo(loja) {
   }).sort(ordenarCupons);
 
   if (!itens.length) {
-    mostrar('c-msg','c-result','c-ok', '');
+    _cupomDosCampos = false; mostrar('c-msg','c-result','c-ok', '');
     document.getElementById('c-msg').value =
       'Nenhum cupom vigente da ' + loja + ' na base agora.\n\n'
       + 'Cadastre em Catálogo › Cupons › Cadastrar cupom na base, ou espere a próxima captura.';
@@ -11061,7 +11134,7 @@ async function montarCombo(loja) {
   if (cImportante) msg += '⚠️ *IMPORTANTE* ' + cImportante + '\n\n';
   if (url) msg += '🔗 *RESGATE OS CUPONS AQUI* ' + url + '\n\n';
 
-  mostrar('c-msg','c-result','c-ok', msg);
+  _cupomDosCampos = false; mostrar('c-msg','c-result','c-ok', msg);
 }
 
 /* ══════ BUSCA DE PRODUTO POR LINK ══════ */
@@ -11101,6 +11174,9 @@ async function buscarProduto() {
 
     _produtoBuscado = d;
     var p = d.produto;
+    // Nicho reconhecido entra no destino automatico (igual ao bot e ao radar).
+    TRILHA_AUTO_CAT.o = (d.nicho && d.nicho.categoria) || '';
+    pintarTrilhas('o');
 
     document.getElementById('o-nome').value     = p.titulo || '';
     document.getElementById('o-original').value = p.precoDe ? p.precoDe.toFixed(2) : '';
@@ -11758,6 +11834,9 @@ function escolherQuando(pid, q) {
   if (sr) sr.style.display = q === 'agendar' ? '' : 'none';
   var btn = document.getElementById(pid + '-send-btn');
   if (btn && QUANDO_ROTULO_BTN[q]) btn.textContent = QUANDO_ROTULO_BTN[q];
+  // ⚡ Prioridade so vale na janela (fura a fila de publicacao) — igual ao bot.
+  var prio = document.getElementById(pid + '-prioridade');
+  if (prio && prio.closest) { var lb = prio.closest('label'); if (lb) lb.style.display = q === 'janela' ? '' : 'none'; }
   if (q === 'janela') carregarJanelaDisparos(pid, false);
   atualizarHintSched(pid);
 }
@@ -11850,7 +11929,7 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
   // Destino escolhido nos chips: lista de trilhas + a categoria delas, que o
   // servidor usa para resolver o rodape de cada grupo.
   var prefEnvio = msgId.charAt(0);
-  var trilhasEnvio = trilhasSel(prefEnvio).slice();
+  var trilhasEnvio = trilhasDoEnvio(prefEnvio);
   var catEnvio = categoriaSel(prefEnvio);
   var s = document.getElementById(statusId);
   if (!wsConectado) { s.className='send-ok send-err'; s.textContent='Servidor desconectado.'; setTimeout(function(){ s.textContent=''; },4000); return; }
@@ -11876,6 +11955,19 @@ async function enviarWA(msgId, statusId, imgInputId, schedInputId) {
       }
       agendarEm = spDate.toISOString();
     }
+  }
+
+  // Cupom criado a mao entra na base antes do envio, como no bot. Duplicata
+  // recente: pergunta antes de mandar de novo (o combo Shopee nao tem codigo).
+  if (msgId === 'c-msg' && _cupomDosCampos && _activePreset !== 'SH-COMBO') {
+    try {
+      var rc = await fetch(SERVER + '/cupons/registrar-criado', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(dadosCupomTela()) });
+      var dc = await rc.json();
+      if (dc && dc.ignorado && !confirm('Esse cupom já foi capturado recentemente (duplicata).\n\nEnviar mesmo assim?')) {
+        s.className='send-ok'; s.textContent='Envio cancelado.'; setTimeout(function(){ s.textContent=''; },4000); return;
+      }
+    } catch (e) { /* registro e auxiliar: falha nao segura o envio */ }
   }
 
   s.className='send-ok'; s.textContent = agendarEm ? 'Agendando...' : (quando === 'janela' ? 'Colocando na janela...' : 'Enviando...');
@@ -12680,6 +12772,12 @@ async function carregarAprovacao() {
         +'<div class="fila-msg-wrap"><div class="fila-msg-label">Mensagem formatada</div>'
         +'<textarea class="fila-msg-area" id="fila-msg-'+o.id+'">'+msg+'</textarea></div>'
         +imgThumb
+        +(ehMarketplace
+            ? '<div class="fila-ajustes" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px">'
+              + [['preco','💲 Por'],['precoDe','🔖 De'],['cupom','🏷️ Cupom'],['titulo','✏️ Título'],['gatilho','🔝 Topo'],['importante','⚠️ Importante']]
+                  .map(function(a){ return '<button type="button" class="cat-chip" onclick="ajustarItemAprov('+o.id+',\''+a[0]+'\')">'+a[1]+'</button>'; }).join('')
+              + '</div>'
+            : '')
         +(ehMarketplace ? '<div class="fila-trilhas" id="fila-trilhas-'+o.id+'">Carregando trilhas…</div>' : '')
         +'<div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:8px">'
         +'<div style="display:flex;gap:8px">'
@@ -12768,6 +12866,46 @@ function trilhaAutoAprov(id, btn) { postTrilhasAprov(id, { automatico: true }, b
 function ehConteudoTspAprov(o) {
   var t = String((o && o.tipoConteudo) || '');
   return t === 'cupom_tsp' || t.indexOf('oferta_') === 0;
+}
+
+// Ajustes do card — os mesmos botoes do card do @ticopromosbot (Por, De,
+// Cupom, Título, Topo, Importante). O servidor REMONTA a mensagem pelo
+// template da loja (/mkt/remontar), em vez de trocar texto a mao.
+var AJUSTE_PERGUNTA = {
+  preco:      'Preço POR (o que o cliente paga), ex: 149,90',
+  precoDe:    'Preço DE (valor cheio, riscado), ex: 249,90 — deixe vazio para tirar',
+  cupom:      'Código do cupom da base — deixe vazio para tirar o cupom',
+  titulo:     'Novo título do produto',
+  gatilho:    'Mensagem de topo (a chamada que abre a oferta) — deixe vazio para tirar',
+  importante: 'Linha IMPORTANTE — deixe vazio para tirar'
+};
+async function ajustarItemAprov(id, campo) {
+  var fb = document.getElementById('fila-fb-'+id);
+  var v = prompt(AJUSTE_PERGUNTA[campo] || campo, '');
+  if (v === null) return;
+  var corpo = {};
+  if (campo === 'preco' || campo === 'precoDe') {
+    var t = String(v).trim();
+    if (!t && campo === 'preco') return;
+    var n = t ? Number(t.indexOf(',') >= 0 ? t.replace(/\./g, '').replace(',', '.') : t) : 0;
+    if (t && !(n > 0)) { fb.className='fila-fb err'; fb.textContent='Valor inválido.'; return; }
+    corpo[campo] = n;
+  } else if (campo === 'cupom') {
+    corpo.cupom = String(v).trim().toUpperCase().replace(/\s+/g, '');
+  } else {
+    corpo[campo] = String(v).trim();
+  }
+  fb.className='fila-fb'; fb.textContent='Remontando a mensagem...';
+  try {
+    var r = await fetch(SERVER+'/mkt/remontar/'+id, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) });
+    var d = await r.json();
+    if (!d.ok) { fb.className='fila-fb err'; fb.textContent='Erro: '+(d.erro||'falha'); return; }
+    var ta = document.getElementById('fila-msg-'+id);
+    if (ta) ta.value = d.mensagem || (d.oferta && d.oferta.mensagemFormatada) || ta.value;
+    fb.className = d.aviso ? 'fila-fb err' : 'fila-fb ok';
+    fb.textContent = d.aviso ? '⚠️ ' + d.aviso : '✓ Mensagem remontada.';
+    if (d.oferta && d.oferta.rota) renderTrilhasAprov(id, d.oferta.rota);
+  } catch (e) { fb.className='fila-fb err'; fb.textContent='Servidor indisponível.'; }
 }
 
 async function aprovarItem(id) {

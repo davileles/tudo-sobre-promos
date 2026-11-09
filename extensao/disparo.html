@@ -167,6 +167,16 @@ textarea:focus{border-color:var(--accent)}
       <input id="fImportante" type="text" placeholder="Ex: Estoque limitado!"/>
     </div>
 
+    <div class="field">
+      <label>Destino</label>
+      <select id="roteamento">
+        <option value="geral">Só os grupos gerais — ignora o nicho curado</option>
+        <option value="nicho_e_geral">Grupo do nicho + grupos gerais</option>
+        <option value="so_nicho">Só o grupo do nicho</option>
+      </select>
+      <div class="hint" id="hintDestino">Mesma escolha da aba Disparos do painel.</div>
+    </div>
+
     <div class="field" style="margin-bottom:0">
       <label>Começar às <span class="tag">opcional</span></label>
       <input id="hora" type="time"/>

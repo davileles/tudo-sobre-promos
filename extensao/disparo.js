@@ -61,6 +61,13 @@ async function cadastrar() {
     $('meta').querySelector('.loja').textContent = salvo.loja || '—';
     $('meta').querySelector('.asin').textContent = salvo.asin;
     $('form').classList.remove('some');
+    // Destino com a regra da aba Disparos do painel: produto com nicho curado
+    // sai só no grupo do nicho; sem nicho, nos grupos gerais.
+    const nicho = salvo.nicho && salvo.nicho !== 'geral' ? salvo.nicho : '';
+    $('roteamento').value = nicho ? 'so_nicho' : 'geral';
+    $('hintDestino').textContent = nicho
+      ? 'Produto curado no nicho ' + nicho + ' — por isso já vem "só o grupo do nicho", como na aba Disparos.'
+      : 'Produto sem nicho curado — por isso já vem nos grupos gerais, como na aba Disparos.';
     carregarCupons(salvo.loja);
     carregarPrevia();
   } catch (e) {
@@ -294,6 +301,7 @@ $('disparar').addEventListener('click', async () => {
     + 'Cupom: ' + (modoTela === 'manual' ? $('fCupom').value.trim().toUpperCase() + ' (digitado)'
                    : modo === 'fixo' ? codigo : modo === 'auto' ? 'melhor disponível' : 'nenhum') + '\n'
     + (aj && (aj.preco || aj.precoDe) ? 'Valores: digitados por você\n' : '')
+    + 'Destino: ' + $('roteamento').options[$('roteamento').selectedIndex].text + '\n'
     + 'Início: ' + (hora || 'imediato') + '\n'
     + ($('fPrioridade') && $('fPrioridade').checked ? 'Prioridade: ⚡ máxima\n' : '')
     + 'Texto: ' + (ed ? 'editado por você' : 'original') + '\n\n'
@@ -310,6 +318,7 @@ $('disparar').addEventListener('click', async () => {
         cupomModo: modo,
         cupomCodigo: codigo,
         iniciarHora: hora,
+        roteamento: $('roteamento').value,
         prioridade: !!($('fPrioridade') && $('fPrioridade').checked),
         edicoesItem: ed ? { [ITEM.asin]: ed } : undefined,
         ajustesItem: aj ? { [ITEM.asin]: aj } : undefined,
