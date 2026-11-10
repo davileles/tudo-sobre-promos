@@ -8693,8 +8693,17 @@ function cadastrarVitrine(destino){
 
   // O servidor aceita no maximo 60 linhas por chamada; acima disso respondia
   // 400 e a tela mostrava "0 cadastrado(s)" sem motivo. Aqui a leva e fatiada
-  // em lotes sequenciais e o resultado somado.
-  var LOTE_VIT = 50;
+  // em lotes sequenciais e o resultado somado. Lotes pequenos (5) para a tela
+  // mostrar andamento: com um lote unico de 12 links do ML a mensagem ficou
+  // parada em "Resolvendo…" por 4 min sem sinal de vida (10/11/2026).
+  var LOTE_VIT = 5;
+  var totalLinhasCad = texto.split('\n').filter(function(l){ return l.trim(); }).length;
+  var feitosCad = 0, inicioCad = Date.now(), msgCad = ok.textContent;
+  var relogioCad = setInterval(function(){
+    var s = Math.round((Date.now() - inicioCad) / 1000);
+    ok.textContent = msgCad + ' · ' + s + ' s'
+      + (s >= 60 ? ' — links do Mercado Livre podem levar alguns segundos cada; pode continuar esperando' : '');
+  }, 1000);
   var linhasCad = texto.split('\n').filter(function(l){ return l.trim(); });
   var lotesCad = [];
   for (var li = 0; li < linhasCad.length; li += LOTE_VIT) lotesCad.push(linhasCad.slice(li, li + LOTE_VIT).join('\n'));
@@ -8702,25 +8711,37 @@ function cadastrarVitrine(destino){
   var cadeia = Promise.resolve();
   lotesCad.forEach(function(txt, idx){
     cadeia = cadeia.then(function(){
-      if (lotesCad.length > 1) ok.textContent = 'Resolvendo lote ' + (idx + 1) + ' de ' + lotesCad.length + '…';
+      if (lotesCad.length > 1) msgCad = ok.textContent = 'Resolvendo ' + (feitosCad + 1) + '–' + Math.min(feitosCad + txt.split('\n').length, totalLinhasCad) + ' de ' + totalLinhasCad + ' link(s)…';
+      var ctlCad = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var tmCad = ctlCad ? setTimeout(function(){ ctlCad.abort(); }, 300000) : null;
       return fetch(SERVER + '/vitrine', {
         method:'POST', headers:{'Content-Type':'application/json'},
+        signal: ctlCad ? ctlCad.signal : undefined,
         body: JSON.stringify({ texto: txt, cupom: cupom, cupomModo: modoCupom, nicho: nichoCad,
                                etiqueta: valorCampo('vit-etiqueta').trim() })
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
+        if (tmCad) clearTimeout(tmCad);
+        feitosCad += txt.split('\n').length;
         if (d && d.ok === false && d.erro && !d.salvos) {
           txt.split('\n').forEach(function(l){ acum.erros.push({ linha: l, erro: d.erro }); });
           return;
         }
         acum.salvos = acum.salvos.concat(d.salvos || []);
         acum.erros  = acum.erros.concat(d.erros || []);
+      }, function(e){
+        // Lote que estourou o prazo ou caiu na rede nao derruba os seguintes:
+        // as linhas voltam como falha e podem ser reenviadas pelo botao.
+        if (tmCad) clearTimeout(tmCad);
+        feitosCad += txt.split('\n').length;
+        var motivo = (e && e.name === 'AbortError') ? 'servidor não respondeu em 5 min — confira na Base se entrou' : ('falha de rede: ' + (e && e.message || e));
+        txt.split('\n').forEach(function(l){ acum.erros.push({ linha: l, erro: motivo }); });
       });
     });
   });
   cadeia
-  .then(function(){ return acum; })
+  .then(function(){ clearInterval(relogioCad); return acum; }, function(e){ clearInterval(relogioCad); throw e; })
   .then(function(d){
     var salvos = d.salvos || [];
     var erros  = d.erros || [];
