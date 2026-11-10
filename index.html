@@ -220,7 +220,7 @@ body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;
 .av-opcao input[type=checkbox]{width:18px;height:18px;margin:1px 0 0;accent-color:var(--accent);cursor:pointer}
 .av-opcao-txt{display:flex;flex-direction:column;gap:3px;font-size:13px;line-height:1.4;color:var(--text)}
 .av-opcao-txt small{font-size:12px;color:var(--muted);font-weight:500}
-.av-opcao-num{width:110px}
+.av-opcao-num{width:auto;white-space:nowrap}.av-opcao-num input{flex:0 0 64px;width:64px;text-align:center}
 .av-campo{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--muted);min-width:0}
 .av-campo small{font-weight:500;font-size:11px;line-height:1.4;color:var(--muted)}
 .av-dupla{display:flex;align-items:center;gap:8px}.av-dupla input{flex:1;min-width:0}
@@ -328,7 +328,7 @@ a.av-titulo:hover{text-decoration:underline}
 .av-msgc-pe{font-size:11px;color:var(--muted);margin-top:5px}
 @media (max-width:600px){
   .av-opcao{grid-template-columns:18px 1fr}
-  .av-opcao-num{grid-column:2;width:130px}
+  .av-opcao-num{grid-column:2;width:auto}
   .av-card-top{flex-wrap:wrap}
   .av-card-acoes{width:100%;justify-content:flex-start}
   .av-thumb{width:52px;height:52px;flex-basis:52px}
