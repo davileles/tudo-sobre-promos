@@ -916,6 +916,14 @@ a.av-titulo:hover{text-decoration:underline}
   .dv-tab .dv-td-pct{text-align:right;color:var(--muted);width:52px}
   .dv-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
   .dv-vazio{font-size:12px;color:var(--muted);font-weight:500;padding:10px 0}
+  .dv-tab th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);text-align:right;padding:0 0 8px 10px;white-space:nowrap}
+  .dv-tab th:first-child{text-align:left;padding-left:0}
+  .dv-grp td{padding:7px 0 7px 10px}
+  .dv-grp td:first-child{padding-left:0}
+  .dv-grp-nome{font-weight:600}
+  .dv-grp-barra{height:4px;border-radius:2px;background:var(--border);margin-top:5px;overflow:hidden}
+  .dv-grp-barra > span{display:block;height:100%;background:var(--accent)}
+  .dv-grp-nota{font-size:11px;color:var(--muted);font-weight:500;margin-top:10px}
   @media (max-width:760px){ .dv-grid2{grid-template-columns:1fr} }
 /* ── LOGIN ── */
 .res-scope #login-screen{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -1411,6 +1419,11 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="dv-chart-label">Total do mês por loja</div>
       <div id="dv-tabela"></div>
     </div>
+  </div>
+
+  <div class="dv-title" id="dv-title-grupos">Por grupo</div>
+  <div class="dv-chart-card">
+    <div id="dv-grupos"><div class="dv-vazio">Carregando grupos...</div></div>
   </div>
 </div>
 
@@ -4405,6 +4418,8 @@ var DV_TIPO     = 'produtos';  // produtos | cupons | tudo
 var DV_DIA      = '';          // dia em foco nos cartoes/pizza (YYYY-MM-DD)
 var DV_CH_DIA   = null;
 var DV_CH_PIZZA = null;
+var DV_GRP_CACHE = {};         // 'YYYY-MM' -> { grupos:[{jid,nome}], porEnvio:{id:[idx]} }
+var DV_GRP = null;
 var DV_PLATS = [
   { nome:'Amazon',         cor:'#ff9900' },
   { nome:'Mercado Livre',  cor:'#f5c518' },
@@ -4482,6 +4497,7 @@ async function carregarDivulgacoes(forcar){
   if (!elMes.value) elMes.value = dvHojeSP().slice(0,7);
   var mes = elMes.value;
   var st  = document.getElementById('dv-status');
+  dvCarregarGrupos(mes, forcar);
   if (!forcar && DV_CACHE[mes]) { DV_MES = mes; DV_REGS = DV_CACHE[mes]; dvRender(); return; }
   st.textContent = 'Carregando histórico...';
   try {
@@ -4527,6 +4543,79 @@ function dvRender(){
   dvGraficoDias(dias, porDia);
   dvGraficoPizza(porDia[DV_DIA] || {});
   dvTabelaLojas(regs);
+  dvTabelaGrupos(regs);
+}
+
+// Para quais grupos cada envio foi: o baileys cruza o historico com o rastreio
+// de links (/operacao/divulgacoes-grupos). Carrega a parte, sem segurar o resto.
+async function dvCarregarGrupos(mes, forcar){
+  if (!forcar && DV_GRP_CACHE[mes]) { DV_GRP = DV_GRP_CACHE[mes]; return; }
+  DV_GRP = null;
+  var el = document.getElementById('dv-grupos');
+  if (el) el.innerHTML = '<div class="dv-vazio">Carregando grupos...</div>';
+  try {
+    var r = await fetch(SERVER + '/operacao/divulgacoes-grupos?mes=' + encodeURIComponent(mes) +
+                        '&t=' + Date.now(), { cache:'no-cache' });
+    if (r.status === 404) {
+      if (el) el.innerHTML = '<div class="dv-vazio">O servidor ainda não tem a leitura por grupo — ela entra na próxima atualização do baileys-server.</div>';
+      return;
+    }
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+    DV_GRP_CACHE[mes] = { grupos: d.grupos || [], porEnvio: d.porEnvio || {} };
+    var elMes = document.getElementById('dv-mes');
+    if (!elMes || elMes.value === mes) { DV_GRP = DV_GRP_CACHE[mes]; if (DV_MES === mes) dvRender(); }
+  } catch(e){
+    if (el) el.innerHTML = '<div class="dv-vazio">Erro ao carregar os grupos: ' + esc(e.message) + '</div>';
+  }
+}
+
+function dvGruposDoReg(r){
+  if (!DV_GRP) return null;
+  return DV_GRP.porEnvio[String(r.loteId || r.id)] || null;
+}
+
+function dvTabelaGrupos(regs){
+  var el = document.getElementById('dv-grupos');
+  if (!el) return;
+  document.getElementById('dv-title-grupos').textContent = 'Por grupo — ' + dvDataBR(DV_DIA) + ' e mês';
+  if (!DV_GRP) { el.innerHTML = '<div class="dv-vazio">Carregando grupos...</div>'; return; }
+  var porGrupo = {}, totalDia = 0, semDia = 0, semMes = 0;
+  regs.forEach(function(r){
+    var ehDia = dvDiaDe(r.enviadoEm) === DV_DIA;
+    if (ehDia) totalDia++;
+    var gs = dvGruposDoReg(r);
+    if (!gs || !gs.length) { semMes++; if (ehDia) semDia++; return; }
+    gs.forEach(function(i){
+      var g = porGrupo[i] || (porGrupo[i] = { dia: 0, mes: 0 });
+      g.mes++;
+      if (ehDia) g.dia++;
+    });
+  });
+  var lista = Object.keys(porGrupo).map(function(i){
+    var g = DV_GRP.grupos[i] || {};
+    return { nome: g.nome || g.jid || '?', dia: porGrupo[i].dia, mes: porGrupo[i].mes };
+  }).sort(function(a,b){ return (b.dia - a.dia) || (b.mes - a.mes) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+  if (!lista.length) {
+    el.innerHTML = '<div class="dv-vazio">Nenhum grupo registrado no mês para o filtro atual.</div>';
+    return;
+  }
+  var html = '<table class="dv-tab dv-grp"><tr><th>Grupo</th><th>' + dvDataBR(DV_DIA).slice(0,5) +
+             '</th><th>% do dia</th><th>No mês</th></tr>';
+  lista.forEach(function(g){
+    var pct = totalDia ? Math.round(g.dia * 100 / totalDia) : 0;
+    html += '<tr><td><div class="dv-grp-nome">' + esc(g.nome) + '</div>' +
+            '<div class="dv-grp-barra"><span style="width:' + pct + '%"></span></div></td>' +
+            '<td class="dv-td-n">' + g.dia + '</td><td class="dv-td-pct">' + pct + '%</td>' +
+            '<td class="dv-td-n">' + g.mes + '</td></tr>';
+  });
+  html += '</table>';
+  html += '<div class="dv-grp-nota">Cada item vai para vários grupos, então a soma passa do total. ' +
+          '"% do dia" = quantos dos ' + totalDia + ' itens do dia chegaram ao grupo.';
+  if (semDia || semMes) html += ' Sem grupo registrado (mensagem sem link rastreado): ' + semDia +
+          ' no dia, ' + semMes + ' no mês.';
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function dvCards(mapaDia){
