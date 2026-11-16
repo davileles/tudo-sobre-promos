@@ -6220,6 +6220,17 @@ function salvarNumerosGrupo() {
 
 /* ══════ VITRINE ══════ */
 var VIT_CACHE = [], VIT_SEL = {};
+// Indice asin -> produto da base. A montagem de disparo consulta a base varias
+// vezes por linha; com dezenas de itens e milhares de produtos, o .find() linear
+// em cada render travava a tela. Refaz o indice quando VIT_CACHE muda.
+var _VIT_IDX = null, _VIT_IDX_REF = null, _VIT_IDX_N = -1;
+function vitItem(asin){
+  if (_VIT_IDX_REF !== VIT_CACHE || _VIT_IDX_N !== VIT_CACHE.length){
+    _VIT_IDX = {}; _VIT_IDX_REF = VIT_CACHE; _VIT_IDX_N = VIT_CACHE.length;
+    for (var k = 0; k < VIT_CACHE.length; k++){ var x = VIT_CACHE[k]; if (x && !(x.asin in _VIT_IDX)) _VIT_IDX[x.asin] = x; }
+  }
+  return _VIT_IDX[asin] || null;
+}
 
 // A base e o catalogo da Awin passaram do tamanho em que rolar a tela ainda era
 // navegar. Em vez de cortar dados no servidor, a aba mostra um bloco por vez e
@@ -6438,15 +6449,21 @@ function lstDestinoPrevisto(rot, it){
 // lista), entao vale para este e para os proximos disparos dele.
 function lstSelectNicho(asin, atual){
   if (atual === undefined) {
-    var i = (VIT_CACHE || []).filter(function(x){ return x.asin === asin; })[0];
+    var i = vitItem(asin);
     atual = i && i.nicho ? String(i.nicho) : '';
   }
   atual = atual || '';
-  var ops = '<option value="">🤖 Classificador decide</option>'
-    + VIT_NICHOS.map(function(n){
-        return '<option value="' + esc(n.id) + '"' + (n.id === atual ? ' selected' : '') + '>'
+  var ctx = LST_RENDER_CTX;
+  var base = ctx && ctx.nichoOps;
+  if (base == null){
+    base = VIT_NICHOS.map(function(n){
+        return '<option value="' + esc(n.id) + '">'
           + esc(((n.emoji || '') + ' ' + (n.id === 'geral' ? 'Geral (não é nicho)' : n.nome)).trim()) + '</option>';
       }).join('');
+    if (ctx) ctx.nichoOps = base;
+  }
+  var ops = '<option value="">🤖 Classificador decide</option>'
+    + (atual ? base.replace('<option value="' + esc(atual) + '">', '<option value="' + esc(atual) + '" selected>') : base);
   return '<select title="Nicho deste produto" onclick="event.stopPropagation()" '
     + 'onchange="lstDefinirNicho(\'' + esc(asin) + '\', this.value, this)" '
     + 'style="font-size:11px;padding:2px 4px;max-width:170px;margin-top:0">' + ops + '</select>';
@@ -6462,7 +6479,7 @@ function lstDefinirNicho(asin, nicho, sel){
   .then(function(d){
     if (!d.ok) throw new Error(d.erro || 'falhou');
     (VIT_CACHE || []).forEach(function(x){ if (x.asin === asin) x.nicho = nicho || null; });
-    if (document.getElementById('lst-form').style.display !== 'none') renderLstSel();
+    if (document.getElementById('lst-form').style.display !== 'none') renderLstSelSeLivre();
     return carregarListas();
   })
   .catch(function(e){ alert('Não deu para salvar o nicho: ' + e.message); })
@@ -6472,8 +6489,7 @@ function lstDefinirNicho(asin, nicho, sel){
 // Link da pagina do produto para conferir preco/cupom antes da vez dele.
 // Vem da base (VIT_CACHE); Amazon e ML caem para a URL canonica pelo id.
 function lstUrlProduto(it){
-  var v = null;
-  for (var k = 0; k < VIT_CACHE.length; k++) { if (VIT_CACHE[k].asin === it.asin) { v = VIT_CACHE[k]; break; } }
+  var v = vitItem(it.asin);
   var asin = String(it.asin || '');
   var loja = String((v && v.loja) || it.loja || '');
   if (/amazon/i.test(loja) && /^[A-Z0-9]{10}$/.test(asin)) return 'https://www.amazon.com.br/dp/' + asin;
@@ -7088,7 +7104,7 @@ function lstMover(asin, delta){
 // Loja do produto em pilula colorida na linha da montagem (Amazon, Mercado
 // Livre, Shopee, Magalu...). A loja vem da base de produtos.
 function lstLojaPill(asin){
-  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  var v = vitItem(asin);
   var loja = String((v && v.loja) || 'Amazon');
   var l = loja.toLowerCase();
   var cor = l.indexOf('amazon') >= 0 ? 'var(--amazon)'
@@ -7102,7 +7118,7 @@ function lstLojaPill(asin){
 }
 
 function lstCupomVinculado(asin){
-  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  var v = vitItem(asin);
   return (v && v.cupom) ? v.cupom : null;
 }
 
@@ -7123,19 +7139,26 @@ function lstCuponsItem(){
 }
 
 function lstSelectCupomItem(p){
-  var v = VIT_CACHE.find(function(x){ return x.asin === p.asin; });
+  var v = vitItem(p.asin);
   var loja = (v && v.loja) || '';
-  var vig = cuponsVigentes();
-  var daLoja = vig.filter(function(c){ return (c.loja || '') === loja; });
-  var lista = daLoja.length ? daLoja : vig;
+  var ctx = LST_RENDER_CTX || {};
+  var vig = ctx.vig || (ctx.vig = cuponsVigentes());
+  ctx.cupOps = ctx.cupOps || {};
+  var base = ctx.cupOps[loja];
+  if (base == null){
+    var daLoja = vig.filter(function(c){ return (c.loja || '') === loja; });
+    var lista = daLoja.length ? daLoja : vig;
+    base = ctx.cupOps[loja] = optgroupsCupons(lista, function(c){
+      var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
+      return '<option value="' + esc(c.codigo) + '">' + esc(c.codigo) + ' · ' + val + '</option>';
+    });
+  }
   var atual = p.cupom || '';
-  var achou = false;
-  var ops = optgroupsCupons(lista, function(c){
-    var sel = c.codigo === atual; if (sel) achou = true;
-    var val = c.tipo === 'pct' ? c.valor + '%' : 'R$ ' + c.valor;
-    return '<option value="' + esc(c.codigo) + '"' + (sel ? ' selected' : '') + '>'
-      + esc(c.codigo) + ' · ' + val + '</option>';
-  });
+  var achou = false, ops = base;
+  if (atual && atual !== '__SEM__'){
+    var alvo = '<option value="' + esc(atual) + '">';
+    if (base.indexOf(alvo) >= 0){ achou = true; ops = base.replace(alvo, '<option value="' + esc(atual) + '" selected>'); }
+  }
   if (atual && atual !== '__SEM__' && !achou) ops = '<option value="' + esc(atual) + '" selected>' + esc(atual) + ' (fora da base)</option>' + ops;
   // O rotulo padrao diz o que "cupom da lista" vai fazer com este item agora.
   var modoL = (document.getElementById('lst-cupom-modo') || {}).value || 'nenhum';
@@ -7167,7 +7190,7 @@ function lstDefinirCupomItem(asin, codigo){
 var LST_CUPAG = {}, LST_CUPAG_EM = 0, LST_CUPAG_TIMER = null, LST_CUPAG_BUSY = false;
 
 function lstEhMl(asin){
-  var v = VIT_CACHE.find(function(x){ return x.asin === asin; });
+  var v = vitItem(asin);
   var l = String((v && v.loja) || '').toLowerCase();
   return l.indexOf('mercado livre') >= 0 || l === 'ml';
 }
@@ -7211,7 +7234,7 @@ function lstCarregarCupomPagina(){
     .then(function(){
       LST_CUPAG_BUSY = false;
       lstAplicarCupomPagina();
-      renderLstSel();
+      if (document.getElementById('lst-form').style.display === 'block') renderLstSelSeLivre();
       var lendo = LST_SEL.some(function(p){ return (LST_CUPAG[p.asin] || {}).estado === 'lendo'; });
       if (lendo) LST_CUPAG_TIMER = setTimeout(function(){ LST_CUPAG_TIMER = null; if (LST_SEL.length) lstCarregarCupomPagina(); }, 7000);
     });
@@ -7230,7 +7253,42 @@ function lstTagCupomPagina(p){
   return '';
 }
 
+// Contexto de um render: opcoes de cupom/nicho montadas uma vez e reaproveitadas
+// em todas as linhas (antes cada linha remontava e reordenava a base de cupons).
+var LST_RENDER_CTX = null, LST_RENDER_PEND = false;
+
+// Renders que chegam em segundo plano (comparativo de preco, cupom da pagina do
+// ML a cada 7 s, nicho salvo) refaziam a lista inteira por innerHTML e
+// destruiam o seletor que o operador tinha acabado de abrir. Com foco num campo
+// da lista, o render espera o campo perder o foco.
+function lstEditandoCampo(){
+  var el = document.getElementById('lst-sel');
+  var a = document.activeElement;
+  return !!(el && a && a !== el && el.contains(a) && /^(SELECT|INPUT|TEXTAREA)$/.test(a.tagName));
+}
+function renderLstSelSeLivre(){
+  if (lstEditandoCampo()) { LST_RENDER_PEND = true; return; }
+  renderLstSel();
+}
+
 function renderLstSel(){
+  var elG = document.getElementById('lst-sel');
+  if (elG && !elG._guardaFoco){
+    elG._guardaFoco = true;
+    elG.addEventListener('focusout', function(){
+      setTimeout(function(){
+        if (LST_RENDER_PEND && !lstEditandoCampo()) { LST_RENDER_PEND = false; renderLstSel(); }
+      }, 0);
+    });
+  }
+  LST_RENDER_PEND = false;
+  LST_RENDER_CTX = {};
+  try { _renderLstSel(); } finally { LST_RENDER_CTX = null; }
+  lstCarregarComparativo();
+  lstCarregarCupomPagina();
+}
+
+function _renderLstSel(){
   lstAutoRoteamento();
   lstAplicarCupomPagina();
   var el = document.getElementById('lst-sel');
@@ -7298,8 +7356,6 @@ function renderLstSel(){
         + ' Para garantir, escolha o nicho ao lado de cada produto.</div>';
     })()
   + lstResumoComparativo();
-  lstCarregarComparativo();
-  lstCarregarCupomPagina();
 }
 
 // ── COMPARATIVO DE PRECO NA MONTAGEM ─────────────────────────────────────────
@@ -7350,7 +7406,7 @@ function lstCarregarComparativo(){
     })
     .then(function(){
       faltam.forEach(function(a){ delete LST_COMP_PEND[a]; });
-      if (document.getElementById('lst-form').style.display === 'block') renderLstSel();
+      if (document.getElementById('lst-form').style.display === 'block') renderLstSelSeLivre();
     });
 }
 
@@ -7499,7 +7555,7 @@ function lstAutoRoteamento(){
 }
 
 function lstNichoDoItem(asin){
-  var i = (VIT_CACHE || []).filter(function(x){ return x.asin === asin; })[0];
+  var i = vitItem(asin);
   var n = i && i.nicho ? String(i.nicho).trim() : '';
   return n && n !== 'geral' ? n : '';
 }
