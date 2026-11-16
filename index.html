@@ -4873,8 +4873,9 @@ function renderDist(){
       var pct = l.limite ? Math.round((g.ocupacao / l.limite) * 100) : 0;
       var alerta = g.erro ? '<div style="color:var(--red);font-size:10.5px;margin-top:3px">⚠️ ' + esc(g.erro)
           + ' <a href="#" onclick="distRenovar(\'' + esc(l.slug) + '\',\'' + esc(g.jid) + '\');return false" style="color:var(--accent)">renovar convite</a></div>' : '';
-      var selo = g.cheio ? '<span style="color:var(--red);font-weight:700">CHEIO</span>'
-               : (g.ativo ? '' : '<span style="color:var(--muted2)">pausado</span>');
+      var selo = (g.cheio ? '<span style="color:var(--red);font-weight:700">CHEIO</span>'
+               : (g.ativo ? '' : '<span style="color:var(--muted2)">pausado</span>'))
+               + (g.reserva === true ? ' <span style="color:var(--amber)">🛟 reserva</span>' : '');
       return '<div style="padding:8px 0;border-bottom:1px dashed var(--border)">'
         + '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">'
         + '<span style="font-size:12px;font-weight:600;flex:1">' + esc(g.nome || g.jid) + '</span>'
@@ -5013,7 +5014,7 @@ function editarDist(slug){
   var l = DIST_CACHE.find(function(x){ return x.slug === slug; });
   if (!l) return;
   DIST_EDIT = slug;
-  DIST_SEL = (l.grupos||[]).map(function(g){ return { jid:g.jid, nome:g.nome, ativo:g.ativo }; });
+  DIST_SEL = (l.grupos||[]).map(function(g){ return { jid:g.jid, nome:g.nome, ativo:g.ativo, reserva:g.reserva === true }; });
   document.getElementById('dist-form-titulo').textContent = 'Editando: ' + l.nome;
   document.getElementById('dist-nome').value = l.nome || '';
   document.getElementById('dist-slug').value = slug;
@@ -5279,7 +5280,7 @@ function distAdd(jid){
   var g = GRUPOS_CACHE.find(function(x){ return x.id === jid; });
   if (!g) return;
   if (!DIST_SEL.some(function(x){ return x.jid === jid; }))
-    DIST_SEL.push({ jid: jid, nome: g.nome, ativo: true });
+    DIST_SEL.push({ jid: jid, nome: g.nome, ativo: true, reserva: false });
   document.getElementById('dist-add').value = '';
   document.getElementById('dist-sug').style.display = 'none';
   renderDistSel();
@@ -5304,6 +5305,13 @@ function distTogglePausa(jid){
   if (g) { g.ativo = g.ativo === false; renderDistSel(); }
 }
 
+// Reserva: fica fora do rodizio enquanto houver titular com vaga e entra
+// sozinha quando nenhum titular serve (cheio ou convite travado) — proxy ggElegiveis.
+function distToggleReserva(jid){
+  var g = DIST_SEL.find(function(x){ return x.jid === jid; });
+  if (g) { g.reserva = g.reserva !== true; renderDistSel(); }
+}
+
 function renderDistSel(){
   var el = document.getElementById('dist-sel');
   if (!DIST_SEL.length){
@@ -5313,7 +5321,8 @@ function renderDistSel(){
   el.innerHTML = DIST_SEL.map(function(g, i){
     return '<div class="grp-chip">'
       + '<span style="flex:1' + (g.ativo === false ? ';opacity:.45' : '') + '" title="' + esc(g.jid) + '">'
-      +   (i+1) + '. ' + esc(g.nome || g.jid) + '</span>'
+      +   (i+1) + '. ' + esc(g.nome || g.jid) + (g.reserva === true ? ' <span style="color:var(--amber);font-size:11px">🛟 reserva</span>' : '') + '</span>'
+      + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" title="' + (g.reserva === true ? 'Tirar da reserva (vira titular)' : 'Marcar como reserva: só recebe quando os titulares estão cheios ou com convite travado') + '" onclick="distToggleReserva(\'' + esc(g.jid) + '\')">' + (g.reserva === true ? '🛟✓' : '🛟') + '</button>'
       + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distMover(\'' + esc(g.jid) + '\',-1)">↑</button>'
       + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distMover(\'' + esc(g.jid) + '\',1)">↓</button>'
       + '<button class="btn btn-copy btn-sm" style="padding:3px 8px" onclick="distTogglePausa(\'' + esc(g.jid) + '\')">'
