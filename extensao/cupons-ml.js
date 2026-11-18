@@ -625,6 +625,25 @@ function mlPassoTexto(sel) {
   return (((modal && modal.innerText) || '') + ' ' + [...document.querySelectorAll('.andes-snackbar, [role=alert], [role=status]')].map(e => e.innerText).join(' ')).replace(/\s+/g, ' ').trim();
 }
 
+// A aba esta em outra pagina do ML (ex.: "Meus cupons" apos uma insercao)?
+// Volta para a pagina de cupons. Aba fora do ML (o operador usou a aba) ou na
+// tela de verificacao: nao mexe — o resto do fluxo decide.
+async function mlVoltarParaCupons(tabId, sel) {
+  let aba = null;
+  try { aba = await chrome.tabs.get(tabId); } catch (_) { return false; }
+  let atual, alvo;
+  try { atual = new URL(aba.url || aba.pendingUrl || ''); alvo = new URL(sel.url); } catch (_) { return false; }
+  if (ML_RE_ANTIBOT_URL.test(atual.href)) return false;
+  if (!/(^|\.)mercadolivre\.com\.br$/i.test(atual.hostname)) return false;
+  const limpa = s => s.replace(/\/+$/, '');
+  if (limpa(atual.pathname) === limpa(alvo.pathname)) return false;
+  await chrome.tabs.update(tabId, { url: sel.url });
+  await mlEsperarVivo(1200);
+  await mlPrepararPagina(tabId, sel);
+  await mlEsperarVivo(800);
+  return true;
+}
+
 // Service worker — conduz os passos.
 async function mlInserirUmPassos(tabId, codigo, sel, tempos) {
   const rnd = f => f[0] + Math.random() * (f[1] - f[0]);
@@ -636,13 +655,19 @@ async function mlInserirUmPassos(tabId, codigo, sel, tempos) {
     return null;
   };
 
+  // 18/11/2026: depois de inserir, o ML leva a aba para "Meus cupons"
+  // (/cupons/active?source_page=int_input_code), que nao tem o botao
+  // "Inserir codigo". Antes do proximo cupom, volta para a pagina de cupons.
+  await mlVoltarParaCupons(tabId, sel);
+
   // Modal pode ja estar aberto do cupom anterior.
   const est = await inj(mlPassoEstado, [sel]);
   if (!est || !est.campoVisivel) {
     if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 6000))) {
       // 29/09/2026: o botao sumiu numa visita mas estava la ao abrir a pagina
-      // de novo — antes de declarar "pagina mudou", recarrega uma vez.
-      await chrome.tabs.reload(tabId).catch(() => {});
+      // de novo — antes de declarar "pagina mudou", abre a pagina de cupons
+      // de novo (recarregar a pagina errada nao adiantava).
+      await chrome.tabs.update(tabId, { url: sel.url }).catch(() => {});
       await mlEsperarVivo(1500);
       await mlPrepararPagina(tabId, sel);
       if (!(await esperar(async () => (await inj(mlPassoEstado, [sel])).temAbrir, 10000))) {

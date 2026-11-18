@@ -132,6 +132,13 @@ ou um com 403, abrem o disjuntor. `sem_login` e `pagina_mudou` (seletor não
 encontrado) também desligam tudo e avisam no bot. Um erro qualquer encerra a
 visita — insistir em seguida é assinatura de robô.
 
+**Volta para a página de cupons (2.15.1, 18/11/2026).** Depois de cada
+inserção o ML leva a aba para "Meus cupons" (`/cupons/active?source_page=int_input_code`),
+que não tem o botão *Inserir código*. Antes de cada cupom a extensão confere a
+aba e, se ela estiver em outra página do ML, abre `/cupons` de novo. Antes ela
+só recarregava a página errada: cada visita inseria 1 cupom e terminava em
+"página mudou", e a reverificação dos cupons já confirmados nunca rodava.
+
 Os **seletores** da página vêm do servidor a cada lote (`SELETORES_PADRAO` em
 `insercao-ml-auto.js`, sobrepostos por `CUPONS_ML_AUTO_SELETORES`): se o ML mudar
 a página, corrige-se no servidor sem republicar a extensão.
