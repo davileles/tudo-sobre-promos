@@ -17120,6 +17120,7 @@ function ns2Pintar() {
       if (n.status === 'emitida' && n.chaveAcesso) acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso) + '" target="_blank" rel="noopener">PDF</a>');
       if (n.status !== 'emitida') acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/mes/' + m.mes + '/previa/' + n.chave) + '" target="_blank" rel="noopener">XML</a>');
       if (n.status === 'erro') acoes.push('<a href="#" onclick="ns2Emitir(\'' + m.mes + '\',1,\'' + n.chave + '\');return false">tentar de novo</a>');
+      if (n.status === 'pendente' || n.status === 'incerta') acoes.push('<a href="#" onclick="ns2Emitir(\'' + m.mes + '\',1,\'' + n.chave + '\');return false">📤 emitir só esta</a>');
       if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'ignorar\');return false">ignorar</a>');
       if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'emitida-fora\');return false">já emiti por fora</a>');
       if (n.status === 'ignorada') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'reativar\');return false">reativar</a>');
