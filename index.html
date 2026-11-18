@@ -3054,11 +3054,11 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label>Série das DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
     </div>
     <div class="field"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="ns2-s-xDescServ" rows="2"></textarea></div>
-    <div class="field"><label>Informação complementar <span class="tag">opcional</span></label><textarea id="ns2-s-xInfComp" rows="2"></textarea></div>
+    <div class="field"><label>Informação complementar <span class="tag">deixe vazio (orientação da contabilidade)</span></label><textarea id="ns2-s-xInfComp" rows="2"></textarea></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
       <div class="field"><label>Buscar o relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
       <div class="field"><label>Valor mínimo por nota (R$)</label><input type="text" id="ns2-minimo"/></div>
-      <div class="field"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão</option></select></div>
+      <div class="field"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão (data da prestação: orientação da contabilidade)</option></select></div>
     </div>
     <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label><br/>
     <label class="env-check"><input type="checkbox" id="ns2-confirmados"/> <b>Códigos do serviço confirmados com o contador</b> (sem isso nada é emitido em produção)</label><br/>
@@ -17229,7 +17229,7 @@ var NS2_DESC = {
   'ns2-s-cTribNac': { '170601': 'Item 17.06 da lista de serviços: propaganda e publicidade, inclusive promoção de vendas, planejamento de campanhas e materiais publicitários', '080201': 'Item 8.02: instrução, treinamento, orientação pedagógica e educacional (código usado nas notas antigas pelo eNotas)', _: 'Código do serviço na lista nacional (LC 116), 6 dígitos.' },
   'ns2-s-cTribMun': { '001': 'Desdobramento de Belo Horizonte para o código nacional acima (opção 001 do Emissor Nacional)', _: 'Subdivisão que o município usa para o código nacional. Em BH, escolhido no Emissor Nacional.' },
   'ns2-s-cNBS': { '114061900': 'Serviços de propaganda não classificados em subposições anteriores', '122051900': 'Código de serviços educacionais usado nas notas antigas pelo eNotas', _: 'Nomenclatura Brasileira de Serviços: classificação do serviço usada pela Receita.' },
-  'ns2-s-pTotTribSN': { '': 'Não informar o percentual (vai “não informado”)', _: 'Percentual aproximado dos tributos do Simples, só informativo para o tomador (Lei da Transparência). Não muda o imposto pago; o DAS é calculado à parte.' },
+  'ns2-s-pTotTribSN': { '': 'Não informar o percentual (vai “não informado”)', _: 'Alíquota do Simples Nacional (a que aparece na guia DAS no Nibo; hoje 6,00%, faixa 1 do Anexo III). Só informativa para o tomador; o imposto é pago no DAS.' },
   'ns2-s-tribISSQN': { '1': 'Operação tributável pelo ISS', '2': 'Imunidade', '3': 'Exportação de serviço', '4': 'Não incidência', _: 'Tributação do ISS nesta operação.' },
   'ns2-s-tpRetISSQN': { '1': 'ISS não retido: a empresa recolhe (no DAS)', '2': 'Retido pelo tomador', '3': 'Retido pelo intermediário', _: 'Quem recolhe o ISS.' },
   'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', _: 'Situação tributária do PIS/COFINS na nota.' },
