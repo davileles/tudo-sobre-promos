@@ -3038,20 +3038,20 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label>Inscrição municipal</label><input type="text" id="ns2-e-im"/></div>
       <div class="field"><label>Telefone</label><input type="text" id="ns2-e-fone"/></div>
       <div class="field"><label>E-mail</label><input type="text" id="ns2-e-email"/></div>
-      <div class="field"><label>Município (IBGE)</label><input type="text" id="ns2-e-cLocEmi"/></div>
-      <div class="field"><label>Simples: opção (opSimpNac)</label><input type="text" id="ns2-e-opSimpNac"/></div>
-      <div class="field"><label>Simples: apuração (regApTribSN)</label><input type="text" id="ns2-e-regApTribSN"/></div>
-      <div class="field"><label>Regime especial (regEspTrib)</label><input type="text" id="ns2-e-regEspTrib"/></div>
+      <div class="field"><label>Município (IBGE)</label><input type="text" id="ns2-e-cLocEmi" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-cLocEmi" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>Simples: opção (opSimpNac)</label><input type="text" id="ns2-e-opSimpNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-opSimpNac" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>Simples: apuração (regApTribSN)</label><input type="text" id="ns2-e-regApTribSN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regApTribSN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>Regime especial (regEspTrib)</label><input type="text" id="ns2-e-regEspTrib" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regEspTrib" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:6px">
-      <div class="field"><label>Código de tributação nacional</label><input type="text" id="ns2-s-cTribNac"/></div>
-      <div class="field"><label>Código municipal (BH)</label><input type="text" id="ns2-s-cTribMun"/></div>
-      <div class="field"><label>NBS</label><input type="text" id="ns2-s-cNBS"/></div>
-      <div class="field"><label>% tributos Simples (pTotTribSN)</label><input type="text" id="ns2-s-pTotTribSN" placeholder="vazio = não informar"/></div>
-      <div class="field"><label>ISS: tributação (tribISSQN)</label><input type="text" id="ns2-s-tribISSQN"/></div>
-      <div class="field"><label>ISS retido? (tpRetISSQN)</label><input type="text" id="ns2-s-tpRetISSQN"/></div>
-      <div class="field"><label>PIS/COFINS CST</label><input type="text" id="ns2-s-cstPisCofins"/></div>
-      <div class="field"><label>Série das DPS</label><input type="text" id="ns2-serie"/></div>
+      <div class="field"><label>Código de tributação nacional</label><input type="text" id="ns2-s-cTribNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribNac" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>Código municipal (BH)</label><input type="text" id="ns2-s-cTribMun" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribMun" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>NBS</label><input type="text" id="ns2-s-cNBS" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cNBS" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>% tributos Simples (pTotTribSN)</label><input type="text" id="ns2-s-pTotTribSN" placeholder="vazio = não informar" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-pTotTribSN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>ISS: tributação (tribISSQN)</label><input type="text" id="ns2-s-tribISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tribISSQN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>ISS retido? (tpRetISSQN)</label><input type="text" id="ns2-s-tpRetISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tpRetISSQN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>PIS/COFINS CST</label><input type="text" id="ns2-s-cstPisCofins" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cstPisCofins" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+      <div class="field"><label>Série das DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
     </div>
     <div class="field"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="ns2-s-xDescServ" rows="2"></textarea></div>
     <div class="field"><label>Informação complementar <span class="tag">opcional</span></label><textarea id="ns2-s-xInfComp" rows="2"></textarea></div>
@@ -17099,6 +17099,7 @@ function ns2Pintar() {
   document.getElementById('ns2-agrupar').checked = !!cfg.agrupar;
   document.getElementById('ns2-confirmados').checked = !!cfg.codigosConfirmados;
   document.getElementById('ns2-ativo').checked = !!cfg.ativo;
+  ns2Descrever();
   var mb = document.getElementById('ns2-mes-buscar');
   if (!mb.value) mb.value = d.mesAlvo.slice(0, 4) + '-' + d.mesAlvo.slice(4, 6);
   var h = '';
@@ -17218,6 +17219,32 @@ function ns2ImportarCsv(inp) {
     });
   };
   rd.readAsText(f, 'utf-8');
+}
+// Significado dos códigos da nota, para conferir sem precisar decorar.
+var NS2_DESC = {
+  'ns2-e-cLocEmi': { '3106200': 'Belo Horizonte/MG', _: 'Código IBGE do município da empresa (7 dígitos). Confira em cidades.ibge.gov.br.' },
+  'ns2-e-opSimpNac': { '1': 'Não optante pelo Simples Nacional', '2': 'MEI', '3': 'Optante pelo Simples Nacional: ME ou EPP', _: 'Situação da empresa no Simples Nacional.' },
+  'ns2-e-regApTribSN': { '1': 'Tributos federais e o ISS apurados pelo Simples Nacional (DAS)', '2': 'Federais pelo Simples; ISS fora do Simples, pela regra do município', '3': 'Federais e ISS fora do Simples', _: 'Como os tributos são apurados no Simples.' },
+  'ns2-e-regEspTrib': { '0': 'Nenhum regime especial', '1': 'Ato cooperado', '2': 'Estimativa', '3': 'Microempresa municipal', '4': 'Notário ou registrador', '5': 'Profissional autônomo', '6': 'Sociedade de profissionais', _: 'Regime especial de tributação do ISS.' },
+  'ns2-s-cTribNac': { '170601': 'Item 17.06 da lista de serviços: propaganda e publicidade, inclusive promoção de vendas, planejamento de campanhas e materiais publicitários', '080201': 'Item 8.02: instrução, treinamento, orientação pedagógica e educacional (código usado nas notas antigas pelo eNotas)', _: 'Código do serviço na lista nacional (LC 116), 6 dígitos.' },
+  'ns2-s-cTribMun': { '001': 'Desdobramento de Belo Horizonte para o código nacional acima (opção 001 do Emissor Nacional)', _: 'Subdivisão que o município usa para o código nacional. Em BH, escolhido no Emissor Nacional.' },
+  'ns2-s-cNBS': { '114061900': 'Serviços de propaganda não classificados em subposições anteriores', '122051900': 'Código de serviços educacionais usado nas notas antigas pelo eNotas', _: 'Nomenclatura Brasileira de Serviços: classificação do serviço usada pela Receita.' },
+  'ns2-s-pTotTribSN': { '': 'Não informar o percentual (vai “não informado”)', _: 'Percentual aproximado dos tributos do Simples, só informativo para o tomador (Lei da Transparência). Não muda o imposto pago; o DAS é calculado à parte.' },
+  'ns2-s-tribISSQN': { '1': 'Operação tributável pelo ISS', '2': 'Imunidade', '3': 'Exportação de serviço', '4': 'Não incidência', _: 'Tributação do ISS nesta operação.' },
+  'ns2-s-tpRetISSQN': { '1': 'ISS não retido: a empresa recolhe (no DAS)', '2': 'Retido pelo tomador', '3': 'Retido pelo intermediário', _: 'Quem recolhe o ISS.' },
+  'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', _: 'Situação tributária do PIS/COFINS na nota.' },
+  'ns2-serie': { '70': 'Série própria do painel (o eNotas usava a série 1). Não trocar depois de emitir.', _: 'Série das DPS. Use uma série que nenhum outro sistema use.' }
+};
+function ns2Descrever() {
+  document.querySelectorAll('.ns2-desc').forEach(function (el) {
+    var inp = document.getElementById(el.getAttribute('data-de')), d = NS2_DESC[el.getAttribute('data-de')] || {};
+    var v = inp ? String(inp.value || '').trim() : '';
+    var txt = Object.prototype.hasOwnProperty.call(d, v) ? d[v] : d._;
+    if (v && !Object.prototype.hasOwnProperty.call(d, v) && v !== '' && el.getAttribute('data-de') === 'ns2-s-pTotTribSN') txt = v + '% — ' + d._;
+    else if (v && !Object.prototype.hasOwnProperty.call(d, v)) txt = '⚠️ código não reconhecido aqui. ' + (d._ || '');
+    else if (v && el.getAttribute('data-de') !== 'ns2-s-pTotTribSN') txt = '→ ' + txt;
+    el.textContent = txt || '';
+  });
 }
 function ns2Teste(m) {
   if (!confirm('Emitir UMA nota de teste no ambiente de homologação do governo (não vale como nota fiscal)?')) return;
