@@ -11,6 +11,7 @@
 html.visao-operador #grp-resultados,
 html.visao-operador #tab-comissao,
 html.visao-operador #tab-trafego,
+html.visao-operador #tab-notas,
 html.visao-operador #tab-ltv { display: none !important; }
 #ltv-bloco .ltv-tab{width:100%;border-collapse:collapse;font-size:12px}
 #ltv-bloco .ltv-tab th{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--border)}
@@ -1261,6 +1262,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-cliques" onclick="switchTab('cliques')">👆 Cliques</button>
   <button class="main-tab" id="tab-descobertas" onclick="switchTab('descobertas')">🔎 Descobertas</button>
   <button class="main-tab" id="tab-trafego" onclick="switchTab('trafego')">📈 Tráfego</button>
+  <button class="main-tab" id="tab-notas" onclick="switchTab('notas')">🧾 Notas Shopee</button>
   <button class="main-tab" id="tab-grupos" onclick="switchTab('grupos')">🧭 Trilhas</button>
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
@@ -3005,6 +3007,44 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="lk-lista"></div>
 </div>
 
+<!-- ════════ NOTAS SHOPEE (comissão extra de vendedores → eNotas) ════════ -->
+<div class="panel" id="panel-notas">
+  <div class="aviso">
+    Suba o <b>relatório mensal de comissão do vendedor</b> baixado na Shopee (MonthlyReport_*.csv) e baixe o arquivo pronto para
+    <b>importar no eNotas</b>: uma nota por vendedor (tomador), no valor da comissão extra paga. Tudo roda aqui no navegador; nada é enviado ao servidor.
+    A <b>chave única</b> de cada nota é <b>SHOPEE-AAAAMM-documento</b>: reimportar o mesmo mês no eNotas não duplica nota.
+  </div>
+  <div class="card">
+    <div class="fila-bar" style="margin:0">
+      <label class="btn btn-sm" style="cursor:pointer">📂 Escolher relatório da Shopee<input type="file" accept=".csv,text/csv" style="display:none" onchange="nfsArquivo(this)"/></label>
+      <span id="nfs-erro" style="color:#ef4444;font-size:12px"></span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec-label">Opções</div>
+    <label class="env-check"><input type="checkbox" id="nfs-agrupar" onchange="nfsRender()"/> uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label><br/>
+    <label class="env-check"><input type="checkbox" id="nfs-estr" onchange="nfsRender()"/> incluir vendedores estrangeiros (sem CNPJ; nota de exportação de serviço)</label>
+    <div class="field" style="margin-top:10px;max-width:220px"><label>Valor mínimo por nota (R$) <span class="tag">0 = todas</span></label><input type="text" id="nfs-minimo" oninput="nfsRender()"/></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+      <div class="field"><label>Produto no eNotas (nome)</label><input type="text" id="nfs-produto" oninput="nfsRender()"/></div>
+      <div class="field"><label>ID do produto no eNotas</label><input type="text" id="nfs-produto-id" oninput="nfsRender()"/></div>
+    </div>
+    <div class="field"><label>Discriminação <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="nfs-disc" rows="3" oninput="nfsRender()"></textarea></div>
+    <div class="sec-label" style="margin-top:14px">Campos fiscais <span class="tag" style="text-transform:none">em branco = vale o serviço do produto/empresa no eNotas</span></div>
+    <div id="nfs-fiscais" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px"></div>
+  </div>
+  <div id="nfs-resultado" style="display:none">
+    <div class="fila-bar">
+      <span id="nfs-resumo"></span>
+      <div class="fila-acoes"><button class="btn btn-sm" id="nfs-baixar" onclick="nfsBaixar()">⬇️ Baixar CSV do eNotas</button></div>
+    </div>
+    <div class="sec-label" style="margin-top:14px">Notas</div>
+    <div id="nfs-tabela"></div>
+    <div class="sec-label" style="margin-top:22px">Fora do arquivo</div>
+    <div id="nfs-fora"></div>
+  </div>
+</div>
+
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
 <div class="panel" id="panel-config">
   <div class="cfg-subtabs">
@@ -3697,7 +3737,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','avisos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','avisos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','notas','config'];
 function switchTab(name) {
   if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos('o', false);
   if (name === 'cupom' && quandoSel('c') === 'janela') carregarJanelaDisparos('c', false);
@@ -3756,6 +3796,7 @@ function switchTab(name) {
   }
   if (name === 'monprecos') mpCarregar();
   if (name === 'avisos') avCarregar();
+  if (name === 'notas') nfsAbrir();
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') { cfgAbrir(); carregarJanelaCupom(); }
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
@@ -3787,7 +3828,7 @@ var SECOES = [
   // material de trabalho — produtos, cupons e o que alimenta a base
   { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','avisos','descobertas'] },
   // quanto os envios renderam, depois quanto a audiencia custa/vale
-  { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego'] },
+  { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego','notas'] },
   { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','saude'] },
   // como o sistema se comporta: regras, formato das mensagens e contas
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
@@ -3797,7 +3838,7 @@ var ROTULO_ABA = {
   divulg: 'Divulgações', cupom: 'Criar cupom', oferta: 'Criar oferta',
   livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços', avisos: 'Avisos de preço',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
-  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', ltv: 'LTV dos membros',
+  rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', notas: 'Notas Shopee', ltv: 'LTV dos membros',
   grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', saude: 'Saúde dos grupos', conexao: 'Conexão e turnos', config: 'Automação e geral'
 };
 var SECAO_ATUAL = 'hoje';
@@ -16715,6 +16756,232 @@ function avDesenhar(){
     ? lista.map(avCartao).join('')
     : '<div class="av-vazio">' + (busca ? 'Nenhum pedido encontrado para “' + esc(busca) + '”.' : 'Nenhum pedido aqui.') + '</div>';
 }
+
+/* ════════ NOTAS SHOPEE (comissão extra de vendedores → importação eNotas) ════════
+   O Davi baixa na Shopee o relatório mensal das comissões extras pagas pelos
+   vendedores (MonthlyReport_*.csv) e sobe aqui. Tudo roda no navegador: nada
+   vai para o servidor. Sai o CSV no layout de importação do eNotas (";" e UTF-8).
+   Campos fiscais em branco = o eNotas usa o serviço padrão da empresa. */
+var NFS_CAB = ['ChaveUnica','Cliente_NomeRazaoSocial','Cliente_NomeFantasia','Cliente_Documento','Cliente_Email','Cliente_EnderecoCidade','Cliente_EnderecoUF','Cliente_EnderecoCEP','Cliente_Endereco','Cliente_EnderecoNumero','Cliente_EnderecoComplemento','Cliente_EnderecoBairro','Cliente_EnderecoPais','Cliente_Telefone','Cliente_TipoPessoa','Cliente_InscricaoMunicipal','Cliente_InscricaoEstadual','Produto_Nome','Produto_IDExterno','Produto_ValorTotal','Venda_ValorTotal','Venda_Data','Venda_MeioPagamento','NFe_CNAE','NFe_CodigoServicoMunicipio','NFe_ItemListaServicoLC116','NFe_ValorCOFINS','NFe_PercentualCOFINS','NFe_ValorPIS','NFe_PercentualPIS','NFe_ValorCSLL','NFe_PercentualCSLL','NFe_ValorINSS','NFe_PercentualINSS','NFe_ValorIR','NFe_PercentualIR','NFe_ValorISS','NFe_AliquotaISS','NFe_ISSRetido','NFe_ValorDeducoes','NFe_ValorDescontos','NFe_DataCompetencia','NFe_MunicipioPrestacao','NFe_Discriminacao','Venda_DataVencimento','NFe_QuandoEmitir','NFe_EnviarNFeCliente','NFe_ValorTotal','NFe_DescricaoServicoMunicipal','NFe_InformacaoAdicional','NFe_CodigoTributacaoNacional','NFe_CodigoIndicadorOperacao','NFe_CodigoNBS','NFe_CodigoClassificacaoTributaria'];
+// Campos fiscais editáveis no painel (vazio = padrão da empresa no eNotas)
+var NFS_FISCAIS = [
+  ['NFe_CNAE', 'CNAE'], ['NFe_CodigoServicoMunicipio', 'Código do serviço no município'],
+  ['NFe_ItemListaServicoLC116', 'Item da LC 116'], ['NFe_AliquotaISS', 'Alíquota ISS (%)'],
+  ['NFe_CodigoTributacaoNacional', 'Código de tributação nacional'], ['NFe_CodigoNBS', 'Código NBS'],
+  ['NFe_CodigoIndicadorOperacao', 'Indicador de operação'], ['NFe_CodigoClassificacaoTributaria', 'Classificação tributária']
+];
+var NFS_UF = { 'acre':'AC','alagoas':'AL','amapa':'AP','amazonas':'AM','bahia':'BA','ceara':'CE','distrito federal':'DF','espirito santo':'ES','goias':'GO','maranhao':'MA','mato grosso':'MT','mato grosso do sul':'MS','minas gerais':'MG','para':'PA','paraiba':'PB','parana':'PR','pernambuco':'PE','piaui':'PI','rio de janeiro':'RJ','rio grande do norte':'RN','rio grande do sul':'RS','rondonia':'RO','roraima':'RR','santa catarina':'SC','sao paulo':'SP','sergipe':'SE','tocantins':'TO' };
+var NFS_MES = { jan:1, feb:2, fev:2, mar:3, apr:4, abr:4, may:5, mai:5, jun:6, jul:7, aug:8, ago:8, sep:9, set:9, oct:10, out:10, nov:11, dec:12, dez:12 };
+var NFS_PADRAO = {
+  produto: 'Comissões Shopee', produtoId: '12345678',
+  discriminacao: 'Serviço de divulgação de produtos (comissão extra paga pelo vendedor via programa de afiliados Shopee) - competência {mes} - loja(s) {lojas}',
+  agrupar: true, estrangeiros: false, minimo: '0'
+};
+var NFS_ESTADO = { linhas: [], nome: '' };
+
+function nfsSemAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+// eNotas: ";" separa colunas e não pode aparecer em nenhum campo
+function nfsLimpo(s) { return String(s == null ? '' : s).replace(/[;\r\n]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function nfsDigitos(s) { return String(s || '').replace(/\D/g, ''); }
+function nfsValor(s) {   // "R$1,46" | "R$1.234,56" → 1.46
+  var t = String(s || '').replace(/[^\d,.-]/g, '');
+  if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+  var n = parseFloat(t); return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+}
+function nfsMoeda(n) { return n.toFixed(2).replace('.', ','); }
+function nfsMes(s) {     // "Aug 2026" → {mm:'08', aaaa:'2026'}
+  var m = String(s || '').trim().match(/^([A-Za-zçÇ]{3})[a-zç]*\.?\s+(\d{4})$/);
+  if (!m) { var m2 = String(s || '').match(/(\d{1,2})\D+(\d{4})/); return m2 ? { mm: ('0' + m2[1]).slice(-2), aaaa: m2[2] } : null; }
+  var n = NFS_MES[nfsSemAcento(m[1])]; return n ? { mm: ('0' + n).slice(-2), aaaa: m[2] } : null;
+}
+function nfsCsv(texto) {  // CSV com aspas ("Cha""rmozza") e BOM
+  texto = String(texto || '').replace(/^﻿/, '');
+  var linhas = [], lin = [], campo = '', aspas = false;
+  for (var i = 0; i < texto.length; i++) {
+    var c = texto[i];
+    if (aspas) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else aspas = false; }
+      else campo += c;
+    } else if (c === '"') aspas = true;
+    else if (c === ',') { lin.push(campo); campo = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && texto[i + 1] === '\n') i++;
+      lin.push(campo); campo = '';
+      if (lin.some(function (x) { return x.trim() !== ''; })) linhas.push(lin);
+      lin = [];
+    } else campo += c;
+  }
+  lin.push(campo); if (lin.some(function (x) { return x.trim() !== ''; })) linhas.push(lin);
+  return linhas;
+}
+// "R Fulano, 506, Andar 2 Sala 03 - Catumbi, São Paulo - São Paulo, 03021060"
+function nfsEndereco(s) {
+  var r = { logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '', cep: '', ok: false };
+  var m = String(s || '').trim().match(/^(.*) - ([^,]*), ([^,]*?) - ([^,]*?), (\d{5}-?\d{3})$/);
+  if (!m) { r.logradouro = nfsLimpo(s); return r; }
+  var partes = m[1].split(',');
+  r.logradouro = nfsLimpo(partes[0]);
+  r.numero = nfsLimpo(partes[1] || '') || 'S/N';
+  r.complemento = nfsLimpo(partes.slice(2).join(','));
+  r.bairro = nfsLimpo(m[2]); r.cidade = nfsLimpo(m[3]);
+  r.uf = NFS_UF[nfsSemAcento(m[4])] || '';
+  var cep = nfsDigitos(m[5]); r.cep = cep.slice(0, 5) + '-' + cep.slice(5);
+  r.ok = !!(r.uf && r.cidade);
+  return r;
+}
+// Relatório da Shopee → lista de vendedores (uma linha por loja)
+function nfsLerShopee(texto) {
+  var tab = nfsCsv(texto);
+  if (tab.length < 2) throw new Error('Arquivo vazio.');
+  var cab = tab[0].map(function (h) { return nfsSemAcento(h); });
+  function col(nome) { var i = cab.indexOf(nfsSemAcento(nome)); if (i < 0) throw new Error('Coluna "' + nome + '" não encontrada: este é o relatório mensal de comissão do vendedor da Shopee?'); return i; }
+  var C = { mes: col('Mês de conclusão'), loja: col('Nome da loja'), id: col('ID da Loja'), valor: col('Comissão Total do Vendedor'),
+    cnpj: col('CNPJ do Vendedor'), cpf: col('CPF do Vendedor'), estr: col('Identificação Fiscal Estrangeira'), razao: col('Razão social do vendedor'),
+    end: col('Endereço do Vendedor'), pais: col('País do Vendedor'), ie: col('Inscrição Estadual'), email: col('E-mail') };
+  return tab.slice(1).map(function (l) {
+    function v(k) { return (l[C[k]] || '').trim(); }
+    var cnpj = nfsDigitos(v('cnpj')), cpf = nfsDigitos(v('cpf')), pais = v('pais').toUpperCase() || 'BR';
+    var doc = cnpj ? ('00000000000000' + cnpj).slice(-14) : (cpf ? ('00000000000' + cpf).slice(-11) : '');
+    return { mes: nfsMes(v('mes')), mesTxt: v('mes'), loja: nfsLimpo(v('loja')), idLoja: v('id'), valor: nfsValor(v('valor')),
+      doc: doc, tipo: cnpj ? 'J' : (cpf ? 'F' : ''), estrangeiro: pais !== 'BR', docEstrangeiro: v('estr'),
+      razao: nfsLimpo(v('razao')) || nfsLimpo(v('loja')), endTxt: v('end'), end: pais === 'BR' ? nfsEndereco(v('end')) : null,
+      pais: pais, ie: nfsDigitos(v('ie')), email: nfsLimpo(v('email')) };
+  });
+}
+// Agrupa (por documento, se pedido) e aplica filtros. Devolve {notas, fora}
+function nfsMontar(linhas, cfg) {
+  var notas = [], fora = [], porChave = {};
+  var minimo = nfsValor(cfg.minimo);
+  linhas.forEach(function (r) {
+    var motivo = '';
+    if (!r.mes) motivo = 'mês ilegível (' + r.mesTxt + ')';
+    else if (r.valor <= 0) motivo = 'sem valor';
+    else if (r.estrangeiro && !cfg.estrangeiros) motivo = 'vendedor estrangeiro (' + r.pais + ')';
+    else if (!r.estrangeiro && !r.doc) motivo = 'sem CNPJ/CPF';
+    if (motivo) { fora.push({ r: r, motivo: motivo }); return; }
+    var mesId = r.mes.aaaa + r.mes.mm;
+    var docChave = r.doc || ('EX' + (r.docEstrangeiro || r.idLoja));
+    var chave = cfg.agrupar ? mesId + '|' + docChave : mesId + '|L' + r.idLoja;
+    var n = porChave[chave];
+    if (!n) { n = porChave[chave] = { chave: chave, mesId: mesId, mes: r.mes, docChave: docChave, base: r, lojas: [], valor: 0 }; notas.push(n); }
+    n.lojas.push(r); n.valor = Math.round((n.valor + r.valor) * 100) / 100;
+  });
+  // Mínimo depois de somar: duas lojas pequenas do mesmo CNPJ podem passar juntas
+  var ficam = [];
+  notas.forEach(function (n) {
+    if (minimo > 0 && n.valor < minimo) n.lojas.forEach(function (r) { fora.push({ r: r, motivo: 'abaixo do mínimo (R$ ' + nfsMoeda(n.valor) + ')' }); });
+    else ficam.push(n);
+  });
+  return { notas: ficam, fora: fora };
+}
+function nfsCsvEnotas(notas, cfg) {
+  var hoje = new Date(Date.now() - 3 * 3600 * 1000);   // America/Sao_Paulo, -03:00 fixo
+  var dataHoje = ('0' + hoje.getUTCDate()).slice(-2) + '/' + ('0' + (hoje.getUTCMonth() + 1)).slice(-2) + '/' + hoje.getUTCFullYear();
+  var out = [NFS_CAB.join(';')];
+  notas.forEach(function (n) {
+    var b = n.base, e = b.end || {}, mesTxt = n.mes.mm + '/' + n.mes.aaaa;
+    var lojas = n.lojas.map(function (r) { return r.loja + ' (ID ' + r.idLoja + ')'; }).join(', ');
+    var disc = String(cfg.discriminacao || NFS_PADRAO.discriminacao).replace(/\{mes\}/g, mesTxt).replace(/\{lojas\}/g, lojas).replace(/\{valor\}/g, nfsMoeda(n.valor));
+    var v = {
+      ChaveUnica: 'SHOPEE-' + n.mesId + '-' + (cfg.agrupar ? n.docChave : n.lojas[0].idLoja),
+      Cliente_NomeRazaoSocial: b.razao, Cliente_NomeFantasia: n.lojas.length > 1 ? '' : b.loja,
+      Cliente_Documento: b.estrangeiro ? '' : b.doc, Cliente_Email: b.email,
+      Cliente_EnderecoCidade: e.cidade || '', Cliente_EnderecoUF: e.uf || '', Cliente_EnderecoCEP: e.cep || '',
+      Cliente_Endereco: b.estrangeiro ? nfsLimpo(b.endTxt) : (e.logradouro || ''), Cliente_EnderecoNumero: e.numero || '',
+      Cliente_EnderecoComplemento: e.complemento || '', Cliente_EnderecoBairro: e.bairro || '',
+      Cliente_EnderecoPais: b.estrangeiro ? b.pais : '', Cliente_TipoPessoa: b.estrangeiro ? '' : b.tipo,
+      Cliente_InscricaoEstadual: b.tipo === 'J' ? b.ie : '',
+      Produto_Nome: nfsLimpo(cfg.produto || NFS_PADRAO.produto), Produto_IDExterno: nfsLimpo(cfg.produtoId),
+      Venda_ValorTotal: nfsMoeda(n.valor), Venda_Data: dataHoje,
+      NFe_Discriminacao: nfsLimpo(disc).slice(0, 2000)
+    };
+    NFS_FISCAIS.forEach(function (f) { if (cfg[f[0]]) v[f[0]] = nfsLimpo(cfg[f[0]]); });
+    out.push(NFS_CAB.map(function (k) { return nfsLimpo(v[k]); }).join(';'));
+  });
+  return out.join('\n') + '\n';
+}
+
+/* ── tela ── */
+function nfsCfg() {
+  var c = {}; try { c = JSON.parse(localStorage.getItem('tsp-notas-shopee') || '{}') || {}; } catch (e) {}
+  Object.keys(NFS_PADRAO).forEach(function (k) { if (c[k] === undefined) c[k] = NFS_PADRAO[k]; });
+  return c;
+}
+function nfsLerTela() {
+  var c = {
+    produto: document.getElementById('nfs-produto').value, produtoId: document.getElementById('nfs-produto-id').value.trim(), discriminacao: document.getElementById('nfs-disc').value,
+    agrupar: document.getElementById('nfs-agrupar').checked, estrangeiros: document.getElementById('nfs-estr').checked,
+    minimo: document.getElementById('nfs-minimo').value
+  };
+  NFS_FISCAIS.forEach(function (f) { c[f[0]] = document.getElementById('nfs-f-' + f[0]).value.trim(); });
+  try { localStorage.setItem('tsp-notas-shopee', JSON.stringify(c)); } catch (e) {}
+  return c;
+}
+function nfsAbrir() {
+  var c = nfsCfg();
+  document.getElementById('nfs-produto').value = c.produto;
+  document.getElementById('nfs-produto-id').value = c.produtoId;
+  document.getElementById('nfs-disc').value = c.discriminacao;
+  document.getElementById('nfs-agrupar').checked = !!c.agrupar;
+  document.getElementById('nfs-estr').checked = !!c.estrangeiros;
+  document.getElementById('nfs-minimo').value = c.minimo;
+  var box = document.getElementById('nfs-fiscais');
+  if (!box.children.length) box.innerHTML = NFS_FISCAIS.map(function (f) {
+    return '<div class="field"><label>' + f[1] + '</label><input type="text" id="nfs-f-' + f[0] + '" oninput="nfsRender()" placeholder="padrão do eNotas"/></div>';
+  }).join('');
+  NFS_FISCAIS.forEach(function (f) { document.getElementById('nfs-f-' + f[0]).value = c[f[0]] || ''; });
+  nfsRender();
+}
+function nfsArquivo(inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    try { NFS_ESTADO = { linhas: nfsLerShopee(rd.result), nome: f.name }; document.getElementById('nfs-erro').textContent = ''; }
+    catch (e) { NFS_ESTADO = { linhas: [], nome: '' }; document.getElementById('nfs-erro').textContent = '⚠️ ' + e.message; }
+    nfsRender();
+  };
+  rd.readAsText(f, 'utf-8');
+  inp.value = '';
+}
+function nfsEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function nfsRender() {
+  var res = document.getElementById('nfs-resultado');
+  if (!NFS_ESTADO.linhas.length) { res.style.display = 'none'; return; }
+  res.style.display = '';
+  var cfg = nfsLerTela(), m = nfsMontar(NFS_ESTADO.linhas, cfg);
+  var total = m.notas.reduce(function (s, n) { return s + n.valor; }, 0);
+  var totalFora = m.fora.reduce(function (s, x) { return s + x.r.valor; }, 0);
+  var meses = {}; m.notas.forEach(function (n) { meses[n.mes.mm + '/' + n.mes.aaaa] = 1; });
+  var semEnd = m.notas.filter(function (n) { return n.base.end && !n.base.end.ok; }).length;
+  document.getElementById('nfs-resumo').innerHTML =
+    '<b>' + m.notas.length + '</b> notas · <b>R$ ' + nfsMoeda(total) + '</b> · competência ' + (Object.keys(meses).join(', ') || '—') +
+    ' · ' + NFS_ESTADO.linhas.length + ' lojas no arquivo' +
+    (m.fora.length ? ' · <span style="color:var(--muted)">' + m.fora.length + ' fora (R$ ' + nfsMoeda(totalFora) + ')</span>' : '') +
+    (semEnd ? ' · <span style="color:#f59e0b">⚠️ ' + semEnd + ' com endereço não reconhecido</span>' : '');
+  var h = '<table class="dv-tab"><tr><th>Tomador</th><th>Documento</th><th>Cidade/UF</th><th>Lojas</th><th>Valor</th></tr>';
+  m.notas.slice().sort(function (a, b) { return b.valor - a.valor; }).forEach(function (n) {
+    var b = n.base, e = b.end;
+    h += '<tr><td>' + nfsEsc(b.razao) + '</td><td>' + nfsEsc(b.estrangeiro ? b.pais + ' ' + b.docEstrangeiro : b.doc) + '</td><td>' +
+      (e ? (e.ok ? nfsEsc(e.cidade + '/' + e.uf) : '<span style="color:#f59e0b">⚠️ conferir</span>') : nfsEsc(b.pais)) + '</td><td>' +
+      nfsEsc(n.lojas.map(function (r) { return r.loja; }).join(', ')) + '</td><td>R$ ' + nfsMoeda(n.valor) + '</td></tr>';
+  });
+  document.getElementById('nfs-tabela').innerHTML = h + '</table>';
+  document.getElementById('nfs-fora').innerHTML = m.fora.length ? '<table class="dv-tab"><tr><th>Loja</th><th>Razão social</th><th>Motivo</th><th>Valor</th></tr>' +
+    m.fora.map(function (x) { return '<tr><td>' + nfsEsc(x.r.loja) + '</td><td>' + nfsEsc(x.r.razao) + '</td><td>' + nfsEsc(x.motivo) + '</td><td>R$ ' + nfsMoeda(x.r.valor) + '</td></tr>'; }).join('') + '</table>'
+    : '<div style="color:var(--muted);font-size:12px">Nenhuma.</div>';
+  document.getElementById('nfs-baixar').disabled = !m.notas.length;
+}
+function nfsBaixar() {
+  var cfg = nfsLerTela(), m = nfsMontar(NFS_ESTADO.linhas, cfg);
+  if (!m.notas.length) return;
+  var blob = new Blob([nfsCsvEnotas(m.notas, cfg)], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'enotas-shopee-' + m.notas[0].mesId + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+
 </script>
 </body>
 </html>
