@@ -1294,6 +1294,7 @@ body.travado > *:not(#login-screen){display:none !important}
   <button class="main-tab" id="tab-dist" onclick="switchTab('dist')">🔗 Distribuidor</button>
   <button class="main-tab" id="tab-admgrupos" onclick="switchTab('admgrupos')">🛡️ Administrar</button>
   <button class="main-tab" id="tab-saude" onclick="switchTab('saude')">🩺 Saúde<span class="tab-badge" id="saude-badge" style="display:none">0</span></button>
+  <button class="main-tab" id="tab-notaof" onclick="switchTab('notaof')">🏅 Nota das ofertas</button>
   <button class="main-tab" id="tab-conexao" onclick="switchTab('conexao')">📱 Conexão</button>
   <button class="main-tab" id="tab-config" onclick="switchTab('config')">⚙️ Ajustes</button>
 </div>
@@ -2022,6 +2023,64 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
   <div id="sg-resumo" class="al-pulso"></div>
   <div id="sg-lista" class="al-lista"><div class="al-vazio">Carregando...</div></div>
+</div>
+
+<div class="panel" id="panel-notaof">
+  <div class="aviso">
+    Cada oferta capturada nos grupos-fonte ganha uma <b>nota de 0 a 100</b> na hora em que chega. Não existe fila nem limite por hora:
+    a oferta sai na mesma hora se a nota passar da mínima do grupo. Em <b>sombra</b> a nota só é registrada e nada é barrado —
+    use os números abaixo para escolher a mínima de cada grupo antes de ligar o modo <b>ativo</b>.
+    Card, aprovação manual, cupom, lista, monitor de preços e Awin não passam pela nota.
+  </div>
+  <div class="al-filtros">
+    <button class="al-f active" data-nof="1" onclick="nofDias(1)">Hoje</button>
+    <button class="al-f" data-nof="3" onclick="nofDias(3)">3 dias</button>
+    <button class="al-f" data-nof="7" onclick="nofDias(7)">7 dias</button>
+    <span id="nof-status" style="font-size:11.5px;color:var(--muted)"></span>
+  </div>
+  <div id="nof-resumo" class="al-pulso"></div>
+
+  <div class="sec-label" style="margin-top:14px">📊 Notas das ofertas que sairiam sozinhas</div>
+  <div class="card" id="nof-dist"><div class="al-vazio">Carregando...</div></div>
+
+  <div class="sec-label" style="margin-top:14px">🧭 Por grupo (trilha): quantas passariam em cada nota de corte</div>
+  <div class="card" id="nof-trilhas"><div class="al-vazio">Carregando...</div></div>
+
+  <div class="sec-label" style="margin-top:14px">🔎 Exemplos</div>
+  <div id="nof-exemplos"></div>
+
+  <div class="sec-label" style="margin-top:14px">⚙️ Ajustes da nota</div>
+  <div class="card">
+    <div class="g2" style="margin-bottom:10px">
+      <div class="field">
+        <label>Modo</label>
+        <select id="nof-modo">
+          <option value="ativo">Ativo (barra o que ficar abaixo da mínima)</option>
+          <option value="off">Desligado</option>
+          <option value="sombra">Sombra (só registra)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Outras fontes contam por (horas)</label>
+        <input type="number" id="nof-janela" min="1" max="48" step="1">
+      </div>
+      <div class="field">
+        <label>Mínima nos grupos gerais</label>
+        <input type="number" id="nof-geral" min="0" max="100" step="1">
+      </div>
+      <div class="field">
+        <label>Mínima de produto de nicho nos gerais</label>
+        <input type="number" id="nof-geral-nicho" min="0" max="100" step="1">
+      </div>
+      <div class="field">
+        <label>Mínima padrão nos grupos de nicho</label>
+        <input type="number" id="nof-nicho" min="0" max="100" step="1">
+      </div>
+    </div>
+    <div id="nof-nichos"></div>
+    <button class="btn" id="nof-salvar" onclick="nofSalvar()">Salvar ajustes</button>
+    <p class="send-ok" id="nof-salvo"></p>
+  </div>
 </div>
 
 <div class="panel" id="panel-conexao">
@@ -3849,7 +3908,7 @@ function ggAbrir() {
   document.head.appendChild(s);
 }
 
-var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','avisos','cupons','templates','grupos','dist','admgrupos','saude','conexao','comissao','trafego','descobertas','rastreio','cliques','notas','config'];
+var TABS = ['hoje','alertas','filaenvio','agend','enviadas','aprov','divulg','cupom','oferta','livre','disparos','vitrine','monprecos','avisos','cupons','templates','grupos','dist','admgrupos','saude','notaof','conexao','comissao','trafego','descobertas','rastreio','cliques','notas','config'];
 function switchTab(name) {
   if (name === 'oferta' && quandoSel('o') === 'janela') carregarJanelaDisparos('o', false);
   if (name === 'cupom' && quandoSel('c') === 'janela') carregarJanelaDisparos('c', false);
@@ -3879,6 +3938,7 @@ function switchTab(name) {
   if (name === 'conexao') { if (!GRUPOS_CACHE.length) carregarGrupos(); carregarContas(); }
   if (name === 'admgrupos') ggAbrir();
   if (name === 'saude') sgCarregar();
+  if (name === 'notaof') nofCarregar();
   if (name === 'cupons') { renderPresetsCupom(); carregarCupons(); }
   // O bloco "Cupom adicional" da Oferta escolhe da base: sem o cache o select
   // abriria vazio na primeira visita da aba.
@@ -3941,7 +4001,7 @@ var SECOES = [
   { id: 'produtos',   label: 'Catálogo',   abas: ['vitrine','cupons','monprecos','avisos','descobertas'] },
   // quanto os envios renderam, depois quanto a audiencia custa/vale
   { id: 'resultados', label: 'Resultados', abas: ['comissao','cliques','rastreio','trafego','notas'] },
-  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','saude'] },
+  { id: 'grupos',     label: 'Grupos',     abas: ['grupos','dist','admgrupos','saude','notaof'] },
   // como o sistema se comporta: regras, formato das mensagens e contas
   { id: 'ajustes',    label: 'Ajustes',    abas: ['config','templates','conexao'] }
 ];
@@ -3951,7 +4011,7 @@ var ROTULO_ABA = {
   livre: 'Mensagem livre', disparos: 'Disparos de produtos', vitrine: 'Produtos', monprecos: 'Monitor de preços', avisos: 'Avisos de preço',
   cupons: 'Cupons', templates: 'Templates', comissao: 'Comissão',
   rastreio: 'Rastreio de links', cliques: 'Cliques dos links', descobertas: 'Descobertas', trafego: 'Tráfego e LTV', notas: 'Notas Shopee', ltv: 'LTV dos membros',
-  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', saude: 'Saúde dos grupos', conexao: 'Conexão e turnos', config: 'Automação e geral'
+  grupos: 'Trilhas', dist: 'Distribuidor', admgrupos: 'Administrar', saude: 'Saúde dos grupos', notaof: 'Nota das ofertas', conexao: 'Conexão e turnos', config: 'Automação e geral'
 };
 var SECAO_ATUAL = 'hoje';
 
@@ -4076,6 +4136,11 @@ var CABECALHOS = {
     if (!SG_DADOS) return 'Grupos de destino do Tica Promos e do CDV';
     var n = (SG_DADOS.grupos || []).filter(function (g) { return sgProblema(g); }).length;
     return _n((SG_DADOS.grupos || []).length) + ' grupos · ' + (n ? _n(n) + ' com problema' : 'todos saudáveis');
+  } },
+  notaof: { titulo: 'Nota das ofertas', acoes: [{ rot: '↻ Atualizar', fn: 'nofCarregar()' }], sub: function () {
+    if (!NOF_DADOS) return 'Nota de 0 a 100 das ofertas capturadas nos grupos-fonte';
+    var m = (NOF_DADOS.config || {}).modo;
+    return 'Modo ' + (m === 'ativo' ? 'ativo' : m === 'off' ? 'desligado' : 'sombra') + ' · ' + _n(NOF_DADOS.avaliadas || 0) + ' ofertas avaliadas no período';
   } },
   conexao: { titulo: 'Conexão', sub: function () { return 'Contas de WhatsApp e status do envio'; } },
   alertas: { titulo: 'Alertas', acoes: [{ rot: '↻ Atualizar', fn: 'carregarAlertas()' }], sub: function () {
@@ -11815,6 +11880,171 @@ function sgQuando(iso) {
   var h = Math.round(min / 60);
   if (h < 48) return 'há ' + h + 'h';
   return 'há ' + Math.round(h / 24) + ' dias';
+}
+
+
+// ══════ NOTA DAS OFERTAS (baileys-server/nota-oferta.js) ══════
+// So le GET /mkt/notas e grava em POST /mkt/notas/config. Nada aqui dispara.
+var NOF_DADOS = null;
+var NOF_DIAS = 1;
+
+function nofDias(d) {
+  NOF_DIAS = d;
+  var bs = document.querySelectorAll('#panel-notaof .al-f[data-nof]');
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-nof') === String(d));
+  nofCarregar();
+}
+
+async function nofCarregar() {
+  var st = document.getElementById('nof-status');
+  if (st) st.textContent = 'carregando...';
+  try {
+    var r = await fetch(SERVER + '/mkt/notas?dias=' + NOF_DIAS + '&t=' + Date.now(), { cache: 'no-cache' });
+    if (r.status === 404) throw new Error('a nota ainda não está no ar no servidor (publicação prevista para depois das 21h)');
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+    NOF_DADOS = d;
+    if (st) st.textContent = 'atualizado ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    nofPintar();
+  } catch (e) {
+    NOF_DADOS = null;
+    if (st) st.textContent = '';
+    ['nof-dist', 'nof-trilhas'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = '<div class="al-vazio">Não consegui carregar: ' + alEsc(e.message) + '</div>';
+    });
+    var ex = document.getElementById('nof-exemplos'); if (ex) ex.innerHTML = '';
+    var rs = document.getElementById('nof-resumo'); if (rs) rs.innerHTML = '';
+  }
+}
+
+function nofPartes(ps) {
+  if (!ps || !ps.length) return 'só a base (50)';
+  return ps.map(function (p) { return p.rotulo + ' ' + (p.pontos > 0 ? '+' : '') + String(p.pontos).replace('.', ','); }).join(' · ');
+}
+
+function nofExemplo(x) {
+  var preco = x.preco ? 'R$ ' + Number(x.preco).toFixed(2).replace('.', ',') : '';
+  var hora = x.em ? new Date(x.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  return '<div class="al-item ' + (x.nota >= x.minima ? 'sg-ok' : 'atencao') + '">'
+    + '<div class="al-cab">'
+    +   '<span class="al-tag">nota ' + x.nota + ' · mín. ' + x.minima + '</span>'
+    +   '<span class="al-tit">' + alEsc(x.titulo || '(sem título)') + '</span>'
+    +   '<span class="al-meta"><span>' + alEsc([x.loja, preco, hora].filter(Boolean).join(' · ')) + '</span></span>'
+    + '</div>'
+    + '<div class="al-corpo">' + alEsc(nofPartes(x.partes)) + (x.fonte ? ' — fonte: ' + alEsc(x.fonte) : '') + '</div>'
+    + '</div>';
+}
+
+function nofPintar() {
+  var d = NOF_DADOS; if (!d) return;
+  var cfg = d.config || {};
+  var dec = d.porDecisao || {};
+  var modoTxt = cfg.modo === 'ativo' ? 'Ativo' : cfg.modo === 'off' ? 'Desligado' : 'Sombra';
+  document.getElementById('nof-resumo').innerHTML =
+      '<div class="al-pl' + (cfg.modo === 'ativo' ? '' : ' sg-amb') + '">Modo <b>' + modoTxt + '</b></div>'
+    + '<div class="al-pl">Avaliadas <b>' + _n(d.avaliadas || 0) + '</b></div>'
+    + '<div class="al-pl">Sairiam sozinhas <b>' + _n(d.elegiveis || 0) + '</b></div>'
+    + '<div class="al-pl">Foram para card <b>' + _n(dec.card || 0) + '</b></div>'
+    + (cfg.modo === 'ativo'
+        ? '<div class="al-pl' + (dec.descartada ? ' parada' : '') + '">Descartadas pela nota <b>' + _n(dec.descartada || 0) + '</b></div>'
+          + '<div class="al-pl">Saíram em parte dos grupos <b>' + _n(dec.parcial || 0) + '</b></div>'
+        : '');
+
+  // distribuicao
+  var dist = d.distribuicao || {};
+  var faixas = Object.keys(dist);
+  var max = Math.max.apply(null, faixas.map(function (k) { return dist[k]; }).concat([1]));
+  document.getElementById('nof-dist').innerHTML = (d.elegiveis
+    ? faixas.map(function (k) {
+        var v = dist[k], w = Math.round(100 * v / max);
+        return '<div style="display:flex;align-items:center;gap:10px;font-size:12px;margin:3px 0">'
+          + '<span style="width:58px;color:var(--muted)">' + k + '</span>'
+          + '<span style="flex:1;background:var(--border);border-radius:4px;height:12px;overflow:hidden">'
+          +   '<span style="display:block;height:100%;width:' + w + '%;background:var(--accent)"></span></span>'
+          + '<span style="width:44px;text-align:right;font-weight:700">' + _n(v) + '</span></div>';
+      }).join('')
+    : '<div class="al-vazio">Nenhuma oferta avaliada no período ainda.</div>');
+
+  // por trilha
+  var cortes = d.cortes || [30, 40, 50, 60, 70];
+  var trs = d.trilhas || [];
+  document.getElementById('nof-trilhas').innerHTML = trs.length
+    ? '<div style="overflow-x:auto"><table class="dv-tab"><tr>'
+      + '<td><b>Grupo</b></td><td class="dv-td-n">Ofertas</td>'
+      + cortes.map(function (c) { return '<td class="dv-td-n">nota ≥ ' + c + '</td>'; }).join('')
+      + '<td class="dv-td-n">Com a mínima atual</td></tr>'
+      + trs.map(function (t) {
+          return '<tr><td>' + alEsc(t.nome) + (t.nicho ? ' <span style="color:var(--muted)">(' + alEsc(t.nicho) + ')</span>' : '') + '</td>'
+            + '<td class="dv-td-n">' + _n(t.elegiveis) + '</td>'
+            + cortes.map(function (c) {
+                var pc = (t.porCorte || {})[c] || { passam: 0 };
+                var pct = t.elegiveis ? Math.round(100 * pc.passam / t.elegiveis) : 0;
+                return '<td class="dv-td-n">' + _n(pc.passam) + ' <span style="color:var(--muted);font-weight:400">(' + pct + '%)</span></td>';
+              }).join('')
+            + '<td class="dv-td-n">' + _n(t.passamComAtual) + ' de ' + _n(t.elegiveis)
+            + (t.minimaAtual != null ? ' <span style="color:var(--muted);font-weight:400">(mín. ' + t.minimaAtual + ')</span>' : '') + '</td></tr>';
+        }).join('')
+      + '</table></div>'
+      + '<p style="font-size:11.5px;color:var(--muted);margin:10px 0 0;line-height:1.6">"Com a mínima atual" já aplica a regra de produto de nicho nos grupos gerais. Divida por ' + NOF_DIAS + (NOF_DIAS === 1 ? ' (hoje)' : ' dias') + ' para ter a média por dia.</p>'
+    : '<div class="al-vazio">Nenhuma oferta avaliada no período ainda.</div>';
+
+  // exemplos
+  var ex = '';
+  trs.forEach(function (t) {
+    if (!(t.barradas || []).length && !(t.pertoDoCorte || []).length) return;
+    ex += '<div class="card" style="margin-bottom:10px"><div style="font-weight:700;margin-bottom:8px">' + alEsc(t.nome) + '</div>';
+    if ((t.barradas || []).length) ex += '<div style="font-size:11.5px;color:var(--muted);margin:4px 0">Ficariam de fora</div><div class="al-lista">' + t.barradas.map(nofExemplo).join('') + '</div>';
+    if ((t.pertoDoCorte || []).length) ex += '<div style="font-size:11.5px;color:var(--muted);margin:10px 0 4px">Passaram raspando</div><div class="al-lista">' + t.pertoDoCorte.map(nofExemplo).join('') + '</div>';
+    ex += '</div>';
+  });
+  document.getElementById('nof-exemplos').innerHTML = ex || '<div class="al-vazio">Sem exemplos no período.</div>';
+
+  // ajustes
+  document.getElementById('nof-modo').value = cfg.modo || 'sombra';
+  document.getElementById('nof-janela').value = cfg.janelaFontesH != null ? cfg.janelaFontesH : 6;
+  document.getElementById('nof-geral').value = cfg.minGeral != null ? cfg.minGeral : 40;
+  document.getElementById('nof-geral-nicho').value = cfg.minGeralProdutoNicho != null ? cfg.minGeralProdutoNicho : 75;
+  document.getElementById('nof-nicho').value = cfg.minNichoPadrao != null ? cfg.minNichoPadrao : 40;
+  var nichos = {};
+  trs.forEach(function (t) { if (t.nicho) nichos[t.nicho] = t.nome; });
+  Object.keys(cfg.minNicho || {}).forEach(function (k) { if (!nichos[k]) nichos[k] = k; });
+  var chaves = Object.keys(nichos).sort(function (a, b) { return String(nichos[a]).localeCompare(String(nichos[b]), 'pt-BR'); });
+  document.getElementById('nof-nichos').innerHTML = chaves.length
+    ? '<div class="g2" style="margin-bottom:10px">' + chaves.map(function (k) {
+        var v = (cfg.minNicho || {})[k];
+        return '<div class="field"><label>Mínima em ' + alEsc(nichos[k]) + '</label>'
+          + '<input type="number" min="0" max="100" step="1" data-nof-nicho="' + alEsc(k) + '" value="' + (v != null ? v : '') + '" placeholder="padrão (' + (cfg.minNichoPadrao != null ? cfg.minNichoPadrao : 40) + ')"></div>';
+      }).join('') + '</div>'
+    : '';
+}
+
+async function nofSalvar() {
+  var btn = document.getElementById('nof-salvar');
+  var ok = document.getElementById('nof-salvo');
+  var modo = document.getElementById('nof-modo').value;
+  if (modo === 'ativo' && !(NOF_DADOS && NOF_DADOS.config && NOF_DADOS.config.modo === 'ativo')) {
+    if (!confirm('Ligar o modo ativo? A partir de agora, oferta capturada com nota abaixo da mínima deixa de sair nos grupos.')) return;
+  }
+  var num = function (id) { var v = document.getElementById(id).value; return v === '' ? undefined : Number(v); };
+  var minNicho = {};
+  var ins = document.querySelectorAll('#nof-nichos input[data-nof-nicho]');
+  for (var i = 0; i < ins.length; i++) {
+    var v = ins[i].value;
+    minNicho[ins[i].getAttribute('data-nof-nicho')] = v === '' ? null : Number(v);
+  }
+  var corpo = { modo: modo, janelaFontesH: num('nof-janela'), minGeral: num('nof-geral'),
+                minGeralProdutoNicho: num('nof-geral-nicho'), minNichoPadrao: num('nof-nicho'), minNicho: minNicho };
+  btn.disabled = true; ok.textContent = '';
+  try {
+    var r = await fetch(SERVER + '/mkt/notas/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.erro || 'falha ao salvar');
+    ok.textContent = '✅ Ajustes salvos.';
+    nofCarregar();
+  } catch (e) {
+    ok.textContent = '❌ ' + e.message;
+  } finally { btn.disabled = false; }
 }
 
 async function sgCarregar(silencioso) {
