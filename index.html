@@ -911,6 +911,33 @@ a.av-titulo:hover{text-decoration:underline}
   .dv-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
   .dv-grid2 > *{min-width:0}
   .dv-tab{width:100%;border-collapse:collapse;font-size:12px}
+
+  /* ══ NOTAS SHOPEE ══ */
+  #panel-notas .ns2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px 12px;align-items:start}
+  #panel-notas .ns2-grid .field>label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #panel-notas .ns2-largo{grid-column:span 2}
+  @media(max-width:620px){ #panel-notas .ns2-largo{grid-column:auto} }
+  #panel-notas .ns2-cert-grid{grid-template-columns:2fr 1fr auto;align-items:end;margin-bottom:8px}
+  @media(max-width:620px){ #panel-notas .ns2-cert-grid{grid-template-columns:1fr} }
+  #panel-notas .ns2-arquivo{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border-ctrl);border-radius:10px;padding:3px 5px;box-sizing:border-box;height:38px}
+  #panel-notas .ns2-arquivo .btn{margin:0;flex:none}
+  #panel-notas .ns2-arquivo span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #panel-notas label.btn{cursor:pointer;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;color:#0f0f0f;display:inline-flex;align-items:center;margin-bottom:0}
+  #panel-notas .ns2-cert-grid button.btn{margin:0;padding:11px 16px}
+  #panel-notas .ns2-arquivo .btn{padding:5px 12px}
+  #panel-notas .ns2-tab a{color:var(--accent);text-decoration:none;font-weight:600}
+  #panel-notas .ns2-tab a:hover{text-decoration:underline}
+  #panel-notas .ns2-mes[open]>summary{margin-bottom:10px}
+  #panel-notas .ns2-desc{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
+  #panel-notas .ns2-sub{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:20px 0 12px;padding-top:16px;border-top:1px solid var(--border)}
+  #panel-notas textarea{min-height:64px}
+  #panel-notas .ns2-checks{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-top:16px}
+  #panel-notas .ns2-checks .env-check{text-transform:none;letter-spacing:0;font-weight:500;margin:0}
+  #panel-notas .ns2-mes{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:0 0 10px;background:var(--card)}
+  #panel-notas .ns2-mes>summary{cursor:pointer;font-size:13px}
+  #panel-notas .ns2-tab-wrap{overflow-x:auto}
+  #panel-notas .ns2-tab th{text-align:left;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:0 10px 8px 0;white-space:nowrap}
+  #panel-notas .ns2-tab td{padding:9px 10px 9px 0;vertical-align:top}
   .dv-tab td{padding:7px 0;border-top:1px solid var(--border)}
   .dv-tab tr:first-child td{border-top:none}
   .dv-tab .dv-td-n{text-align:right;font-weight:700}
@@ -3018,61 +3045,72 @@ body.travado > *:not(#login-screen){display:none !important}
 
   <div class="card">
     <div class="sec-label">Certificado digital A1</div>
-    <div id="ns2-cert" style="font-size:13px;margin-bottom:10px">—</div>
-    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">
-      <div class="field" style="margin:0"><label>Arquivo .pfx</label><input type="file" id="ns2-pfx" accept=".pfx,.p12"/></div>
-      <div class="field" style="margin:0"><label>Senha</label><input type="password" id="ns2-senha" autocomplete="new-password"/></div>
-      <button class="btn btn-sm" onclick="ns2EnviarCert()">🔐 Cadastrar</button>
+    <div id="ns2-cert" style="font-size:13px;margin-bottom:14px">—</div>
+    <div class="ns2-grid ns2-cert-grid">
+      <div class="field"><label>Arquivo .pfx</label>
+        <div class="ns2-arquivo"><label class="btn btn-sm">📎 Escolher arquivo<input type="file" id="ns2-pfx" accept=".pfx,.p12" style="display:none" onchange="document.getElementById('ns2-pfx-nome').textContent=this.files[0]?this.files[0].name:'nenhum arquivo escolhido'"/></label><span id="ns2-pfx-nome">nenhum arquivo escolhido</span></div></div>
+      <div class="field"><label>Senha</label><input type="password" id="ns2-senha" autocomplete="new-password"/></div>
+      <div class="field"><label>&nbsp;</label><button class="btn btn-sm" onclick="ns2EnviarCert()">🔐 Cadastrar</button></div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px">O arquivo vai direto para o disco do servidor (Railway), fora do GitHub. A senha é guardada cifrada e nunca volta para a tela.</div>
+    <div class="ns2-desc">O arquivo vai direto para o disco do servidor (Railway), fora do GitHub. A senha é guardada cifrada e nunca volta para a tela.</div>
   </div>
 
   <div class="card">
-    <div class="sec-label">Emitente e serviço</div>
-    <div class="fila-bar" style="margin:0 0 10px">
-      <label class="btn btn-sm" style="cursor:pointer">📄 Preencher com o XML de uma NFS-e já emitida<input type="file" accept=".xml" style="display:none" onchange="ns2ImportarXml(this)"/></label>
-      <span id="ns2-xml-ok" style="font-size:12px;color:var(--muted)"></span>
+    <div class="fila-bar" style="margin:0 0 4px">
+      <span class="sec-label" style="margin:0">Emitente e serviço</span>
+      <div class="fila-acoes"><label class="btn btn-sm" style="margin:0">📄 Preencher com o XML de uma NFS-e já emitida<input type="file" accept=".xml" style="display:none" onchange="ns2ImportarXml(this)"/></label></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
-      <div class="field"><label>CNPJ do emitente</label><input type="text" id="ns2-e-cnpj"/></div>
-      <div class="field"><label>Inscrição municipal</label><input type="text" id="ns2-e-im"/></div>
-      <div class="field"><label>Telefone</label><input type="text" id="ns2-e-fone"/></div>
-      <div class="field"><label>E-mail</label><input type="text" id="ns2-e-email"/></div>
-      <div class="field"><label>Município (IBGE)</label><input type="text" id="ns2-e-cLocEmi" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-cLocEmi" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>Simples: opção (opSimpNac)</label><input type="text" id="ns2-e-opSimpNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-opSimpNac" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>Simples: apuração (regApTribSN)</label><input type="text" id="ns2-e-regApTribSN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regApTribSN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>Regime especial (regEspTrib)</label><input type="text" id="ns2-e-regEspTrib" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regEspTrib" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+    <div id="ns2-xml-ok" style="font-size:12px;color:var(--muted)"></div>
+
+    <div class="ns2-sub">Empresa</div>
+    <div class="ns2-grid">
+      <div class="field"><label title="CNPJ">CNPJ</label><input type="text" id="ns2-e-cnpj"/></div>
+      <div class="field"><label title="Inscrição municipal">Inscrição municipal</label><input type="text" id="ns2-e-im"/></div>
+      <div class="field"><label title="Telefone">Telefone</label><input type="text" id="ns2-e-fone"/></div>
+      <div class="field"><label title="E-mail">E-mail</label><input type="text" id="ns2-e-email"/></div>
+      <div class="field"><label title="Município (IBGE)">Município (IBGE)</label><input type="text" id="ns2-e-cLocEmi" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-cLocEmi"></div></div>
+      <div class="field"><label title="Opção no Simples">Opção no Simples</label><input type="text" id="ns2-e-opSimpNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-opSimpNac"></div></div>
+      <div class="field"><label title="Apuração no Simples">Apuração no Simples</label><input type="text" id="ns2-e-regApTribSN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regApTribSN"></div></div>
+      <div class="field"><label title="Regime especial">Regime especial</label><input type="text" id="ns2-e-regEspTrib" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-e-regEspTrib"></div></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:6px">
-      <div class="field"><label>Código de tributação nacional</label><input type="text" id="ns2-s-cTribNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribNac" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>Código municipal (BH)</label><input type="text" id="ns2-s-cTribMun" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribMun" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>NBS</label><input type="text" id="ns2-s-cNBS" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cNBS" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>% tributos Simples (pTotTribSN)</label><input type="text" id="ns2-s-pTotTribSN" placeholder="vazio = não informar" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-pTotTribSN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>ISS: tributação (tribISSQN)</label><input type="text" id="ns2-s-tribISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tribISSQN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>ISS retido? (tpRetISSQN)</label><input type="text" id="ns2-s-tpRetISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tpRetISSQN" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>PIS/COFINS CST</label><input type="text" id="ns2-s-cstPisCofins" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cstPisCofins" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
-      <div class="field"><label>Série das DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie" style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35"></div></div>
+
+    <div class="ns2-sub">Serviço e tributos</div>
+    <div class="ns2-grid">
+      <div class="field"><label title="Tributação nacional">Tributação nacional</label><input type="text" id="ns2-s-cTribNac" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribNac"></div></div>
+      <div class="field"><label title="Código municipal (BH)">Código municipal (BH)</label><input type="text" id="ns2-s-cTribMun" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cTribMun"></div></div>
+      <div class="field"><label title="NBS">NBS</label><input type="text" id="ns2-s-cNBS" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cNBS"></div></div>
+      <div class="field"><label title="Alíquota do Simples (%)">Alíquota do Simples (%)</label><input type="text" id="ns2-s-pTotTribSN" placeholder="ex.: 6.00" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-pTotTribSN"></div></div>
+      <div class="field"><label title="Tributação do ISS">Tributação do ISS</label><input type="text" id="ns2-s-tribISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tribISSQN"></div></div>
+      <div class="field"><label title="ISS retido?">ISS retido?</label><input type="text" id="ns2-s-tpRetISSQN" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-tpRetISSQN"></div></div>
+      <div class="field"><label title="PIS/COFINS (CST)">PIS/COFINS (CST)</label><input type="text" id="ns2-s-cstPisCofins" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-s-cstPisCofins"></div></div>
+      <div class="field"><label title="Série das DPS">Série das DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie"></div></div>
     </div>
-    <div class="field"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="ns2-s-xDescServ" rows="2"></textarea></div>
+
+    <div class="ns2-sub">Texto da nota</div>
+    <div class="field" style="margin-bottom:14px"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="ns2-s-xDescServ" rows="3"></textarea></div>
     <div class="field"><label>Informação complementar <span class="tag">deixe vazio (orientação da contabilidade)</span></label><textarea id="ns2-s-xInfComp" rows="2"></textarea></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
-      <div class="field"><label>Buscar o relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
+
+    <div class="ns2-sub">Emissão</div>
+    <div class="ns2-grid">
+      <div class="field"><label>Buscar relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
       <div class="field"><label>Valor mínimo por nota (R$)</label><input type="text" id="ns2-minimo"/></div>
-      <div class="field"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão (data da prestação: orientação da contabilidade)</option></select></div>
+      <div class="field ns2-largo"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão (orientação da contabilidade)</option></select></div>
     </div>
-    <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label><br/>
-    <label class="env-check"><input type="checkbox" id="ns2-confirmados"/> <b>Códigos do serviço confirmados com o contador</b> (sem isso nada é emitido em produção)</label><br/>
-    <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
-    <div class="fila-bar" style="margin:10px 0 0"><span id="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
+    <div class="ns2-checks">
+      <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> Uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label>
+      <label class="env-check"><input type="checkbox" id="ns2-confirmados"/> <b>Códigos do serviço confirmados com o contador</b> (sem isso nada é emitido em produção)</label>
+      <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
+    </div>
+    <div class="fila-bar" style="margin:16px 0 0"><span id="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
   </div>
 
   <div class="card">
     <div class="fila-bar" style="margin:0">
       <span class="sec-label" style="margin:0">Meses</span>
       <div class="fila-acoes">
-        <input type="month" id="ns2-mes-buscar" style="width:auto;padding:6px 8px;font-size:12px"/>
+        <input type="month" id="ns2-mes-buscar" class="dv-mes" title="Mês do relatório"/>
         <button class="btn btn-sm" onclick="ns2Buscar()">🛒 Buscar relatório na Shopee</button>
-        <label class="btn btn-sm" style="cursor:pointer">📂 Importar CSV do mês<input type="file" accept=".csv,text/csv" style="display:none" onchange="ns2ImportarCsv(this)"/></label>
+        <label class="btn btn-sm" style="margin:0">📂 Importar CSV do mês<input type="file" accept=".csv,text/csv" style="display:none" onchange="ns2ImportarCsv(this)"/></label>
         <button class="btn btn-sm" onclick="ns2Carregar()">↻</button>
       </div>
     </div>
@@ -17107,14 +17145,14 @@ function ns2Pintar() {
   d.meses.forEach(function (m) {
     var cont = Object.keys(m.contagem).map(function (k) { return (NS2_STATUS[k] || ['', k])[0] + ' ' + m.contagem[k] + ' ' + (NS2_STATUS[k] || ['', k])[1]; }).join(' · ');
     var pend = (m.contagem.pendente || 0) + (m.contagem.incerta || 0);
-    h += '<details class="card" style="margin:0 0 10px"' + (m.mes === d.mesAlvo ? ' open' : '') + '><summary style="cursor:pointer"><b>' + ns2Mes(m.mes) + '</b> · '
+    h += '<details class="ns2-mes"' + (m.mes === d.mesAlvo ? ' open' : '') + '><summary><b>' + ns2Mes(m.mes) + '</b> · '
       + m.notas.length + ' notas · emitido ' + ns2R(m.totalEmitido) + (m.relatorio ? ' de ' + ns2R(m.relatorio.total) : '') + ' · ' + cont + '</summary>'
       + (m.erroRelatorio ? '<div style="color:#f59e0b;font-size:12px;margin:6px 0">Última leitura falhou (' + ns2Hora(m.erroRelatorio.em) + '): ' + ns2Esc(m.erroRelatorio.erro) + '</div>' : '')
       + '<div class="fila-bar" style="margin:8px 0"><span style="font-size:12px;color:var(--muted)">' + (m.relatorio ? 'Relatório lido em ' + ns2Hora(m.relatorio.em) : '') + '</span><div class="fila-acoes">'
       + '<button class="btn btn-sm" onclick="ns2Teste(\'' + m.mes + '\')">🧪 Nota de teste (homologação)</button>'
       + (pend ? '<button class="btn btn-sm" onclick="ns2Emitir(\'' + m.mes + '\',' + pend + ')">📤 Emitir ' + pend + ' pendente(s)</button>' : '')
       + '</div></div>'
-      + '<table class="dv-tab"><tr><th>Tomador</th><th>Documento</th><th>Lojas</th><th>Valor</th><th>Situação</th><th></th></tr>';
+      + '<div class="ns2-tab-wrap"><table class="dv-tab ns2-tab"><tr><th>Tomador</th><th>Documento</th><th>Lojas</th><th>Valor</th><th>Situação</th><th></th></tr>';
     m.notas.slice().sort(function (a, b) { return b.valor - a.valor; }).forEach(function (n) {
       var st = NS2_STATUS[n.status] || ['', n.status];
       var acoes = [];
@@ -17132,7 +17170,7 @@ function ns2Pintar() {
         + (n.teste ? '<br><span style="font-size:11px;color:var(--muted)">teste: ' + ns2Esc(n.teste.status) + (n.teste.erro ? ' — ' + ns2Esc(n.teste.erro) : '') + '</span>' : '') + '</td>'
         + '<td style="font-size:12px;white-space:nowrap">' + acoes.join(' · ') + '</td></tr>';
     });
-    h += '</table>';
+    h += '</table></div>';
     if (m.fora.length) h += '<div style="font-size:12px;color:var(--muted);margin-top:8px">Fora: ' + m.fora.map(function (f) { return ns2Esc(f.nome + ' (' + f.motivo + ', ' + ns2R(f.loja.valor) + ')'); }).join('; ') + '</div>';
     h += '</details>';
   });
@@ -17240,7 +17278,7 @@ function ns2Descrever() {
     var inp = document.getElementById(el.getAttribute('data-de')), d = NS2_DESC[el.getAttribute('data-de')] || {};
     var v = inp ? String(inp.value || '').trim() : '';
     var txt = Object.prototype.hasOwnProperty.call(d, v) ? d[v] : d._;
-    if (v && !Object.prototype.hasOwnProperty.call(d, v) && v !== '' && el.getAttribute('data-de') === 'ns2-s-pTotTribSN') txt = v + '% — ' + d._;
+    if (v && el.getAttribute('data-de') === 'ns2-s-pTotTribSN') txt = d._;
     else if (v && !Object.prototype.hasOwnProperty.call(d, v)) txt = '⚠️ código não reconhecido aqui. ' + (d._ || '');
     else if (v && el.getAttribute('data-de') !== 'ns2-s-pTotTribSN') txt = '→ ' + txt;
     el.textContent = txt || '';
