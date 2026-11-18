@@ -116,6 +116,15 @@ async function mlPintar() {
           + ' Teste automático às ' + new Date(ps.verificacao.proximoTesteEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '')
       + (pg.ultimo ? '<br>Última página: ' + String(pg.ultimo.texto).replace(/</g, '&lt;') : ''));
   }
+  // Leitura de páginas da Amazon (2.15.0): fetch sem aba, pedido pelo servidor quando ele não consegue.
+  const az = await pedir({ tipo: 'amazon-paginas' });
+  if (az) {
+    const as = az.servidor || {};
+    partes.push('Páginas da Amazon: ' + (as.semRota ? 'aguardando o servidor ligar a leitura'
+      : !as.ok ? '<span class="ruim">' + String(as.erro || 'servidor sem resposta').replace(/</g, '&lt;') + '</span>'
+      : (az.rodando ? '<span class="ok">ouvindo o servidor</span>' : 'em espera') + ' · hoje <b>' + (as.hoje || 0) + '</b>')
+      + (az.ultimo && az.ultimo.texto ? '<br>Última página: ' + String(az.ultimo.texto).replace(/</g, '&lt;') : ''));
+  }
   // Relatório mensal da Shopee para as Notas Shopee (2.14.0).
   const rs = await pedir({ tipo: 'relatorio-shopee' });
   if (rs) partes.push('Relatório Shopee (notas): ' + (rs.rodando ? '<span class="ok">lendo agora</span>' : 'consulta a cada 30 min')

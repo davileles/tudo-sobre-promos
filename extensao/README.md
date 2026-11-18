@@ -165,6 +165,24 @@ Usa o **mesmo interruptor e o mesmo token** da inserção de cupons. Volume: só
 que o servidor precisa (anúncio clássico, cupom declarado no anúncio, sonda
 diária), com teto diário no servidor e 4–8 s entre uma página e outra.
 
+## Páginas de produto da Amazon (cupons do anúncio, 2.15.0)
+
+O servidor lê na página do produto da Amazon o bloco de cupons
+(`promoPriceBlockMessage`: "Só no app: 50% off… código REFORMA50", "Salve o
+cupom 40%: BF40") para conferir se o cupom citado no post ainda vale e achar o
+código que o post não deu. Do IP do Railway a Amazon às vezes responde com a
+página intermediária de robô; quando isso acontece, o servidor pede a página
+à extensão.
+
+- A extensão busca a página por `fetch()`, com os cookies deste Chrome,
+  **sem abrir aba nem janela**, e devolve só o título, o bloco de preço e o
+  bloco de cupons (~80 KB).
+- Usa o mesmo interruptor e o mesmo token dos cupons do ML.
+- Servidor numa versão sem essa leitura (rota `/amazon/pagina/proximo` dá
+  404): a extensão anota "Servidor ainda sem a leitura da Amazon" e pergunta
+  de novo a cada 10 minutos. Não é erro e não afeta mais nada.
+- O popup mostra a linha **Páginas da Amazon**.
+
 ## Aparência
 
 A janela de disparo e o popup da fila usam as mesmas variáveis, tipografia e

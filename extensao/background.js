@@ -7,6 +7,8 @@
 importScripts('cupons-ml.js');
 // Leitura de pagina de produto do ML pelo Chrome do operador (fila do servidor, fetch aqui, sem aba).
 importScripts('paginas-ml.js');
+// Leitura de pagina de produto da Amazon (cupons do anuncio) quando o servidor nao consegue: fetch aqui, sem aba.
+importScripts('paginas-amazon.js');
 // Relatorio mensal da Shopee (Notas Shopee): pedido pelo servidor, lido pela propria pagina numa janela minimizada.
 importScripts('relatorio-shopee.js');
 
