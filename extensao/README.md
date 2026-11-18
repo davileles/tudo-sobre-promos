@@ -116,11 +116,15 @@ para o `/inserir` do bot para você inserir do celular.
 
 **Modos**
 
-- *Perguntar antes de inserir* (padrão): quando há lote pronto, chega uma
+Desde a 2.15.2 (18/11/2026) o **servidor decide o modo** (`CUPONS_ML_AUTO_MODO`,
+padrão `auto`): com `auto`, a extensão insere sozinha mesmo que o popup diga
+"perguntar antes" — reinstalar a extensão zerava o modo e os cupons ficavam
+esperando um clique. Com `CUPONS_ML_AUTO_MODO=aprovar` vale o que está no popup.
+
+- *Perguntar antes de inserir*: quando há lote pronto, chega uma
   notificação do Chrome com os códigos e os botões **Inserir agora** / **Depois**.
   Um clique para o lote inteiro. "Depois" adia 30 min.
-- *Automático*: insere sem perguntar. Recomendado só depois de duas semanas
-  sem disjuntor no modo anterior.
+- *Automático* (padrão): insere sem perguntar.
 
 **Vereditos que a extensão devolve**
 

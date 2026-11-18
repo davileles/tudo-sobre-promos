@@ -24,7 +24,7 @@ let mlLendo = false;                      // leitura de "Meus cupons" em andamen
 
 async function mlCfg() {
   const s = await chrome.storage.local.get({ mlAuto: null });
-  return Object.assign({ ligado: false, modo: 'aprovar', token: '', servidor: ML_SERVIDOR_PADRAO }, s.mlAuto || {});
+  return Object.assign({ ligado: false, modo: 'auto', token: '', servidor: ML_SERVIDOR_PADRAO }, s.mlAuto || {});
 }
 async function mlStatus(texto) {
   await chrome.storage.local.set({ mlUltimo: { em: Date.now(), texto: String(texto).slice(0, 200) } });
@@ -96,6 +96,17 @@ async function mlCiclo() {
   const r = await mlChamar('/cupons/auto/proximo?espiar=1');
   if (!r.ok) return mlStatus(r.motivo === 'disjuntor' ? 'Desligada pelo disjuntor — religue no bot (/autoinserir)' : 'Servidor: ' + (r.motivo || 'desligada'));
   if (!r.lote || !r.lote.length) return mlStatus(mlMotivoLegivel(r));
+  // 18/11/2026: reinstalar a extensao zera o storage e o modo voltava para
+  // "perguntar antes" — os cupons ficaram a tarde toda esperando um clique.
+  // A decisao da operacao e inserir sozinho: o servidor manda modo 'auto' e
+  // ele vale mais que o popup.
+  if (r.modo === 'auto') {
+    const r2 = await mlChamar('/cupons/auto/proximo');
+    if (!r2.ok) return mlStatus('Servidor: ' + (r2.motivo || 'desligada'));
+    if (!r2.lote || !r2.lote.length) return mlStatus(mlMotivoLegivel(r2));
+    mlIniciarVisita(r2).catch(e => mlStatus('Erro na visita: ' + e.message));
+    return;
+  }
   const { mlAvisadoEm } = await chrome.storage.local.get({ mlAvisadoEm: 0 });
   if (Date.now() - mlAvisadoEm < ML_REAVISAR_MS) return;
   await chrome.storage.local.set({ mlAvisadoEm: Date.now() });

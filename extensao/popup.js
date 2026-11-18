@@ -75,7 +75,7 @@ async function mlPintar() {
   const cfg = await pedir({ tipo: 'ml-cfg' });
   if (!cfg) return;
   mlEl('ml-ligado').checked = !!cfg.ligado;
-  mlEl('ml-modo').value = cfg.modo || 'aprovar';
+  mlEl('ml-modo').value = cfg.modo || 'auto';
   mlEl('ml-token').value = cfg.token || '';
   const st = mlEl('ml-status');
   if (!cfg.token) { st.innerHTML = 'Cole aqui o mesmo valor de <b>CUPONS_ML_EXTENSAO_TOKEN</b> do Railway e salve.'; return; }

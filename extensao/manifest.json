@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Captura Tica",
-  "version": "2.15.1",
+  "version": "2.15.2",
   "description": "Junta links para a vitrine do Tica Promos, insere os cupons do Mercado Livre na sua conta, lê a validade deles busca páginas de produto do ML, lê páginas da Amazon (cupons do anúncio) e lê o relatório mensal da Shopee para as notas fiscais.",
   "permissions": [
     "contextMenus",
