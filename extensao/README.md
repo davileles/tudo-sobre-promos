@@ -224,3 +224,19 @@ nome sai do slug da URL, que já é legível.
   a causa era build velho.
 - **O botão sumiu depois de trocar de domínio:** compare a versão no rodapé do
   popup com a do `manifest.json` no repositório. Diferente = recarregue a pasta.
+
+## Relatório mensal da Shopee (Notas Shopee, 2.14.0)
+
+Usa o mesmo interruptor e token dos cupons do ML. A cada 30 min a extensão
+pergunta ao servidor se há relatório para buscar (`GET /notas-shopee/tarefa`).
+Havendo, abre o *Relatório mensal para Documentos Fiscais* do painel de
+afiliados da Shopee numa **janela minimizada**, troca para 100 linhas por
+página, passa as páginas pela própria tela e **só escuta** as respostas que a
+página recebe — não chama a API da Shopee por fora (isso cai em verificação
+anti-robô). Junta as linhas do mês pedido, devolve em
+`POST /notas-shopee/relatorio` e fecha a janela. O servidor emite as NFS-e.
+
+Precisa estar logado na Shopee Afiliados neste Chrome. Se a página pedir login
+ou verificação, o servidor avisa no grupo do operador e a extensão tenta de
+novo sozinha em 30 min. O popup mostra a última leitura em
+"Relatório Shopee (notas)".

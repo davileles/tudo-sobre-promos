@@ -116,6 +116,10 @@ async function mlPintar() {
           + ' Teste automático às ' + new Date(ps.verificacao.proximoTesteEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '')
       + (pg.ultimo ? '<br>Última página: ' + String(pg.ultimo.texto).replace(/</g, '&lt;') : ''));
   }
+  // Relatório mensal da Shopee para as Notas Shopee (2.14.0).
+  const rs = await pedir({ tipo: 'relatorio-shopee' });
+  if (rs) partes.push('Relatório Shopee (notas): ' + (rs.rodando ? '<span class="ok">lendo agora</span>' : 'consulta a cada 30 min')
+    + (rs.ultimo ? '<br>Último: ' + String(rs.ultimo.texto).replace(/</g, '&lt;') : ''));
   const bt = mlEl('ml-resolvi');
   if (bt) bt.style.display = (pg && pg.servidor && pg.servidor.verificacao) ? '' : 'none';
   st.innerHTML = partes.join('<br>');

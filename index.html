@@ -3007,13 +3007,84 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="lk-lista"></div>
 </div>
 
-<!-- ════════ NOTAS SHOPEE (comissão extra de vendedores → eNotas) ════════ -->
+<!-- ════════ NOTAS SHOPEE (comissão extra de vendedores → NFS-e Nacional) ════════ -->
 <div class="panel" id="panel-notas">
   <div class="aviso">
-    Suba o <b>relatório mensal de comissão do vendedor</b> baixado na Shopee (MonthlyReport_*.csv) e baixe o arquivo pronto para
-    <b>importar no eNotas</b>: uma nota por vendedor (tomador), no valor da comissão extra paga. Tudo roda aqui no navegador; nada é enviado ao servidor.
-    A <b>chave única</b> de cada nota é <b>SHOPEE-AAAAMM-documento</b>: reimportar o mesmo mês no eNotas não duplica nota.
+    Todo mês o servidor pede à extensão <b>Captura Tica</b> o relatório mensal da Shopee (comissões extras dos vendedores), monta uma
+    <b>NFS-e por vendedor</b> e emite <b>direto no Emissor Nacional</b>, assinando com o certificado A1 da empresa. Nada sai em produção sem
+    certificado válido, sem os códigos do serviço confirmados e sem a emissão automática ligada. Nota emitida nunca é reemitida.
   </div>
+  <div id="ns2-topo"><div class="fila-loading"><div class="spinner"></div></div></div>
+
+  <div class="card">
+    <div class="sec-label">Certificado digital A1</div>
+    <div id="ns2-cert" style="font-size:13px;margin-bottom:10px">—</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end">
+      <div class="field" style="margin:0"><label>Arquivo .pfx</label><input type="file" id="ns2-pfx" accept=".pfx,.p12"/></div>
+      <div class="field" style="margin:0"><label>Senha</label><input type="password" id="ns2-senha" autocomplete="new-password"/></div>
+      <button class="btn btn-sm" onclick="ns2EnviarCert()">🔐 Cadastrar</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">O arquivo vai direto para o disco do servidor (Railway), fora do GitHub. A senha é guardada cifrada e nunca volta para a tela.</div>
+  </div>
+
+  <div class="card">
+    <div class="sec-label">Emitente e serviço</div>
+    <div class="fila-bar" style="margin:0 0 10px">
+      <label class="btn btn-sm" style="cursor:pointer">📄 Preencher com o XML de uma NFS-e já emitida<input type="file" accept=".xml" style="display:none" onchange="ns2ImportarXml(this)"/></label>
+      <span id="ns2-xml-ok" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+      <div class="field"><label>CNPJ do emitente</label><input type="text" id="ns2-e-cnpj"/></div>
+      <div class="field"><label>Inscrição municipal</label><input type="text" id="ns2-e-im"/></div>
+      <div class="field"><label>Telefone</label><input type="text" id="ns2-e-fone"/></div>
+      <div class="field"><label>E-mail</label><input type="text" id="ns2-e-email"/></div>
+      <div class="field"><label>Município (IBGE)</label><input type="text" id="ns2-e-cLocEmi"/></div>
+      <div class="field"><label>Simples: opção (opSimpNac)</label><input type="text" id="ns2-e-opSimpNac"/></div>
+      <div class="field"><label>Simples: apuração (regApTribSN)</label><input type="text" id="ns2-e-regApTribSN"/></div>
+      <div class="field"><label>Regime especial (regEspTrib)</label><input type="text" id="ns2-e-regEspTrib"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:6px">
+      <div class="field"><label>Código de tributação nacional</label><input type="text" id="ns2-s-cTribNac"/></div>
+      <div class="field"><label>Código municipal (BH)</label><input type="text" id="ns2-s-cTribMun"/></div>
+      <div class="field"><label>NBS</label><input type="text" id="ns2-s-cNBS"/></div>
+      <div class="field"><label>% tributos Simples (pTotTribSN)</label><input type="text" id="ns2-s-pTotTribSN" placeholder="vazio = não informar"/></div>
+      <div class="field"><label>ISS: tributação (tribISSQN)</label><input type="text" id="ns2-s-tribISSQN"/></div>
+      <div class="field"><label>ISS retido? (tpRetISSQN)</label><input type="text" id="ns2-s-tpRetISSQN"/></div>
+      <div class="field"><label>PIS/COFINS CST</label><input type="text" id="ns2-s-cstPisCofins"/></div>
+      <div class="field"><label>Série das DPS</label><input type="text" id="ns2-serie"/></div>
+    </div>
+    <div class="field"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="ns2-s-xDescServ" rows="2"></textarea></div>
+    <div class="field"><label>Informação complementar <span class="tag">opcional</span></label><textarea id="ns2-s-xInfComp" rows="2"></textarea></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
+      <div class="field"><label>Buscar o relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
+      <div class="field"><label>Valor mínimo por nota (R$)</label><input type="text" id="ns2-minimo"/></div>
+    </div>
+    <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label><br/>
+    <label class="env-check"><input type="checkbox" id="ns2-confirmados"/> <b>Códigos do serviço confirmados com o contador</b> (sem isso nada é emitido em produção)</label><br/>
+    <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
+    <div class="fila-bar" style="margin:10px 0 0"><span id="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
+  </div>
+
+  <div class="card">
+    <div class="fila-bar" style="margin:0">
+      <span class="sec-label" style="margin:0">Meses</span>
+      <div class="fila-acoes">
+        <input type="month" id="ns2-mes-buscar" style="width:auto;padding:6px 8px;font-size:12px"/>
+        <button class="btn btn-sm" onclick="ns2Buscar()">🛒 Buscar relatório na Shopee</button>
+        <button class="btn btn-sm" onclick="ns2Carregar()">↻</button>
+      </div>
+    </div>
+    <div id="ns2-meses" style="margin-top:12px"></div>
+  </div>
+
+  <details class="card">
+    <summary style="cursor:pointer;font-weight:600">Registro</summary>
+    <div id="ns2-log" style="font-size:12px;margin-top:8px"></div>
+  </details>
+
+  <details class="card">
+    <summary style="cursor:pointer;font-weight:600">Conversor manual: CSV da Shopee → importação do eNotas</summary>
+    <div style="font-size:12px;color:var(--muted);margin:8px 0">Alternativa sem o Emissor Nacional: suba o MonthlyReport_*.csv e baixe o arquivo de importação do eNotas. Roda só neste navegador.</div>
   <div class="card">
     <div class="fila-bar" style="margin:0">
       <label class="btn btn-sm" style="cursor:pointer">📂 Escolher relatório da Shopee<input type="file" accept=".csv,text/csv" style="display:none" onchange="nfsArquivo(this)"/></label>
@@ -3043,6 +3114,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="sec-label" style="margin-top:22px">Fora do arquivo</div>
     <div id="nfs-fora"></div>
   </div>
+  </details>
 </div>
 
 <!-- ════════ CONFIGURAÇÕES DA OPERAÇÃO ════════ -->
@@ -3796,7 +3868,7 @@ function switchTab(name) {
   }
   if (name === 'monprecos') mpCarregar();
   if (name === 'avisos') avCarregar();
-  if (name === 'notas') nfsAbrir();
+  if (name === 'notas') { nfsAbrir(); ns2Carregar(); }
   if (name === 'templates') { carregarTemplates(); rodAbrir(); }
   if (name === 'config') { cfgAbrir(); carregarJanelaCupom(); }
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
@@ -16982,6 +17054,161 @@ function nfsBaixar() {
   setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
 }
 
+
+/* ════════ NOTAS SHOPEE — emissão pelo Emissor Nacional (baileys-server, notas-shopee.js) ════════ */
+var NS2 = null;
+var NS2_STATUS = { pendente: ['⏳', 'pendente'], emitindo: ['📤', 'emitindo'], incerta: ['❔', 'resposta perdida (confere antes de reenviar)'],
+  emitida: ['✅', 'emitida'], erro: ['❌', 'recusada'], ignorada: ['🚫', 'ignorada'] };
+function ns2Esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function ns2Hora(t) { try { return new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(t); } }
+function ns2Mes(m) { return m.slice(4, 6) + '/' + m.slice(0, 4); }
+function ns2R(v) { return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ','); }
+function ns2Api(caminho, corpo) {
+  return fetch(SERVER + caminho, corpo === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+    .then(function (r) { return r.json().then(function (d) { if (!r.ok && d && !d.erro) d.erro = 'HTTP ' + r.status; return d; }); });
+}
+function ns2Carregar() {
+  return ns2Api('/notas-shopee').then(function (d) {
+    if (!d || !d.ok) { document.getElementById('ns2-topo').innerHTML = '<div class="card" style="color:#ef4444">⚠️ ' + ns2Esc(d && d.erro || 'servidor sem resposta') + '</div>'; return; }
+    NS2 = d; ns2Pintar();
+  }).catch(function (e) { document.getElementById('ns2-topo').innerHTML = '<div class="card" style="color:#ef4444">⚠️ ' + ns2Esc(e.message) + '</div>'; });
+}
+function ns2Pintar() {
+  var d = NS2, cfg = d.config, cert = d.certificado;
+  var topo = '<div class="card"><div style="font-size:13px;line-height:1.7">'
+    + (cfg.ativo ? '🟢 <b>Emissão automática ligada</b>' : '⚪ Emissão automática desligada')
+    + ' · relatório do mês anterior (' + ns2Mes(d.mesAlvo) + ') a partir do dia ' + cfg.diaInicio + ', das ' + cfg.horaIni + 'h às ' + cfg.horaFim + 'h'
+    + (d.tarefa ? '<br>🛒 Aguardando a extensão ler o relatório de <b>' + ns2Mes(d.tarefa.mes) + '</b>' + (d.tarefa.tentativas ? ' (' + d.tarefa.tentativas + ' tentativa(s))' : '') : '')
+    + (d.emitindo ? '<br>📤 <b>Emitindo agora…</b>' : '')
+    + (d.bloqueios.length ? '<br><span style="color:#f59e0b">⚠️ Emissão em produção travada: ' + ns2Esc(d.bloqueios.join(' · ')) + '</span>' : '<br>✅ Pronto para emitir em produção')
+    + '</div></div>';
+  document.getElementById('ns2-topo').innerHTML = topo;
+  document.getElementById('ns2-cert').innerHTML = !cert.cadastrado ? '⚪ Nenhum certificado cadastrado.'
+    : (cert.vencido ? '❌ ' : (cert.diasParaVencer < 30 ? '⚠️ ' : '✅ ')) + '<b>' + ns2Esc(cert.cn) + '</b> · válido até ' + ns2Esc(String(cert.validoAte).slice(0, 10))
+      + ' (' + (cert.vencido ? 'vencido' : cert.diasParaVencer + ' dias') + ')' + (cert.abre ? '' : ' · <span style="color:#ef4444">não abre</span>')
+      + '<br><span style="color:var(--muted);font-size:11px">' + ns2Esc(cert.emissor || '') + ' · cadastrado em ' + ns2Esc(String(cert.enviadoEm || '').slice(0, 10)) + '</span>';
+  var e = cfg.emitente, s = cfg.servico;
+  ['cnpj', 'im', 'fone', 'email', 'cLocEmi', 'opSimpNac', 'regApTribSN', 'regEspTrib'].forEach(function (k) { document.getElementById('ns2-e-' + k).value = e[k] || ''; });
+  ['cTribNac', 'cTribMun', 'cNBS', 'pTotTribSN', 'tribISSQN', 'tpRetISSQN', 'cstPisCofins', 'xDescServ', 'xInfComp'].forEach(function (k) { document.getElementById('ns2-s-' + k).value = s[k] || ''; });
+  document.getElementById('ns2-serie').value = cfg.serie;
+  document.getElementById('ns2-diaInicio').value = cfg.diaInicio;
+  document.getElementById('ns2-minimo').value = cfg.minimo;
+  document.getElementById('ns2-agrupar').checked = !!cfg.agrupar;
+  document.getElementById('ns2-confirmados').checked = !!cfg.codigosConfirmados;
+  document.getElementById('ns2-ativo').checked = !!cfg.ativo;
+  var mb = document.getElementById('ns2-mes-buscar');
+  if (!mb.value) mb.value = d.mesAlvo.slice(0, 4) + '-' + d.mesAlvo.slice(4, 6);
+  var h = '';
+  if (!d.meses.length) h = '<div style="color:var(--muted);font-size:12px">Nenhum relatório recebido ainda.</div>';
+  d.meses.forEach(function (m) {
+    var cont = Object.keys(m.contagem).map(function (k) { return (NS2_STATUS[k] || ['', k])[0] + ' ' + m.contagem[k] + ' ' + (NS2_STATUS[k] || ['', k])[1]; }).join(' · ');
+    var pend = (m.contagem.pendente || 0) + (m.contagem.incerta || 0);
+    h += '<details class="card" style="margin:0 0 10px"' + (m.mes === d.mesAlvo ? ' open' : '') + '><summary style="cursor:pointer"><b>' + ns2Mes(m.mes) + '</b> · '
+      + m.notas.length + ' notas · emitido ' + ns2R(m.totalEmitido) + (m.relatorio ? ' de ' + ns2R(m.relatorio.total) : '') + ' · ' + cont + '</summary>'
+      + (m.erroRelatorio ? '<div style="color:#f59e0b;font-size:12px;margin:6px 0">Última leitura falhou (' + ns2Hora(m.erroRelatorio.em) + '): ' + ns2Esc(m.erroRelatorio.erro) + '</div>' : '')
+      + '<div class="fila-bar" style="margin:8px 0"><span style="font-size:12px;color:var(--muted)">' + (m.relatorio ? 'Relatório lido em ' + ns2Hora(m.relatorio.em) : '') + '</span><div class="fila-acoes">'
+      + '<button class="btn btn-sm" onclick="ns2Teste(\'' + m.mes + '\')">🧪 Nota de teste (homologação)</button>'
+      + (pend ? '<button class="btn btn-sm" onclick="ns2Emitir(\'' + m.mes + '\',' + pend + ')">📤 Emitir ' + pend + ' pendente(s)</button>' : '')
+      + '</div></div>'
+      + '<table class="dv-tab"><tr><th>Tomador</th><th>Documento</th><th>Lojas</th><th>Valor</th><th>Situação</th><th></th></tr>';
+    m.notas.slice().sort(function (a, b) { return b.valor - a.valor; }).forEach(function (n) {
+      var st = NS2_STATUS[n.status] || ['', n.status];
+      var acoes = [];
+      if (n.status === 'emitida' && n.chaveAcesso) acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso) + '" target="_blank" rel="noopener">PDF</a>');
+      if (n.status !== 'emitida') acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/mes/' + m.mes + '/previa/' + n.chave) + '" target="_blank" rel="noopener">XML</a>');
+      if (n.status === 'erro') acoes.push('<a href="#" onclick="ns2Emitir(\'' + m.mes + '\',1,\'' + n.chave + '\');return false">tentar de novo</a>');
+      if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'ignorar\');return false">ignorar</a>');
+      if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'emitida-fora\');return false">já emiti por fora</a>');
+      if (n.status === 'ignorada') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'reativar\');return false">reativar</a>');
+      h += '<tr><td>' + ns2Esc(n.nome) + (n.cidade ? '<br><span style="font-size:11px;color:var(--muted)">' + ns2Esc(n.cidade) + '</span>' : (n.enderecoOk ? '' : '<br><span style="font-size:11px;color:#f59e0b">endereço não lido: vai sem endereço</span>')) + '</td>'
+        + '<td>' + ns2Esc(n.doc) + '</td><td>' + ns2Esc(n.lojas.map(function (l) { return l.nome; }).join(', ')) + '</td><td>' + ns2R(n.valor) + '</td>'
+        + '<td>' + st[0] + ' ' + st[1] + (n.nNFSe ? ' nº ' + ns2Esc(n.nNFSe) : '') + (n.foraDoSistema ? ' (por fora)' : '')
+        + (n.erro ? '<br><span style="font-size:11px;color:#ef4444">' + ns2Esc(n.erro) + '</span>' : '')
+        + (n.teste ? '<br><span style="font-size:11px;color:var(--muted)">teste: ' + ns2Esc(n.teste.status) + (n.teste.erro ? ' — ' + ns2Esc(n.teste.erro) : '') + '</span>' : '') + '</td>'
+        + '<td style="font-size:12px;white-space:nowrap">' + acoes.join(' · ') + '</td></tr>';
+    });
+    h += '</table>';
+    if (m.fora.length) h += '<div style="font-size:12px;color:var(--muted);margin-top:8px">Fora: ' + m.fora.map(function (f) { return ns2Esc(f.nome + ' (' + f.motivo + ', ' + ns2R(f.loja.valor) + ')'); }).join('; ') + '</div>';
+    h += '</details>';
+  });
+  document.getElementById('ns2-meses').innerHTML = h;
+  document.getElementById('ns2-log').innerHTML = (d.log || []).map(function (l) { return ns2Hora(l.em) + ' — ' + ns2Esc(l.texto); }).join('<br>') || '—';
+}
+function ns2EnviarCert() {
+  var f = document.getElementById('ns2-pfx').files[0], senha = document.getElementById('ns2-senha').value;
+  if (!f) return alert('Escolha o arquivo .pfx');
+  if (!senha) return alert('Digite a senha do certificado');
+  var rd = new FileReader();
+  rd.onload = function () {
+    var b64 = String(rd.result).split(',')[1] || '';
+    ns2Api('/notas-shopee/certificado', { pfxB64: b64, senha: senha }).then(function (d) {
+      document.getElementById('ns2-senha').value = ''; document.getElementById('ns2-pfx').value = '';
+      if (!d.ok) return alert('Certificado não cadastrado: ' + d.erro);
+      ns2Carregar();
+    });
+  };
+  rd.readAsDataURL(f);
+}
+function ns2ImportarXml(inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () {
+    ns2Api('/notas-shopee/importar-xml', { xml: String(rd.result) }).then(function (d) {
+      inp.value = '';
+      if (!d.ok) return alert('XML não lido: ' + d.erro);
+      var c = d.codigosDoXml || {};
+      document.getElementById('ns2-xml-ok').textContent = 'Emitente e regime preenchidos. Códigos do serviço daquela nota: ' + [c.cTribNac, c.cTribMun, c.cNBS].filter(Boolean).join(' / ') + ' (não copiados)';
+      ns2Carregar();
+    });
+  };
+  rd.readAsText(f, 'utf-8');
+}
+function ns2SalvarConfig() {
+  var v = function (id) { return document.getElementById(id).value.trim(); };
+  var corpo = { emitente: {}, servico: {}, serie: v('ns2-serie'), diaInicio: v('ns2-diaInicio'), minimo: v('ns2-minimo'),
+    agrupar: document.getElementById('ns2-agrupar').checked, codigosConfirmados: document.getElementById('ns2-confirmados').checked,
+    ativo: document.getElementById('ns2-ativo').checked };
+  ['cnpj', 'im', 'fone', 'email', 'cLocEmi', 'opSimpNac', 'regApTribSN', 'regEspTrib'].forEach(function (k) { corpo.emitente[k] = v('ns2-e-' + k); });
+  ['cTribNac', 'cTribMun', 'cNBS', 'pTotTribSN', 'tribISSQN', 'tpRetISSQN', 'cstPisCofins', 'xDescServ', 'xInfComp'].forEach(function (k) { corpo.servico[k] = v('ns2-s-' + k); });
+  ns2Api('/notas-shopee/config', corpo).then(function (d) {
+    var el = document.getElementById('ns2-cfg-ok');
+    el.textContent = d.ok ? '✅ Salvo' + (d.config && corpo.codigosConfirmados && !d.config.codigosConfirmados ? ' (códigos mudaram: confirme de novo)' : '') : '⚠️ ' + d.erro;
+    if (d.ok) ns2Carregar();
+  });
+}
+function ns2Buscar() {
+  var m = (document.getElementById('ns2-mes-buscar').value || '').replace('-', '');
+  if (!/^\d{6}$/.test(m)) return alert('Escolha o mês');
+  ns2Api('/notas-shopee/mes/' + m + '/buscar', {}).then(function (d) {
+    if (!d.ok) return alert(d.erro);
+    alert('Pedido feito. A extensão Captura Tica lê o relatório de ' + ns2Mes(m) + ' em até 30 min (ou clique em "Verificar agora" no popup dela).');
+    ns2Carregar();
+  });
+}
+function ns2Teste(m) {
+  if (!confirm('Emitir UMA nota de teste no ambiente de homologação do governo (não vale como nota fiscal)?')) return;
+  ns2Api('/notas-shopee/mes/' + m + '/teste', {}).then(function (d) {
+    alert(d.ok ? '✅ Teste aceito pela Sefin (homologação). Nota: ' + d.nota + '\nChave: ' + d.chaveAcesso : '❌ Teste recusado' + (d.nota ? ' (' + d.nota + ')' : '') + ':\n' + d.erro);
+    ns2Carregar();
+  });
+}
+function ns2Emitir(m, qtd, chave) {
+  if (!confirm('Emitir ' + qtd + ' nota(s) fiscal(is) de ' + ns2Mes(m) + ' em PRODUÇÃO? Isso gera NFS-e de verdade.')) return;
+  ns2Api('/notas-shopee/mes/' + m + '/emitir', chave ? { so: [chave] } : {}).then(function (d) {
+    if (d.ok && d.emAndamento) { alert('Emissão iniciada. A lista atualiza sozinha enquanto as notas saem.'); ns2Acompanhar(); return; }
+    alert(d.ok ? '✅ ' + d.emitidas + ' emitida(s)' + (d.falhas && d.falhas.length ? '\n❌ ' + d.falhas.length + ' com falha:\n' + d.falhas.slice(0, 6).join('\n') : '') : '⚠️ ' + d.erro);
+    ns2Carregar();
+  });
+}
+var NS2_TIMER = null;
+function ns2Acompanhar() {
+  clearTimeout(NS2_TIMER);
+  ns2Carregar().then(function () { if (NS2 && NS2.emitindo) NS2_TIMER = setTimeout(ns2Acompanhar, 5000); });
+}
+function ns2Nota(m, chave, acao) {
+  if (acao === 'emitida-fora' && !confirm('Marcar como já emitida fora deste sistema? Ela não será mais emitida aqui.')) return;
+  ns2Api('/notas-shopee/mes/' + m + '/nota/' + chave + '/' + acao, {}).then(function (d) { if (!d.ok) alert(d.erro); ns2Carregar(); });
+}
 </script>
 </body>
 </html>
