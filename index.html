@@ -3058,6 +3058,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px">
       <div class="field"><label>Buscar o relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
       <div class="field"><label>Valor mínimo por nota (R$)</label><input type="text" id="ns2-minimo"/></div>
+      <div class="field"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão</option></select></div>
     </div>
     <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label><br/>
     <label class="env-check"><input type="checkbox" id="ns2-confirmados"/> <b>Códigos do serviço confirmados com o contador</b> (sem isso nada é emitido em produção)</label><br/>
@@ -3071,6 +3072,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="fila-acoes">
         <input type="month" id="ns2-mes-buscar" style="width:auto;padding:6px 8px;font-size:12px"/>
         <button class="btn btn-sm" onclick="ns2Buscar()">🛒 Buscar relatório na Shopee</button>
+        <label class="btn btn-sm" style="cursor:pointer">📂 Importar CSV do mês<input type="file" accept=".csv,text/csv" style="display:none" onchange="ns2ImportarCsv(this)"/></label>
         <button class="btn btn-sm" onclick="ns2Carregar()">↻</button>
       </div>
     </div>
@@ -17093,6 +17095,7 @@ function ns2Pintar() {
   document.getElementById('ns2-serie').value = cfg.serie;
   document.getElementById('ns2-diaInicio').value = cfg.diaInicio;
   document.getElementById('ns2-minimo').value = cfg.minimo;
+  document.getElementById('ns2-competencia').value = cfg.competencia || 'emissao';
   document.getElementById('ns2-agrupar').checked = !!cfg.agrupar;
   document.getElementById('ns2-confirmados').checked = !!cfg.codigosConfirmados;
   document.getElementById('ns2-ativo').checked = !!cfg.ativo;
@@ -17165,7 +17168,7 @@ function ns2ImportarXml(inp) {
 }
 function ns2SalvarConfig() {
   var v = function (id) { return document.getElementById(id).value.trim(); };
-  var corpo = { emitente: {}, servico: {}, serie: v('ns2-serie'), diaInicio: v('ns2-diaInicio'), minimo: v('ns2-minimo'),
+  var corpo = { emitente: {}, servico: {}, serie: v('ns2-serie'), diaInicio: v('ns2-diaInicio'), minimo: v('ns2-minimo'), competencia: v('ns2-competencia'),
     agrupar: document.getElementById('ns2-agrupar').checked, codigosConfirmados: document.getElementById('ns2-confirmados').checked,
     ativo: document.getElementById('ns2-ativo').checked };
   ['cnpj', 'im', 'fone', 'email', 'cLocEmi', 'opSimpNac', 'regApTribSN', 'regEspTrib'].forEach(function (k) { corpo.emitente[k] = v('ns2-e-' + k); });
@@ -17184,6 +17187,36 @@ function ns2Buscar() {
     alert('Pedido feito. A extensão Captura Tica lê o relatório de ' + ns2Mes(m) + ' em até 30 min (ou clique em "Verificar agora" no popup dela).');
     ns2Carregar();
   });
+}
+// CSV baixado na Shopee (Exportar do relatório mensal) → mesmo formato que a
+// extensão manda. Mês = o escolhido ao lado; linhas de outros meses são ignoradas.
+function ns2ImportarCsv(inp) {
+  var f = inp.files && inp.files[0]; if (!f) return;
+  var alvo = (document.getElementById('ns2-mes-buscar').value || '').replace('-', '');
+  var rd = new FileReader();
+  rd.onload = function () {
+    inp.value = '';
+    var linhas;
+    try { linhas = nfsLerShopee(rd.result); } catch (e) { return alert('Arquivo não lido: ' + e.message); }
+    var meses = {};
+    linhas.forEach(function (r) { if (r.mes) meses[r.mes.aaaa + r.mes.mm] = (meses[r.mes.aaaa + r.mes.mm] || 0) + 1; });
+    var lista = Object.keys(meses).sort();
+    if (!/^\d{6}$/.test(alvo) || !meses[alvo]) {
+      if (lista.length === 1) alvo = lista[0];
+      else return alert('Escolha o mês ao lado. O arquivo tem: ' + lista.map(ns2Mes).join(', '));
+    }
+    var itens = linhas.filter(function (r) { return r.mes && r.mes.aaaa + r.mes.mm === alvo; }).map(function (r) {
+      return { completedMonth: alvo, shopName: r.loja, shopId: r.idLoja, totalSellerCommission: String(Math.round(r.valor * 100000)),
+        sellerCnpj: r.tipo === 'J' ? r.doc : '', sellerCpf: r.tipo === 'F' ? r.doc : '', foreignTaxId: r.docEstrangeiro || '',
+        sellerLegalName: r.razao, sellerAddress: r.endTxt, sellerRegion: r.pais, stateRegistration: r.ie, email: r.email };
+    });
+    if (!confirm('Importar ' + itens.length + ' linha(s) de ' + ns2Mes(alvo) + '? Notas já emitidas desse mês não mudam.')) return;
+    ns2Api('/notas-shopee/mes/' + alvo + '/importar', { itens: itens }).then(function (d) {
+      alert(d.ok ? '✅ ' + ns2Mes(alvo) + ': ' + d.notas + ' nota(s) prontas, ' + d.fora + ' fora.' : '⚠️ ' + d.erro);
+      ns2Carregar();
+    });
+  };
+  rd.readAsText(f, 'utf-8');
 }
 function ns2Teste(m) {
   if (!confirm('Emitir UMA nota de teste no ambiente de homologação do governo (não vale como nota fiscal)?')) return;
