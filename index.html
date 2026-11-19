@@ -3104,7 +3104,7 @@ body.travado > *:not(#login-screen){display:none !important}
     Notas fiscais (NFS-e) das comissões dos programas de afiliados, emitidas <b>direto no Emissor Nacional</b> com o certificado A1 da empresa.
     Os <b>dados da empresa</b> são os mesmos do Gestão CDV; cada <b>produto fiscal</b> define como a nota sai, e cada programa aponta para um produto.
     Hoje a Shopee é automática: todo mês a extensão <b>Captura Tica</b> lê o relatório mensal e sai uma nota por vendedor. Nada sai em produção sem
-    certificado válido, sem os códigos do produto confirmados e sem a emissão automática ligada. Nota emitida nunca é reemitida.
+    certificado válido, sem os códigos do produto confirmados e sem o modo Produção. Nota emitida nunca é reemitida.
   </div>
   <div id="ns2-topo"><div class="fila-loading"><div class="spinner"></div></div></div>
 
@@ -3158,19 +3158,26 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="sec-label">4. Emissão</div>
     <div class="ns2-grid">
       <div class="field"><label title="Série da DPS">Série da DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie"></div></div>
-      <div class="field"><label title="Competência padrão">Competência padrão</label><select id="ns2-competencia"><option value="emissao">Data de emissão</option><option value="mes">Último dia do mês da comissão</option></select><div class="ns2-desc">Vale para o produto fiscal que estiver em "A padrão da Emissão". Cada produto pode ter a sua.</div></div>
-      <div class="field"><label title="Buscar relatório a partir do dia">Buscar relatório no dia</label><input type="text" id="ns2-diaInicio"/><div class="ns2-desc">Dia do mês em que o relatório do mês anterior é buscado.</div></div>
-      <div class="field"><label title="Valor mínimo por nota (R$)">Valor mínimo (R$)</label><input type="text" id="ns2-minimo"/><div class="ns2-desc">Notas abaixo disso ficam de fora (0 = todas).</div></div>
+      <div class="field"><label title="Competência padrão">Competência padrão</label><select id="ns2-competencia"><option value="emissao">Data de emissão</option><option value="pagamento">Data do pagamento</option><option value="mes">Último dia do mês do pagamento</option></select><div class="ns2-desc">Vale para o produto fiscal que estiver em "A padrão da Emissão". Pagamento = dia em que a venda foi paga; nos relatórios mensais dos programas de afiliados é o mês da comissão (vale o último dia).</div></div>
+      <div class="field"><label title="Modo">Modo</label><select id="ns2-modo"><option value="desligado">Desligado</option><option value="homologacao">Homologação (testes)</option><option value="producao">Produção (notas válidas)</option></select><div class="ns2-desc">Desligado: nada roda sozinho. Homologação: monta a fila e só sai nota de teste. Produção: notas válidas.</div></div>
+      <div class="field"><label title="Valor mínimo (R$)">Valor mínimo (R$)</label><input type="text" id="ns2-minimo"/><div class="ns2-desc">Notas abaixo disso ficam de fora (0 = todas).</div></div>
     </div>
     <div class="ns2-checks">
-      <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> Uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label>
-      <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
+      <label class="env-check"><input type="checkbox" id="ns2-auto"/> <b>Emitir automaticamente</b> (em Produção, as notas da fila saem sozinhas; desmarcado, só pelo botão Emitir)</label>
     </div>
     <div class="ns2-salvar"><button class="btn btn-sm" style="margin:0" onclick="ns2SalvarConfig(this)">💾 Salvar</button><span class="ns2-cfg-ok" style="font-size:12px"></span></div>
   </div>
 
   <div class="card">
-    <div class="sec-label">5. Programas de afiliados → produto fiscal</div>
+    <div class="sec-label">5. Só do Tica Promos · programas de afiliados</div>
+    <div class="ns2-desc" style="margin:0 0 12px">De onde vêm as notas deste painel: os relatórios mensais dos programas de afiliados. As opções acima valem do mesmo jeito que no Gestão CDV.</div>
+    <div class="ns2-grid">
+      <div class="field"><label title="Buscar relatório a partir do dia">Buscar relatório no dia</label><input type="text" id="ns2-diaInicio"/><div class="ns2-desc">Dia do mês em que o relatório do mês anterior é buscado (em Homologação e Produção).</div></div>
+    </div>
+    <div class="ns2-checks">
+      <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> Uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label>
+    </div>
+    <div class="sec-label" style="margin-top:18px">Programas de afiliados → produto fiscal</div>
     <div class="ns2-desc" style="margin:0 0 12px">Todo programa de afiliados usa o produto fiscal padrão. Cadastre aqui só as exceções: programas que saem com outro produto fiscal. Se você trocar o padrão, todos os programas sem exceção passam a usar o novo. Hoje só a comissão extra da Shopee tem relatório para virar nota; os outros programas já ficam configurados para quando tiverem.</div>
     <div class="ns2-grid" style="margin-bottom:12px"><div class="field ns2-largo"><label>Produto fiscal padrão</label><select id="ns2-padrao" onchange="NS2_PRODS_SUJO=true;ns2ProdutosLer();NS2_PADRAO=this.value;ns2ProdutosRender()"></select><div class="ns2-desc">Vale para todos os programas que não estão nas exceções.</div></div></div>
     <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Exceções</label>
@@ -17385,7 +17392,8 @@ function ns2Pintar() {
   document.getElementById('ns2-minimo').value = cfg.minimo;
   document.getElementById('ns2-competencia').value = cfg.competencia || 'emissao';
   document.getElementById('ns2-agrupar').checked = !!cfg.agrupar;
-  document.getElementById('ns2-ativo').checked = !!cfg.ativo;
+  document.getElementById('ns2-modo').value = cfg.modo || 'homologacao';
+  document.getElementById('ns2-auto').checked = !!cfg.emitirAuto;
   ns2Descrever();
   var mb = document.getElementById('ns2-mes-buscar');
   if (!mb.value) mb.value = d.mesAlvo.slice(0, 4) + '-' + d.mesAlvo.slice(4, 6);
@@ -17493,7 +17501,7 @@ function ns2ProdutosRender() {
       if (c[0] === 'cstPisCofins') {
         var cp = p.competencia || '';
         h += '<div class="field"><label title="Competência">Competência</label><select id="' + pre + 'competencia" onchange="NS2_PRODS_SUJO=true">'
-          + [['', 'A padrão da Emissão'], ['emissao', 'Data de emissão'], ['mes', 'Último dia do mês da comissão']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cp ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+          + [['', 'A padrão da Emissão'], ['emissao', 'Data de emissão'], ['pagamento', 'Data do pagamento'], ['mes', 'Último dia do mês do pagamento']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cp ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
           + '</select><div class="ns2-desc">Data que vai na nota como competência, só para este produto.</div></div>';
       }
     });
@@ -17609,7 +17617,9 @@ function ns2ImportarXml(inp) {
 function ns2SalvarConfig(btn) {
   var v = function (id) { return document.getElementById(id).value.trim(); };
   var corpo = { emitente: {}, serie: v('ns2-serie'), diaInicio: v('ns2-diaInicio'), minimo: v('ns2-minimo'), competencia: v('ns2-competencia'),
-    agrupar: document.getElementById('ns2-agrupar').checked, ativo: document.getElementById('ns2-ativo').checked, programas: {} };
+    agrupar: document.getElementById('ns2-agrupar').checked, modo: v('ns2-modo'), emitirAuto: document.getElementById('ns2-auto').checked, programas: {} };
+  if (corpo.modo === 'producao' && NS2 && NS2.config && NS2.config.modo !== 'producao' &&
+      !confirm('Ligar a emissão em PRODUÇÃO? As notas passam a ser válidas' + (corpo.emitirAuto ? ' e saem sozinhas todo mês' : '') + '.')) return;
   ['razao', 'cnpj', 'im', 'fone', 'email', 'cLocEmi', 'opSimpNac', 'regApTribSN', 'regEspTrib'].forEach(function (k) { corpo.emitente[k] = v('ns2-e-' + k); });
   corpo.produtos = ns2ProdutosLer().map(function (p) { var x = Object.assign({}, p); delete x._aberto; return x; });
   corpo.produtoPadrao = NS2_PADRAO;
@@ -17671,10 +17681,11 @@ var NS2_DESC = {
   'ns2-s-cTribNac': { '170601': 'Item 17.06 da lista de serviços: propaganda e publicidade, inclusive promoção de vendas, planejamento de campanhas e materiais publicitários', '080201': 'Item 8.02: instrução, treinamento, orientação pedagógica e educacional (código usado nas notas antigas pelo eNotas)', _: 'Código do serviço na lista nacional (LC 116), 6 dígitos.' },
   'ns2-s-cTribMun': { '001': 'Desdobramento de Belo Horizonte para o código nacional acima (opção 001 do Emissor Nacional)', _: 'Subdivisão que o município usa para o código nacional. Em BH, escolhido no Emissor Nacional.' },
   'ns2-s-cNBS': { '114061900': 'Serviços de propaganda não classificados em subposições anteriores', '122051900': 'Código de serviços educacionais usado nas notas antigas pelo eNotas', _: 'Nomenclatura Brasileira de Serviços: classificação do serviço usada pela Receita.' },
-  'ns2-s-pTotTribSN': { '': 'Não informar o percentual (vai “não informado”)', _: 'Alíquota do Simples Nacional (a que aparece na guia DAS no Nibo; hoje 6,00%, faixa 1 do Anexo III). Só informativa para o tomador; o imposto é pago no DAS.' },
+  // Mesmos textos de NF_DESC_TRIB do Gestão CDV: mudou um, muda o outro.
+  'ns2-s-pTotTribSN': { '': 'Não informar o percentual (vai “não informado”).', _: 'Alíquota do Simples Nacional (a da guia DAS). Só informativa para o tomador; o imposto é pago no DAS.' },
   'ns2-s-tribISSQN': { '1': 'Operação tributável pelo ISS', '2': 'Imunidade', '3': 'Exportação de serviço', '4': 'Não incidência', _: 'Tributação do ISS nesta operação.' },
   'ns2-s-tpRetISSQN': { '1': 'ISS não retido: a empresa recolhe (no DAS)', '2': 'Retido pelo tomador', '3': 'Retido pelo intermediário', _: 'Quem recolhe o ISS.' },
-  'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', _: 'Situação tributária do PIS/COFINS na nota.' },
+  'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', '': 'Vazio: a nota sai sem o grupo de PIS/COFINS.', _: 'Situação tributária do PIS/COFINS na nota.' },
   'ns2-serie': { _: 'Número da série das notas deste painel (use o que a contabilidade indicar). Só não pode ser igual à série do Gestão CDV nem à do eNotas (1): mesma série + mesmo número a Sefin recusa. A numeração recomeça do 1 em cada série. Não troque depois de emitir.' }
 };
 function ns2Descrever() {
