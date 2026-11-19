@@ -17387,6 +17387,11 @@ var NS2_STATUS = { pendente: ['⏳', 'pendente'], emitindo: ['📤', 'emitindo']
 // Linha extra de cancelamento (mesmo texto do Gestão CDV).
 function ns2InfoCancel(x) {
   if (!x) return '';
+  var re = (x.reemissaoDe ? '<br><span style="font-size:11px;color:var(--muted)">↻ Emitida de novo no lugar de uma nota cancelada' + (x.competencia ? ' · competência ' + x.competencia.split('-').reverse().join('/') : '') + '</span>' : '')
+    + (x.substituidaPor ? '<br><span style="font-size:11px;color:var(--muted)">↻ Substituída por uma nota nova</span>' : '');
+  return re + ns2InfoCancel2(x);
+}
+function ns2InfoCancel2(x) {
   if (x.status === 'cancelada') return '<br><span style="font-size:11px;color:var(--muted)">Cancelada' + (x.canceladaEm ? ' em ' + ns2Hora(x.canceladaEm) : '')
     + (x.canceladaPor === 'portal' ? ' (no Portal Nacional)' : '') + (x.motivo ? ': ' + ns2Esc(x.motivo) : '') + '</span>';
   if (x.cancelamentoErros && x.cancelamentoErros.length) return '<br><span style="font-size:11px;color:#ef4444">Cancelamento recusado: '
@@ -17396,11 +17401,41 @@ function ns2InfoCancel(x) {
 // Botões de cancelar (nota válida ou teste); mes = AAAAMM ou 'avulsa'.
 function ns2AcoesCancel(mes, n, teste) {
   var x = teste ? (n.teste === true ? n : n.teste) : n;
+  if (!teste && x && x.status === 'cancelada' && !x.substituidaPor && x.teste !== true)
+    return ['<a href="#" style="font-weight:700" onclick="ns2Reemitir(\'' + mes + '\',\'' + n.chave + '\');return false">↻ emitir de novo</a>'];
   if (!x || x.status !== 'emitida') return [];
   var a = [];
   if (x.chaveAcesso && !x.foraDoSistema) a.push('<a href="#" style="color:#ef4444" onclick="ns2Cancelar(\'' + mes + '\',\'' + n.chave + '\',' + (teste ? 'true' : 'false') + ');return false">✕ cancelar ' + (teste ? 'teste' : 'nota') + '</a>');
   if (!teste) a.push('<a href="#" onclick="ns2CanceladaFora(\'' + mes + '\',\'' + n.chave + '\');return false">já cancelei no portal</a>');
   return a;
+}
+// Emitir de novo uma nota cancelada (mesmo fluxo do Gestão CDV): mesmos dados,
+// competência e valor ajustáveis.
+function ns2DataIso(txt) {
+  txt = String(txt || '').trim();
+  if (!txt) return '';
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(txt);
+  if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  return /^\d{4}-\d{2}-\d{2}$/.test(txt) ? txt : null;
+}
+function ns2Reemitir(mes, chave) {
+  var n = null;
+  if (mes === 'avulsa') n = (NS2.avulsas || []).filter(function (x) { return x.chave === chave; })[0];
+  else (NS2.meses || []).forEach(function (m) { if (m.mes === mes) n = (m.notas || []).filter(function (x) { return x.chave === chave; })[0]; });
+  n = n || {};
+  var sug = mes !== 'avulsa' ? mes.slice(0, 4) + '-' + mes.slice(4, 6) : '';
+  if (sug) { var d = new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(4, 6)), 0)); sug = d.toISOString().slice(0, 10); }
+  var c = prompt('Competência da nota nova (DD/MM/AAAA).\nDeixe vazio para usar a regra do produto fiscal.' + (sug ? '\nSugestão: último dia do mês da comissão.' : ''), sug ? sug.split('-').reverse().join('/') : '');
+  if (c === null) return;
+  var comp = ns2DataIso(c);
+  if (comp === null) { alert('Data inválida. Use DD/MM/AAAA.'); return; }
+  var v = prompt('Valor da nota nova (R$):', String(n.valor || '').replace('.', ','));
+  if (v === null) return;
+  if (!confirm('Emitir de novo a nota de ' + (n.nome || 'tomador') + ' com os mesmos dados' + (comp ? ', competência ' + comp.split('-').reverse().join('/') : '') + ' e valor R$ ' + v + '?')) return;
+  ns2Api('/notas-shopee/reemitir', { mes: mes, chave: chave, competencia: comp, valor: v }).then(function (r) {
+    alert(r.ok ? 'Nota emitida de novo' + (r.nNFSe ? ' (nº ' + r.nNFSe + ')' : '') + '.' : 'Não foi possível emitir de novo: ' + (r.erro || 'erro sem descrição'));
+    ns2Carregar();
+  }).catch(function (e) { alert('Erro: ' + e.message); ns2Carregar(); });
 }
 function ns2Cancelar(mes, chave, teste) {
   var m = prompt('Motivo do cancelamento:\n1 = Erro na emissão\n2 = Serviço não prestado (venda desfeita / reembolso)\n9 = Outros', '1');
