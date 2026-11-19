@@ -17383,7 +17383,43 @@ function nfsBaixar() {
 /* ════════ NOTAS FISCAIS — emissão pelo Emissor Nacional (baileys-server, notas-shopee.js) ════════ */
 var NS2 = null;
 var NS2_STATUS = { pendente: ['⏳', 'pendente'], emitindo: ['📤', 'emitindo'], incerta: ['❔', 'resposta perdida (confere antes de reenviar)'],
-  emitida: ['✅', 'emitida'], erro: ['❌', 'recusada'], ignorada: ['🚫', 'ignorada'] };
+  emitida: ['✅', 'emitida'], erro: ['❌', 'recusada'], ignorada: ['🚫', 'ignorada'], cancelada: ['⛔', 'cancelada'] };
+// Linha extra de cancelamento (mesmo texto do Gestão CDV).
+function ns2InfoCancel(x) {
+  if (!x) return '';
+  if (x.status === 'cancelada') return '<br><span style="font-size:11px;color:var(--muted)">Cancelada' + (x.canceladaEm ? ' em ' + ns2Hora(x.canceladaEm) : '')
+    + (x.canceladaPor === 'portal' ? ' (no Portal Nacional)' : '') + (x.motivo ? ': ' + ns2Esc(x.motivo) : '') + '</span>';
+  if (x.cancelamentoErros && x.cancelamentoErros.length) return '<br><span style="font-size:11px;color:#ef4444">Cancelamento recusado: '
+    + ns2Esc(x.cancelamentoErros.map(function (e) { return e.codigo + ' ' + e.descricao; }).join('; ')) + '</span>';
+  return '';
+}
+// Botões de cancelar (nota válida ou teste); mes = AAAAMM ou 'avulsa'.
+function ns2AcoesCancel(mes, n, teste) {
+  var x = teste ? (n.teste === true ? n : n.teste) : n;
+  if (!x || x.status !== 'emitida') return [];
+  var a = [];
+  if (x.chaveAcesso && !x.foraDoSistema) a.push('<a href="#" style="color:#ef4444" onclick="ns2Cancelar(\'' + mes + '\',\'' + n.chave + '\',' + (teste ? 'true' : 'false') + ');return false">✕ cancelar ' + (teste ? 'teste' : 'nota') + '</a>');
+  if (!teste) a.push('<a href="#" onclick="ns2CanceladaFora(\'' + mes + '\',\'' + n.chave + '\');return false">já cancelei no portal</a>');
+  return a;
+}
+function ns2Cancelar(mes, chave, teste) {
+  var m = prompt('Motivo do cancelamento:\n1 = Erro na emissão\n2 = Serviço não prestado (venda desfeita / reembolso)\n9 = Outros', '1');
+  if (m === null) return;
+  m = String(m).trim(); if (['1', '2', '9'].indexOf(m) < 0) { alert('Use 1, 2 ou 9.'); return; }
+  var j = prompt('Justificativa (mínimo 15 caracteres):', m === '1' ? 'Nota emitida com dados incorretos.' : (m === '2' ? 'Serviço não prestado, cobrança desfeita.' : ''));
+  if (j === null) return;
+  if (j.trim().length < 15) { alert('A justificativa precisa de pelo menos 15 caracteres.'); return; }
+  if (!confirm('Cancelar esta nota no Emissor Nacional' + (teste ? ' (homologação)' : '') + '? Não dá para desfazer.')) return;
+  ns2Api('/notas-shopee/cancelar', { mes: mes, chave: chave, teste: !!teste, motivo: Number(m), justificativa: j.trim() }).then(function (r) {
+    alert(r.ok ? 'Nota cancelada.' : 'Cancelamento recusado: ' + (r.erro || (r.erros || []).map(function (e) { return e.codigo + ' ' + e.descricao; }).join('; ')));
+    ns2Carregar();
+  }).catch(function (e) { alert('Erro: ' + e.message); ns2Carregar(); });
+}
+function ns2CanceladaFora(mes, chave) {
+  var motivo = prompt('Cancelou no Emissor Nacional? Motivo:');
+  if (motivo === null) return;
+  ns2Api('/notas-shopee/mes/' + mes + '/nota/' + chave + '/cancelada-fora', { motivo: motivo }).then(function (d) { if (!d.ok) alert(d.erro); ns2Carregar(); });
+}
 function ns2Esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function ns2Hora(t) { try { return new Date(t).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(t); } }
 function ns2Mes(m) { return m.slice(4, 6) + '/' + m.slice(0, 4); }
@@ -17414,8 +17450,8 @@ function ns2AvulsasPintar() {
         var pdf = n.chaveAcesso ? '<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso + (n.teste ? '?ambiente=producaorestrita' : '')) + '" target="_blank" rel="noopener">PDF</a>' : '';
         return '<tr><td>' + ns2Hora(n.criadaEm) + '</td><td>' + ns2Esc(n.nome) + '</td><td>' + ns2Esc(n.doc) + '</td><td>' + ns2R(n.valor) + '</td>'
           + '<td>' + (n.teste ? '🧪 teste · ' : '') + st[0] + ' ' + st[1] + (n.nNFSe ? ' nº ' + ns2Esc(n.nNFSe) : '')
-          + (n.erro ? '<br><span style="font-size:11px;color:#ef4444">' + ns2Esc(n.erro) + '</span>' : '') + '</td>'
-          + '<td style="font-size:12px">' + pdf + '</td></tr>';
+          + (n.erro ? '<br><span style="font-size:11px;color:#ef4444">' + ns2Esc(n.erro) + '</span>' : '') + ns2InfoCancel(n) + '</td>'
+          + '<td style="font-size:12px;white-space:nowrap">' + [pdf].filter(Boolean).concat(ns2AcoesCancel('avulsa', n, !!n.teste)).join(' · ') + '</td></tr>';
       }).join('') + '</table></div>';
   document.getElementById('ns2-avulsas').innerHTML = h;
 }
@@ -17486,18 +17522,20 @@ function ns2Pintar() {
     m.notas.slice().sort(function (a, b) { return b.valor - a.valor; }).forEach(function (n) {
       var st = NS2_STATUS[n.status] || ['', n.status];
       var acoes = [];
-      if (n.status === 'emitida' && n.chaveAcesso) acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso) + '" target="_blank" rel="noopener">PDF</a>');
-      if (n.status !== 'emitida') acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/mes/' + m.mes + '/previa/' + n.chave) + '" target="_blank" rel="noopener">XML</a>');
+      if ((n.status === 'emitida' || n.status === 'cancelada') && n.chaveAcesso) acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso) + '" target="_blank" rel="noopener">PDF</a>');
+      if (n.status !== 'emitida' && n.status !== 'cancelada') acoes.push('<a href="' + urlComToken(SERVER + '/notas-shopee/mes/' + m.mes + '/previa/' + n.chave) + '" target="_blank" rel="noopener">XML</a>');
       if (n.status === 'erro') acoes.push('<a href="#" onclick="ns2Emitir(\'' + m.mes + '\',1,\'' + n.chave + '\');return false">tentar de novo</a>');
       if (n.status === 'pendente' || n.status === 'incerta') acoes.push('<a href="#" onclick="ns2Emitir(\'' + m.mes + '\',1,\'' + n.chave + '\');return false">📤 emitir só esta</a>');
       if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'ignorar\');return false">ignorar</a>');
       if (n.status === 'pendente' || n.status === 'erro') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'emitida-fora\');return false">já emiti por fora</a>');
       if (n.status === 'ignorada') acoes.push('<a href="#" onclick="ns2Nota(\'' + m.mes + '\',\'' + n.chave + '\',\'reativar\');return false">reativar</a>');
+      acoes = acoes.concat(ns2AcoesCancel(m.mes, n, false), ns2AcoesCancel(m.mes, n, true));
       h += '<tr><td>' + ns2Esc(n.nome) + (n.cidade ? '<br><span style="font-size:11px;color:var(--muted)">' + ns2Esc(n.cidade) + '</span>' : (n.enderecoOk ? '' : '<br><span style="font-size:11px;color:#f59e0b">endereço não lido: vai sem endereço</span>')) + '</td>'
         + '<td>' + ns2Esc(n.doc) + '</td><td>' + ns2Esc(n.lojas.map(function (l) { return l.nome; }).join(', ')) + '</td><td>' + ns2R(n.valor) + '</td>'
         + '<td>' + st[0] + ' ' + st[1] + (n.nNFSe ? ' nº ' + ns2Esc(n.nNFSe) : '') + (n.foraDoSistema ? ' (por fora)' : '')
         + (n.erro ? '<br><span style="font-size:11px;color:#ef4444">' + ns2Esc(n.erro) + '</span>' : '')
-        + (n.teste ? '<br><span style="font-size:11px;color:var(--muted)">teste: ' + ns2Esc(n.teste.status) + (n.teste.erro ? ' — ' + ns2Esc(n.teste.erro) : '') + '</span>' : '') + '</td>'
+        + ns2InfoCancel(n)
+        + (n.teste ? '<br><span style="font-size:11px;color:var(--muted)">teste: ' + ns2Esc(n.teste.status) + (n.teste.erro ? ' — ' + ns2Esc(n.teste.erro) : '') + '</span>' + ns2InfoCancel(n.teste) : '') + '</td>'
         + '<td style="font-size:12px;white-space:nowrap">' + acoes.join(' · ') + '</td></tr>';
     });
     h += '</table></div>';
