@@ -916,6 +916,9 @@ a.av-titulo:hover{text-decoration:underline}
   #panel-notas .ns2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px 12px;align-items:start}
   #panel-notas .ns2-grid .field>label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #panel-notas .ns2-largo{grid-column:span 2}
+  #panel-notas .ns2-cheio{grid-column:1/-1}
+  #panel-notas .ns2-prod{border:1px solid var(--border);border-radius:12px;padding:14px;margin:0 0 10px;background:var(--card)}
+  #panel-notas .ns2-prod-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;font-weight:700;font-size:13px}
   @media(max-width:620px){ #panel-notas .ns2-largo{grid-column:auto} }
   #panel-notas .ns2-cert-grid{grid-template-columns:2fr 1fr auto;align-items:end;margin-bottom:8px}
   @media(max-width:620px){ #panel-notas .ns2-cert-grid{grid-template-columns:1fr} }
@@ -3103,12 +3106,14 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
   <div id="ns2-topo"><div class="fila-loading"><div class="spinner"></div></div></div>
 
+  <!-- Mesma ordem da aba 📄 Notas fiscais do Gestão CDV: primeiro o que é comum
+       (empresa, certificado, produtos fiscais, emissão), depois o que é só deste painel. -->
   <div class="card">
     <div class="fila-bar" style="margin:0 0 4px">
-      <span class="sec-label" style="margin:0">Empresa emissora</span>
+      <span class="sec-label" style="margin:0">1. Empresa emissora</span>
       <div class="fila-acoes"><label class="btn btn-sm" style="margin:0">📄 Preencher com o XML de uma NFS-e já emitida<input type="file" accept=".xml" style="display:none" onchange="ns2ImportarXml(this)"/></label></div>
     </div>
-    <div class="ns2-desc" style="margin:0 0 4px">Cadastro único com o <b>Gestão CDV</b> (aba Notas fiscais): o que salvar aqui vale lá, e o que salvar lá aparece aqui.</div>
+    <div class="ns2-desc" style="margin:0 0 4px">Cadastro único com as <b>Notas fiscais do Gestão CDV</b>: o que salvar aqui vale lá, e o que salvar lá vale aqui (a mesma empresa emite as duas).</div>
     <div id="ns2-empresa-sinc" style="font-size:12px;color:var(--muted)"></div>
     <div id="ns2-xml-ok" style="font-size:12px;color:var(--muted)"></div>
     <div class="ns2-grid" style="margin-top:14px">
@@ -3122,11 +3127,10 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label title="Apuração no Simples">Apuração no Simples</label><select id="ns2-e-regApTribSN" onchange="ns2Descrever()"><option value="1">1 · Tudo pelo Simples (DAS)</option><option value="2">2 · ISS fora do Simples</option><option value="3">3 · Tudo fora do Simples</option></select><div class="ns2-desc" data-de="ns2-e-regApTribSN"></div></div>
       <div class="field"><label title="Regime especial">Regime especial</label><select id="ns2-e-regEspTrib" onchange="ns2Descrever()"><option value="0">0 · Nenhum</option><option value="1">1 · Ato cooperado</option><option value="2">2 · Estimativa</option><option value="3">3 · Microempresa municipal</option><option value="4">4 · Notário ou registrador</option><option value="5">5 · Profissional autônomo</option><option value="6">6 · Sociedade de profissionais</option></select><div class="ns2-desc" data-de="ns2-e-regEspTrib"></div></div>
     </div>
-    <div class="fila-bar" style="margin:16px 0 0"><span class="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
   </div>
 
   <div class="card">
-    <div class="sec-label">Certificado digital A1</div>
+    <div class="sec-label">2. Certificado digital A1</div>
     <div id="ns2-cert" style="font-size:13px;margin-bottom:14px">—</div>
     <div class="ns2-grid ns2-cert-grid">
       <div class="field"><label>Arquivo .pfx</label>
@@ -3134,35 +3138,40 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label>Senha</label><input type="password" id="ns2-senha" autocomplete="new-password"/></div>
       <div class="field"><label>&nbsp;</label><button class="btn btn-sm" onclick="ns2EnviarCert()">🔐 Cadastrar</button></div>
     </div>
-    <div class="ns2-desc">O arquivo vai direto para o disco do servidor (Railway), fora do GitHub. A senha é guardada cifrada e nunca volta para a tela.</div>
+    <div class="ns2-desc">Neste painel o certificado fica no disco do servidor do Tica Promos (Railway), fora do GitHub; a senha é guardada cifrada e nunca volta para a tela. O Gestão CDV guarda a própria cópia: ao renovar o certificado, troque nos dois.</div>
   </div>
 
   <div class="card">
     <div class="fila-bar" style="margin:0 0 4px">
-      <span class="sec-label" style="margin:0">Produtos fiscais</span>
+      <span class="sec-label" style="margin:0">3. Produtos fiscais</span>
       <div class="fila-acoes"><button class="btn btn-sm" onclick="ns2NovoProduto()">➕ Novo produto fiscal</button></div>
     </div>
-    <div class="ns2-desc" style="margin:0 0 12px">Cada produto fiscal diz como a nota sai: códigos do serviço, tributos e texto. Cada programa de afiliados (abaixo) aponta para um deles. Na descrição: <b>{mes}</b> = mês da comissão, <b>{lojas}</b> = lojas do vendedor, <b>{valor}</b> = valor da nota.</div>
+    <div class="ns2-desc" style="margin:0 0 12px">Cada produto fiscal diz como a nota sai: código do serviço, NBS, tributos e texto. Na descrição, <b>{mes}</b> = mês da comissão, <b>{lojas}</b> = lojas do vendedor, <b>{valor}</b> = valor da nota.</div>
     <div id="ns2-produtos"></div>
-    <div class="ns2-sub">Programas de afiliados</div>
-    <div id="ns2-programas" class="ns2-grid"></div>
-    <div class="fila-bar" style="margin:16px 0 0"><span class="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
   </div>
 
   <div class="card">
-    <div class="sec-label">Emissão</div>
+    <div class="sec-label">4. Emissão</div>
     <div class="ns2-grid">
-      <div class="field"><label title="Série das DPS">Série das DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie"></div></div>
-      <div class="field"><label>Buscar relatório a partir do dia</label><input type="text" id="ns2-diaInicio"/></div>
-      <div class="field"><label>Valor mínimo por nota (R$)</label><input type="text" id="ns2-minimo"/></div>
-      <div class="field ns2-largo"><label>Competência da nota</label><select id="ns2-competencia"><option value="emissao">Data da emissão</option><option value="mes">Último dia do mês da comissão (orientação da contabilidade)</option></select></div>
+      <div class="field"><label title="Série da DPS">Série da DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie"></div></div>
+      <div class="field"><label title="Competência">Competência</label><select id="ns2-competencia"><option value="emissao">Data de emissão</option><option value="mes">Último dia do mês da comissão</option></select><div class="ns2-desc">Data que vai na nota como competência.</div></div>
+      <div class="field"><label title="Buscar relatório a partir do dia">Buscar relatório no dia</label><input type="text" id="ns2-diaInicio"/><div class="ns2-desc">Dia do mês em que o relatório do mês anterior é buscado.</div></div>
+      <div class="field"><label title="Valor mínimo por nota (R$)">Valor mínimo (R$)</label><input type="text" id="ns2-minimo"/><div class="ns2-desc">Notas abaixo disso ficam de fora (0 = todas).</div></div>
     </div>
     <div class="ns2-checks">
       <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> Uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label>
       <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
     </div>
-    <div class="fila-bar" style="margin:16px 0 0"><span class="ns2-cfg-ok" style="font-size:12px"></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2SalvarConfig()">💾 Salvar</button></div></div>
   </div>
+
+  <div class="card">
+    <div class="sec-label">5. Programas de afiliados → produto fiscal</div>
+    <div class="ns2-desc" style="margin:0 0 12px">Cada programa de afiliados aponta para um produto fiscal. Os outros programas (Amazon, Mercado Livre, Awin…) entram aqui quando tiverem um relatório para virar nota.</div>
+    <div id="ns2-programas" class="ns2-grid"></div>
+  </div>
+
+  <button class="btn" style="width:100%;margin:0 0 6px" onclick="ns2SalvarConfig()">💾 Salvar configuração</button>
+  <div class="ns2-cfg-ok" style="font-size:12px;margin:0 0 18px"></div>
 
   <div class="card">
     <div class="fila-bar" style="margin:0">
@@ -17412,14 +17421,45 @@ function ns2Pintar() {
   document.getElementById('ns2-meses').innerHTML = h;
   document.getElementById('ns2-log').innerHTML = (d.log || []).map(function (l) { return ns2Hora(l.em) + ' — ' + ns2Esc(l.texto); }).join('<br>') || '—';
 }
-/* Produtos fiscais (19/11/2026): lista editável; cada programa de afiliados aponta para um. */
+/* Produtos fiscais (19/11/2026): cartões com a mesma ordem de campos do Gestão CDV;
+   cada programa de afiliados aponta para um produto. */
 var NS2_PRODS = [], NS2_PRODS_SUJO = false;
+// [campo, rótulo, chave da explicação, é código?, classe, textarea?]
 var NS2_P_CAMPOS = [
-  ['cTribNac', 'Tributação nacional', 'ns2-s-cTribNac', true], ['cTribMun', 'Código municipal (BH)', 'ns2-s-cTribMun', true],
+  ['nome', 'Nome', '', false, 'ns2-cheio'],
+  ['cTribNac', 'Tributação nacional', 'ns2-s-cTribNac', true], ['cTribMun', 'Código municipal', 'ns2-s-cTribMun', true],
   ['cNBS', 'NBS', 'ns2-s-cNBS', true], ['pTotTribSN', 'Alíquota do Simples (%)', 'ns2-s-pTotTribSN'],
   ['tribISSQN', 'Tributação do ISS', 'ns2-s-tribISSQN'], ['tpRetISSQN', 'ISS retido?', 'ns2-s-tpRetISSQN'],
-  ['cstPisCofins', 'PIS/COFINS (CST)', 'ns2-s-cstPisCofins']
+  ['cstPisCofins', 'PIS/COFINS (CST)', 'ns2-s-cstPisCofins'],
+  ['xDescServ', 'Descrição na nota', '', false, 'ns2-cheio', true], ['xInfComp', 'Informação complementar', '', false, 'ns2-cheio', true]
 ];
+var NS2_P_DICA = { xDescServ: '{mes} = mês da comissão · {lojas} = lojas do vendedor · {valor} = valor da nota.', xInfComp: 'Deixe vazio (orientação da contabilidade).' };
+// Significado dos códigos. Mesma tabela do Gestão CDV (NF_ITENS_LC116 / NF_NBS): mudou uma, muda a outra.
+// Código de tributação nacional = item da lista de serviços (LC 116) em 4 dígitos + desdobramento nacional em 2.
+var NS2_ITENS_LC116 = {
+  '0802': 'Instrução, treinamento, orientação pedagógica e educacional, avaliação de conhecimentos (cursos)',
+  '0902': 'Agenciamento, organização, promoção e execução de programas de turismo, passeios, viagens e hospedagens',
+  '1005': 'Agenciamento, corretagem ou intermediação de bens não abrangidos em outros itens',
+  '1009': 'Representação de qualquer natureza, inclusive comercial',
+  '1701': 'Assessoria ou consultoria de qualquer natureza',
+  '1706': 'Propaganda e publicidade, inclusive promoção de vendas e planejamento de campanhas'
+};
+var NS2_NBS = {
+  '114061900': 'Serviços de propaganda não classificados em outras posições',
+  '122051900': 'Serviços educacionais (código das notas antigas do eNotas)'
+};
+function ns2DescCodigo(tipo, v) {
+  v = String(v || '').replace(/\D/g, '');
+  if (!v) return { cTribNac: 'Código do serviço na lista nacional (LC 116), 6 dígitos.', cTribMun: 'Desdobramento do município. Em BH, 001.', cNBS: 'Classificação do serviço na Receita (NBS), 9 dígitos.' }[tipo] || '';
+  if (tipo === 'cTribNac') {
+    if (v.length !== 6) return '⚠️ Precisa de 6 dígitos.';
+    var item = NS2_ITENS_LC116[v.slice(0, 4)];
+    return item ? '→ Item ' + Number(v.slice(0, 2)) + '.' + v.slice(2, 4) + ': ' + item + '.' : '⚠️ Item ' + Number(v.slice(0, 2)) + '.' + v.slice(2, 4) + ' não está na lista deste painel: confira no Emissor Nacional.';
+  }
+  if (tipo === 'cNBS') return v.length !== 9 ? '⚠️ Precisa de 9 dígitos.' : (NS2_NBS[v] ? '→ ' + NS2_NBS[v] + '.' : 'Confira a descrição no Emissor Nacional.');
+  if (tipo === 'cTribMun') return v === '001' ? '→ Opção 001 de Belo Horizonte para o código nacional.' : 'Desdobramento do município (em BH, 001).';
+  return '';
+}
 function ns2ProdutosRender() {
   var progs = (NS2 && NS2.config.programas) || {}, nomesProg = (NS2 && NS2.programasNota) || {};
   var h = '';
@@ -17427,46 +17467,38 @@ function ns2ProdutosRender() {
   NS2_PRODS.forEach(function (p, i) {
     var usos = Object.keys(progs).filter(function (k) { return progs[k] === p.id; }).map(function (k) { return nomesProg[k] || k; });
     var pre = 'ns2-p-' + i + '-';
-    h += '<details class="ns2-mes"' + (p._aberto ? ' open' : '') + ' data-i="' + i + '" ontoggle="NS2_PRODS[' + i + ']._aberto=this.open">'
-      + '<summary><b>' + ns2Esc(p.nome || 'Produto sem nome') + '</b> · ' + ns2Esc(p.cTribNac || '—') + ' / ' + ns2Esc(p.cTribMun || '—') + ' / ' + ns2Esc(p.cNBS || '—')
-      + (p.ativo === false ? ' · ⚪ desligado' : '') + (p.codigosConfirmados ? ' · ✅ códigos confirmados' : ' · ⚠️ códigos não confirmados')
-      + (usos.length ? ' · usado em: ' + ns2Esc(usos.join(', ')) : ' · sem programa') + '</summary>'
-      + '<div class="ns2-grid" style="margin-top:6px">'
-      + '<div class="field ns2-largo"><label>Nome do produto fiscal</label><input type="text" id="' + pre + 'nome" value="' + ns2Esc(p.nome || '') + '" oninput="NS2_PRODS_SUJO=true"/></div>';
+    h += '<div class="ns2-prod"><div class="ns2-prod-topo"><span>' + ns2Esc(p.nome || 'Produto fiscal')
+      + (usos.length ? ' <span style="font-weight:500;color:var(--muted)">· ' + ns2Esc(usos.join(', ')) + '</span>' : '') + '</span>'
+      + '<span style="display:flex;gap:14px;align-items:center"><label class="env-check" style="margin:0"><input type="checkbox" id="' + pre + 'ativo"' + (p.ativo !== false ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> Ativo</label>'
+      + '<button class="btn btn-sm" style="margin:0" onclick="ns2RemoverProduto(' + i + ')">🗑️ Remover</button></span></div>'
+      + '<div class="ns2-grid">';
     NS2_P_CAMPOS.forEach(function (c) {
-      h += '<div class="field"><label title="' + c[1] + '">' + c[1] + '</label><input type="text" id="' + pre + c[0] + '" value="' + ns2Esc(p[c[0]] == null ? '' : p[c[0]]) + '"'
-        + (c[0] === 'pTotTribSN' ? ' placeholder="ex.: 6.00"' : '')
-        + ' oninput="NS2_PRODS_SUJO=true;' + (c[3] ? 'document.getElementById(\'' + pre + 'codigosConfirmados\').checked=false;' : '') + 'ns2Descrever()"/>'
-        + '<div class="ns2-desc" data-de="' + pre + c[0] + '" data-chave="' + c[2] + '"></div></div>';
+      var val = p[c[0]] == null ? '' : p[c[0]];
+      var on = ' oninput="NS2_PRODS_SUJO=true;' + (c[3] ? 'document.getElementById(\'' + pre + 'codigosConfirmados\').checked=false;' : '') + 'ns2Descrever()"';
+      var ctl = c[5] ? '<textarea id="' + pre + c[0] + '" rows="2"' + on + '>' + ns2Esc(val) + '</textarea>'
+        : '<input type="text" id="' + pre + c[0] + '" value="' + ns2Esc(val) + '"' + (c[0] === 'pTotTribSN' ? ' placeholder="ex.: 6.00"' : '') + on + '/>';
+      var dica = c[2] ? '<div class="ns2-desc" data-de="' + pre + c[0] + '" data-chave="' + c[2] + '"></div>' : (NS2_P_DICA[c[0]] ? '<div class="ns2-desc">' + NS2_P_DICA[c[0]] + '</div>' : '');
+      h += '<div class="field' + (c[4] ? ' ' + c[4] : '') + '"><label title="' + c[1] + '">' + c[1] + '</label>' + ctl + dica + '</div>';
     });
-    h += '</div>'
-      + '<div class="field" style="margin:14px 0"><label>Descrição do serviço <span class="tag">{mes} {lojas} {valor}</span></label><textarea id="' + pre + 'xDescServ" rows="3" oninput="NS2_PRODS_SUJO=true">' + ns2Esc(p.xDescServ || '') + '</textarea></div>'
-      + '<div class="field"><label>Informação complementar <span class="tag">deixe vazio (orientação da contabilidade)</span></label><textarea id="' + pre + 'xInfComp" rows="2" oninput="NS2_PRODS_SUJO=true">' + ns2Esc(p.xInfComp || '') + '</textarea></div>'
-      + '<div class="ns2-checks">'
-      + '<label class="env-check"><input type="checkbox" id="' + pre + 'codigosConfirmados"' + (p.codigosConfirmados ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> <b>Códigos confirmados com o contador</b> (sem isso nada deste produto sai em produção; editar um código desmarca)</label>'
-      + '<label class="env-check"><input type="checkbox" id="' + pre + 'ativo"' + (p.ativo !== false ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> Produto ativo</label>'
-      + '</div>'
-      + '<div class="fila-bar" style="margin:12px 0 0"><span></span><div class="fila-acoes"><button class="btn btn-sm" onclick="ns2RemoverProduto(' + i + ')">🗑️ Remover</button></div></div>'
-      + '</details>';
+    h += '</div><div class="ns2-checks"><label class="env-check"><input type="checkbox" id="' + pre + 'codigosConfirmados"' + (p.codigosConfirmados ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> <b>Códigos confirmados com o contador</b> (sem isso nada deste produto sai em produção; editar um código desmarca)</label></div></div>';
   });
   document.getElementById('ns2-produtos').innerHTML = h;
   // Programas de afiliados → produto fiscal (opções em ordem alfabética)
-  var ord = NS2_PRODS.map(function (p, i) { return { id: p.id, i: i, nome: p.nome || 'Produto sem nome' }; })
+  var ord = NS2_PRODS.map(function (p) { return { id: p.id, nome: p.nome || 'Produto sem nome' }; })
     .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
   document.getElementById('ns2-programas').innerHTML = Object.keys(nomesProg).sort(function (a, b) { return String(nomesProg[a]).localeCompare(nomesProg[b], 'pt-BR'); }).map(function (k) {
     return '<div class="field ns2-largo"><label>' + ns2Esc(nomesProg[k]) + '</label><select id="ns2-prog-' + k + '" onchange="NS2_PRODS_SUJO=true">'
       + ord.map(function (o) { return '<option value="' + ns2Esc(o.id) + '"' + (o.id && o.id === progs[k] ? ' selected' : '') + '>' + ns2Esc(o.nome) + '</option>'; }).join('')
       + '</select><div class="ns2-desc">Produto fiscal usado nas notas deste programa.</div></div>';
-  }).join('') + '<div class="field ns2-largo"><div class="ns2-desc">Os outros programas (Amazon, Mercado Livre, Awin…) entram aqui quando tiverem um relatório para virar nota.</div></div>';
+  }).join('');
   ns2Descrever();
 }
-// Lê o que está na tela de volta para NS2_PRODS (mantém id e o estado aberto/fechado).
+// Lê o que está na tela de volta para NS2_PRODS (mantém o id).
 function ns2ProdutosLer() {
   NS2_PRODS = NS2_PRODS.map(function (p, i) {
     var pre = 'ns2-p-' + i + '-', el = function (k) { return document.getElementById(pre + k); };
     if (!el('nome')) return p;
-    var x = { id: p.id, _aberto: p._aberto, nome: el('nome').value.trim(), xDescServ: el('xDescServ').value.trim(), xInfComp: el('xInfComp').value.trim(),
-      codigosConfirmados: el('codigosConfirmados').checked, ativo: el('ativo').checked, tpRetPisCofins: p.tpRetPisCofins };
+    var x = { id: p.id, codigosConfirmados: el('codigosConfirmados').checked, ativo: el('ativo').checked, tpRetPisCofins: p.tpRetPisCofins };
     NS2_P_CAMPOS.forEach(function (c) { x[c[0]] = el(c[0]).value.trim(); });
     return x;
   });
@@ -17475,7 +17507,7 @@ function ns2ProdutosLer() {
 function ns2NovoProduto() {
   ns2ProdutosLer();
   var base = NS2_PRODS[0] || {};
-  NS2_PRODS.push({ id: 'pf-' + Date.now().toString(36), _aberto: true, nome: '', cTribNac: '', cTribMun: '001', cNBS: '', pTotTribSN: base.pTotTribSN || '',
+  NS2_PRODS.push({ id: 'pf-' + Date.now().toString(36), nome: 'Novo produto fiscal', cTribNac: '', cTribMun: '001', cNBS: '', pTotTribSN: base.pTotTribSN || '',
     tribISSQN: '1', tpRetISSQN: '1', cstPisCofins: base.cstPisCofins || '00', tpRetPisCofins: '0', xDescServ: '', xInfComp: '', codigosConfirmados: false, ativo: true });
   NS2_PRODS_SUJO = true;
   ns2ProdutosRender();
@@ -17486,7 +17518,7 @@ function ns2RemoverProduto(i) {
   var progs = (NS2 && NS2.config.programas) || {};
   var usado = Object.keys(progs).some(function (k) { return p.id && progs[k] === p.id; });
   if (usado) return alert('"' + (p.nome || 'Produto') + '" está escolhido num programa de afiliados. Troque o produto do programa e salve antes de remover.');
-  if (!confirm('Remover o produto fiscal "' + (p.nome || 'sem nome') + '"? Notas já emitidas não mudam.')) return;
+  if (!confirm('Remover o produto fiscal "' + (p.nome || 'sem nome') + '"? Notas já emitidas não mudam. Vale depois de salvar.')) return;
   NS2_PRODS.splice(i, 1);
   NS2_PRODS_SUJO = true;
   ns2ProdutosRender();
@@ -17588,7 +17620,7 @@ var NS2_DESC = {
   'ns2-s-tribISSQN': { '1': 'Operação tributável pelo ISS', '2': 'Imunidade', '3': 'Exportação de serviço', '4': 'Não incidência', _: 'Tributação do ISS nesta operação.' },
   'ns2-s-tpRetISSQN': { '1': 'ISS não retido: a empresa recolhe (no DAS)', '2': 'Retido pelo tomador', '3': 'Retido pelo intermediário', _: 'Quem recolhe o ISS.' },
   'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', _: 'Situação tributária do PIS/COFINS na nota.' },
-  'ns2-serie': { '70': 'Série própria do painel (o eNotas usava a série 1). Não trocar depois de emitir.', _: 'Série das DPS. Use uma série que nenhum outro sistema use.' }
+  'ns2-serie': { '70': 'Tica Promos = 70, Clube do Viajante = 900. Cada painel tem a sua para os números nunca repetirem. Não trocar depois de emitir.', _: 'Série das DPS. Tica Promos usa a 70 e o Clube do Viajante a 900: use uma que nenhum outro sistema use.' }
 };
 function ns2Descrever() {
   document.querySelectorAll('.ns2-desc').forEach(function (el) {
@@ -17596,6 +17628,8 @@ function ns2Descrever() {
     var chave = el.getAttribute('data-chave') || el.getAttribute('data-de');
     var inp = document.getElementById(el.getAttribute('data-de')), d = NS2_DESC[chave] || {};
     var v = inp ? String(inp.value || '').trim() : '';
+    var tipoCod = { 'ns2-s-cTribNac': 'cTribNac', 'ns2-s-cTribMun': 'cTribMun', 'ns2-s-cNBS': 'cNBS' }[chave];
+    if (tipoCod) { el.textContent = ns2DescCodigo(tipoCod, v); return; }
     var txt = Object.prototype.hasOwnProperty.call(d, v) ? d[v] : d._;
     if (v && chave === 'ns2-s-pTotTribSN') txt = d._;
     else if (v && !Object.prototype.hasOwnProperty.call(d, v)) txt = '⚠️ código não reconhecido aqui. ' + (d._ || '');
