@@ -3186,6 +3186,27 @@ body.travado > *:not(#login-screen){display:none !important}
   </div>
 
   <div class="card">
+    <div class="sec-label">📄 Nota avulsa</div>
+    <div class="ns2-desc" style="margin:0 0 12px">Nota para uma venda fora dos relatórios (ex.: comissão de afiliados da Amazon, do Mercado Livre ou da Shopee). "Emitir teste" vai para o ambiente de homologação, sem valor fiscal. A nota válida só sai com o modo Produção.</div>
+    <div class="ns2-grid">
+      <div class="field"><label>CPF ou CNPJ</label><input type="text" id="ns2-av-doc" inputmode="numeric"/></div>
+      <div class="field"><label>Nome / razão social</label><input type="text" id="ns2-av-nome"/></div>
+      <div class="field"><label>E-mail (opcional)</label><input type="text" id="ns2-av-email"/></div>
+      <div class="field"><label>Telefone (opcional)</label><input type="text" id="ns2-av-fone"/></div>
+      <div class="field"><label>Valor (R$)</label><input type="text" id="ns2-av-valor" inputmode="decimal"/></div>
+      <div class="field"><label>Produto fiscal</label><select id="ns2-av-produto"></select></div>
+      <div class="field"><label>Competência</label><input type="date" id="ns2-av-comp"/><div class="ns2-desc">Vazio = data de emissão.</div></div>
+      <div class="field ns2-largo"><label>Descrição do serviço</label><textarea id="ns2-av-desc" rows="2" placeholder="Vazio = descrição do produto fiscal"></textarea></div>
+    </div>
+    <div class="ns2-salvar">
+      <button class="btn btn-sm" style="margin:0" onclick="ns2Avulsa(true, this)">🧪 Emitir teste</button>
+      <button class="btn btn-sm" style="margin:0" onclick="ns2Avulsa(false, this)">📄 Emitir nota válida</button>
+      <span id="ns2-av-ok" style="font-size:12px"></span>
+    </div>
+    <div id="ns2-avulsas" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
     <div class="fila-bar" style="margin:0">
       <span class="sec-label" style="margin:0">Shopee · comissões extras dos vendedores</span>
       <div class="fila-acoes">
@@ -17377,10 +17398,50 @@ function ns2Carregar() {
     NS2 = d; ns2Pintar();
   }).catch(function (e) { document.getElementById('ns2-topo').innerHTML = '<div class="card" style="color:#ef4444">⚠️ ' + ns2Esc(e.message) + '</div>'; });
 }
+// Nota avulsa: mesma função do Gestão CDV (tomador digitado; teste ou nota válida).
+function ns2AvulsasPintar() {
+  var d = NS2, cfg = d.config, sel = document.getElementById('ns2-av-produto');
+  if (document.activeElement !== sel) {
+    var atual = sel.value || cfg.produtoPadrao || '';
+    sel.innerHTML = (cfg.produtos || []).slice().sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); })
+      .map(function (p) { return '<option value="' + ns2Esc(p.id) + '"' + (p.id === atual ? ' selected' : '') + '>' + ns2Esc(p.nome) + (p.id === cfg.produtoPadrao ? ' (padrão)' : '') + '</option>'; }).join('');
+  }
+  var lista = d.avulsas || [];
+  var h = !lista.length ? '<div style="color:var(--muted);font-size:12px">Nenhuma nota avulsa ainda.</div>'
+    : '<div class="ns2-tab-wrap"><table class="dv-tab ns2-tab"><tr><th>Quando</th><th>Tomador</th><th>Documento</th><th>Valor</th><th>Situação</th><th></th></tr>'
+      + lista.map(function (n) {
+        var st = NS2_STATUS[n.status] || ['', n.status];
+        var pdf = n.chaveAcesso ? '<a href="' + urlComToken(SERVER + '/notas-shopee/danfse/' + n.chaveAcesso + (n.teste ? '?ambiente=producaorestrita' : '')) + '" target="_blank" rel="noopener">PDF</a>' : '';
+        return '<tr><td>' + ns2Hora(n.criadaEm) + '</td><td>' + ns2Esc(n.nome) + '</td><td>' + ns2Esc(n.doc) + '</td><td>' + ns2R(n.valor) + '</td>'
+          + '<td>' + (n.teste ? '🧪 teste · ' : '') + st[0] + ' ' + st[1] + (n.nNFSe ? ' nº ' + ns2Esc(n.nNFSe) : '')
+          + (n.erro ? '<br><span style="font-size:11px;color:#ef4444">' + ns2Esc(n.erro) + '</span>' : '') + '</td>'
+          + '<td style="font-size:12px">' + pdf + '</td></tr>';
+      }).join('') + '</table></div>';
+  document.getElementById('ns2-avulsas').innerHTML = h;
+}
+function ns2Avulsa(teste, btn) {
+  function v(id) { return document.getElementById(id).value.trim(); }
+  var ok = document.getElementById('ns2-av-ok');
+  var corpo = { tomador: { doc: v('ns2-av-doc'), nome: v('ns2-av-nome'), email: v('ns2-av-email'), fone: v('ns2-av-fone') },
+    valor: v('ns2-av-valor'), produtoFiscalId: v('ns2-av-produto'), competencia: v('ns2-av-comp'), descricao: v('ns2-av-desc'), teste: !!teste };
+  if (!corpo.tomador.doc || !corpo.tomador.nome || !corpo.valor) { ok.style.color = '#ef4444'; ok.textContent = 'Preencha CPF/CNPJ, nome e valor.'; return; }
+  if (!teste) {
+    if (!confirm('Emitir nota fiscal VÁLIDA de R$ ' + corpo.valor + ' para ' + corpo.tomador.nome + '?')) return;
+    corpo.confirmar = true;
+  }
+  btn.disabled = true; ok.style.color = 'var(--muted)'; ok.textContent = teste ? 'Emitindo teste…' : 'Emitindo nota…';
+  ns2Api('/notas-shopee/avulsa', corpo).then(function (r) {
+    if (r && r.ok) { ok.style.color = '#22c55e'; ok.textContent = (teste ? '✅ Teste aceito' : '✅ Nota emitida') + (r.nNFSe ? ' nº ' + r.nNFSe : '') + '.'; }
+    else { ok.style.color = '#ef4444'; ok.textContent = '⚠️ ' + ((r && r.erro) || 'falhou'); }
+    return ns2Carregar();
+  }).catch(function (e) { ok.style.color = '#ef4444'; ok.textContent = '⚠️ ' + e.message; })
+    .then(function () { btn.disabled = false; });
+}
 function ns2Pintar() {
   var d = NS2, cfg = d.config, cert = d.certificado;
   var topo = '<div class="card"><div style="font-size:13px;line-height:1.7">'
-    + (cfg.ativo ? '🟢 <b>Emissão automática ligada</b>' : '⚪ Emissão automática desligada')
+    + ({ desligado: '⚪ Modo Desligado', homologacao: '🧪 Modo Homologação (só teste)', producao: '🟢 Modo Produção' }[cfg.modo] || '⚪ Modo ' + ns2Esc(cfg.modo || ''))
+    + (cfg.modo === 'producao' ? (cfg.emitirAuto ? ' · <b>emissão automática ligada</b>' : ' · emissão automática desligada') : '')
     + ' · relatório do mês anterior (' + ns2Mes(d.mesAlvo) + ') a partir do dia ' + cfg.diaInicio + ', das ' + cfg.horaIni + 'h às ' + cfg.horaFim + 'h'
     + (d.tarefa ? '<br>🛒 Aguardando a extensão ler o relatório de <b>' + ns2Mes(d.tarefa.mes) + '</b>' + (d.tarefa.tentativas ? ' (' + d.tarefa.tentativas + ' tentativa(s))' : '') : '')
     + (d.emitindo ? '<br>📤 <b>Emitindo agora…</b>' : '')
@@ -17444,6 +17505,7 @@ function ns2Pintar() {
     h += '</details>';
   });
   document.getElementById('ns2-meses').innerHTML = h;
+  ns2AvulsasPintar();
   document.getElementById('ns2-log').innerHTML = (d.log || []).map(function (l) { return ns2Hora(l.em) + ' — ' + ns2Esc(l.texto); }).join('<br>') || '—';
 }
 /* Produtos fiscais (19/11/2026): cartões com a mesma ordem de campos do Gestão CDV;
