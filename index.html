@@ -919,6 +919,7 @@ a.av-titulo:hover{text-decoration:underline}
   #panel-notas .ns2-cheio{grid-column:1/-1}
   #panel-notas .ns2-prod{border:1px solid var(--border);border-radius:12px;padding:14px;margin:0 0 10px;background:var(--card)}
   #panel-notas .ns2-prod-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;font-weight:700;font-size:13px}
+.ns2-salvar{display:flex;gap:12px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
   @media(max-width:620px){ #panel-notas .ns2-largo{grid-column:auto} }
   #panel-notas .ns2-cert-grid{grid-template-columns:2fr 1fr auto;align-items:end;margin-bottom:8px}
   @media(max-width:620px){ #panel-notas .ns2-cert-grid{grid-template-columns:1fr} }
@@ -3127,6 +3128,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <div class="field"><label title="Apuração no Simples">Apuração no Simples</label><select id="ns2-e-regApTribSN" onchange="ns2Descrever()"><option value="1">1 · Tudo pelo Simples (DAS)</option><option value="2">2 · ISS fora do Simples</option><option value="3">3 · Tudo fora do Simples</option></select><div class="ns2-desc" data-de="ns2-e-regApTribSN"></div></div>
       <div class="field"><label title="Regime especial">Regime especial</label><select id="ns2-e-regEspTrib" onchange="ns2Descrever()"><option value="0">0 · Nenhum</option><option value="1">1 · Ato cooperado</option><option value="2">2 · Estimativa</option><option value="3">3 · Microempresa municipal</option><option value="4">4 · Notário ou registrador</option><option value="5">5 · Profissional autônomo</option><option value="6">6 · Sociedade de profissionais</option></select><div class="ns2-desc" data-de="ns2-e-regEspTrib"></div></div>
     </div>
+    <div class="ns2-salvar"><button class="btn btn-sm" style="margin:0" onclick="ns2SalvarConfig(this)">💾 Salvar</button><span class="ns2-cfg-ok" style="font-size:12px"></span></div>
   </div>
 
   <div class="card">
@@ -3148,6 +3150,7 @@ body.travado > *:not(#login-screen){display:none !important}
     </div>
     <div class="ns2-desc" style="margin:0 0 12px">Só os produtos do Tica Promos: os do Clube do Viajante ficam no Gestão CDV e não aparecem aqui. Cada produto fiscal diz como a nota sai: código do serviço, NBS, tributos e texto. Na descrição, <b>{programa}</b> = programa de afiliados (Amazon, Mercado Livre, Shopee), <b>{mes}</b> = mês da comissão, <b>{lojas}</b> = lojas do vendedor, <b>{valor}</b> = valor da nota.</div>
     <div id="ns2-produtos"></div>
+    <div class="ns2-salvar"><button class="btn btn-sm" style="margin:0" onclick="ns2SalvarConfig(this)">💾 Salvar</button><span class="ns2-cfg-ok" style="font-size:12px"></span></div>
   </div>
 
   <div class="card">
@@ -3162,6 +3165,7 @@ body.travado > *:not(#login-screen){display:none !important}
       <label class="env-check"><input type="checkbox" id="ns2-agrupar"/> Uma nota por CNPJ/CPF (soma as lojas do mesmo vendedor)</label>
       <label class="env-check"><input type="checkbox" id="ns2-ativo"/> <b>Emitir automaticamente todo mês</b> (busca o relatório do mês anterior e emite)</label>
     </div>
+    <div class="ns2-salvar"><button class="btn btn-sm" style="margin:0" onclick="ns2SalvarConfig(this)">💾 Salvar</button><span class="ns2-cfg-ok" style="font-size:12px"></span></div>
   </div>
 
   <div class="card">
@@ -3170,10 +3174,8 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="ns2-grid" style="margin-bottom:12px"><div class="field ns2-largo"><label>Produto fiscal padrão</label><select id="ns2-padrao" onchange="NS2_PRODS_SUJO=true;ns2ProdutosLer();NS2_PADRAO=this.value;ns2ProdutosRender()"></select><div class="ns2-desc">Vale para todos os programas que não estão nas exceções.</div></div></div>
     <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Exceções</label>
     <div id="ns2-programas"></div>
+    <div class="ns2-salvar"><button class="btn btn-sm" style="margin:0" onclick="ns2SalvarConfig(this)">💾 Salvar</button><span class="ns2-cfg-ok" style="font-size:12px"></span></div>
   </div>
-
-  <button class="btn" style="width:100%;margin:0 0 6px" onclick="ns2SalvarConfig()">💾 Salvar configuração</button>
-  <div class="ns2-cfg-ok" style="font-size:12px;margin:0 0 18px"></div>
 
   <div class="card">
     <div class="fila-bar" style="margin:0">
@@ -17581,7 +17583,7 @@ function ns2ImportarXml(inp) {
   };
   rd.readAsText(f, 'utf-8');
 }
-function ns2SalvarConfig() {
+function ns2SalvarConfig(btn) {
   var v = function (id) { return document.getElementById(id).value.trim(); };
   var corpo = { emitente: {}, serie: v('ns2-serie'), diaInicio: v('ns2-diaInicio'), minimo: v('ns2-minimo'), competencia: v('ns2-competencia'),
     agrupar: document.getElementById('ns2-agrupar').checked, ativo: document.getElementById('ns2-ativo').checked, programas: {} };
@@ -17589,7 +17591,8 @@ function ns2SalvarConfig() {
   corpo.produtos = ns2ProdutosLer().map(function (p) { var x = Object.assign({}, p); delete x._aberto; return x; });
   corpo.produtoPadrao = NS2_PADRAO;
   Object.keys(NS2_EXC).forEach(function (k) { if (NS2_EXC[k] && NS2_EXC[k] !== NS2_PADRAO) corpo.programas[k] = NS2_EXC[k]; });
-  var msg = function (t) { document.querySelectorAll('#panel-notas .ns2-cfg-ok').forEach(function (el) { el.textContent = t; }); };
+  // Cada cartão tem o seu 💾 Salvar (19/11/2026); todos gravam a configuração inteira e a resposta aparece ao lado do botão clicado.
+  var msg = function (t) { document.querySelectorAll('#panel-notas .ns2-cfg-ok').forEach(function (el) { el.textContent = ''; }); var el = btn && btn.parentNode.querySelector('.ns2-cfg-ok'); if (el) el.textContent = t; else if (/^⚠️/.test(t)) alert(t); };
   msg('Salvando…');
   ns2Api('/notas-shopee/config', corpo).then(function (d) {
     var s = d.empresaSync || {};
