@@ -3943,6 +3943,10 @@ function switchTab(name) {
     document.getElementById('tab-'+id).classList.toggle('active', id===name);
     document.getElementById('panel-'+id).classList.toggle('active', id===name);
   });
+  // Os carregadores ficam num try: se um deles falhar, a lateral, a faixa de
+  // sub-abas e a aba lembrada continuam acompanhando o painel aberto (antes um
+  // erro aqui deixava "Hoje" marcado na lateral com outra tela aberta).
+  try {
   if (name === 'hoje') hojeCarregar();
   if (name === 'alertas') carregarAlertas();
   if (name === 'descobertas') carregarDescobertas();
@@ -3995,6 +3999,7 @@ function switchTab(name) {
   if (name === 'config') { cfgAbrir(); carregarJanelaCupom(); }
   if (name === 'comissao' || name === 'trafego') resAbrir(name);
   if (name === 'trafego' && document.getElementById('panel-trafego').classList.contains('active')) ltvAbrir();
+  } catch (e) { console.error('switchTab(' + name + '):', e); }
   // Espelha a navegacao de dois niveis: qualquer switchTab (menu, ⌘K, atalho
   // interno) reposiciona a lateral e a faixa de sub-abas.
   SECAO_ATUAL = secaoDaAba(name);
@@ -15795,13 +15800,20 @@ function sairDaConta(){
 }
 
 // Decide no carregamento: sessao valida entra direto, senao fica no portao.
+// Espera o DOMContentLoaded: as abas Notas Fiscais e Avisos de preço moram em
+// blocos <script> mais abaixo, que ainda nao rodaram neste ponto. Abrir a aba
+// lembrada aqui mesmo quebrava o F5 nelas (tela da aba aberta, "Hoje" marcado
+// na lateral e carregador sem rodar).
 (function inicioComAuth(){
-  var s = lerSessao();
-  if (s) {
+  function entrar() {
+    var s = lerSessao();
+    if (!s) return;
     abrirPainel();
     var el = document.getElementById('cfg-email-logado');
     if (el) el.textContent = s.email || '';
   }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', entrar);
+  else entrar();
 })();
 
 
