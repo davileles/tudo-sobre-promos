@@ -17667,7 +17667,7 @@ var NS2_DESC = {
   'ns2-s-tribISSQN': { '1': 'Operação tributável pelo ISS', '2': 'Imunidade', '3': 'Exportação de serviço', '4': 'Não incidência', _: 'Tributação do ISS nesta operação.' },
   'ns2-s-tpRetISSQN': { '1': 'ISS não retido: a empresa recolhe (no DAS)', '2': 'Retido pelo tomador', '3': 'Retido pelo intermediário', _: 'Quem recolhe o ISS.' },
   'ns2-s-cstPisCofins': { '00': 'Nenhum: no Simples, PIS e COFINS vão no DAS e não são destacados na nota', _: 'Situação tributária do PIS/COFINS na nota.' },
-  'ns2-serie': { '70': 'Tica Promos = 70, Clube do Viajante = 900. Cada painel tem a sua para os números nunca repetirem. Não trocar depois de emitir.', _: 'Série das DPS. Tica Promos usa a 70 e o Clube do Viajante a 900: use uma que nenhum outro sistema use.' }
+  'ns2-serie': { _: 'Número da série das notas deste painel (use o que a contabilidade indicar). Só não pode ser igual à série do Gestão CDV nem à do eNotas (1): mesma série + mesmo número a Sefin recusa. A numeração recomeça do 1 em cada série. Não troque depois de emitir.' }
 };
 function ns2Descrever() {
   document.querySelectorAll('.ns2-desc').forEach(function (el) {
@@ -17678,9 +17678,9 @@ function ns2Descrever() {
     var tipoCod = { 'ns2-s-cTribNac': 'cTribNac', 'ns2-s-cTribMun': 'cTribMun', 'ns2-s-cNBS': 'cNBS' }[chave];
     if (tipoCod) { el.textContent = ns2DescCodigo(tipoCod, v); return; }
     var txt = Object.prototype.hasOwnProperty.call(d, v) ? d[v] : d._;
-    if (v && chave === 'ns2-s-pTotTribSN') txt = d._;
+    if (v && (chave === 'ns2-s-pTotTribSN' || chave === 'ns2-serie')) txt = d._;
     else if (v && !Object.prototype.hasOwnProperty.call(d, v)) txt = '⚠️ código não reconhecido aqui. ' + (d._ || '');
-    else if (v && chave !== 'ns2-s-pTotTribSN') txt = '→ ' + txt;
+    else if (v && chave !== 'ns2-s-pTotTribSN' && chave !== 'ns2-serie') txt = '→ ' + txt;
     el.textContent = txt || '';
   });
 }
