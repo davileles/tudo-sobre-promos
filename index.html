@@ -3158,7 +3158,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="sec-label">4. Emissão</div>
     <div class="ns2-grid">
       <div class="field"><label title="Série da DPS">Série da DPS</label><input type="text" id="ns2-serie" oninput="ns2Descrever()"/><div class="ns2-desc" data-de="ns2-serie"></div></div>
-      <div class="field"><label title="Competência">Competência</label><select id="ns2-competencia"><option value="emissao">Data de emissão</option><option value="mes">Último dia do mês da comissão</option></select><div class="ns2-desc">Data que vai na nota como competência.</div></div>
+      <div class="field"><label title="Competência padrão">Competência padrão</label><select id="ns2-competencia"><option value="emissao">Data de emissão</option><option value="mes">Último dia do mês da comissão</option></select><div class="ns2-desc">Vale para o produto fiscal que estiver em "A padrão da Emissão". Cada produto pode ter a sua.</div></div>
       <div class="field"><label title="Buscar relatório a partir do dia">Buscar relatório no dia</label><input type="text" id="ns2-diaInicio"/><div class="ns2-desc">Dia do mês em que o relatório do mês anterior é buscado.</div></div>
       <div class="field"><label title="Valor mínimo por nota (R$)">Valor mínimo (R$)</label><input type="text" id="ns2-minimo"/><div class="ns2-desc">Notas abaixo disso ficam de fora (0 = todas).</div></div>
     </div>
@@ -17489,6 +17489,13 @@ function ns2ProdutosRender() {
         : '<input type="text" id="' + pre + c[0] + '" value="' + ns2Esc(val) + '"' + (c[0] === 'pTotTribSN' ? ' placeholder="ex.: 6.00"' : '') + on + '/>';
       var dica = c[2] ? '<div class="ns2-desc" data-de="' + pre + c[0] + '" data-chave="' + c[2] + '"></div>' : (NS2_P_DICA[c[0]] ? '<div class="ns2-desc">' + NS2_P_DICA[c[0]] + '</div>' : '');
       h += '<div class="field' + (c[4] ? ' ' + c[4] : '') + '"><label title="' + c[1] + '">' + c[1] + '</label>' + ctl + dica + '</div>';
+      // Competência por produto (19/11/2026), logo depois do PIS/COFINS
+      if (c[0] === 'cstPisCofins') {
+        var cp = p.competencia || '';
+        h += '<div class="field"><label title="Competência">Competência</label><select id="' + pre + 'competencia" onchange="NS2_PRODS_SUJO=true">'
+          + [['', 'A padrão da Emissão'], ['emissao', 'Data de emissão'], ['mes', 'Último dia do mês da comissão']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === cp ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('')
+          + '</select><div class="ns2-desc">Data que vai na nota como competência, só para este produto.</div></div>';
+      }
     });
     h += '</div><div class="ns2-checks"><label class="env-check"><input type="checkbox" id="' + pre + 'codigosConfirmados"' + (p.codigosConfirmados ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> <b>Códigos confirmados com o contador</b> (sem isso nada deste produto sai em produção; editar um código desmarca)</label></div></div>';
   });
@@ -17537,6 +17544,7 @@ function ns2ProdutosLer() {
     if (!el('nome')) { if (el('ativo')) p.ativo = el('ativo').checked; return p; }
     var x = { id: p.id, codigosConfirmados: el('codigosConfirmados').checked, ativo: el('ativo').checked, tpRetPisCofins: p.tpRetPisCofins, _aberto: p._aberto };
     NS2_P_CAMPOS.forEach(function (c) { x[c[0]] = el(c[0]).value.trim(); });
+    x.competencia = el('competencia') ? el('competencia').value : (p.competencia || '');
     return x;
   });
   return NS2_PRODS;
