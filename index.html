@@ -3166,8 +3166,10 @@ body.travado > *:not(#login-screen){display:none !important}
 
   <div class="card">
     <div class="sec-label">5. Programas de afiliados → produto fiscal</div>
-    <div class="ns2-desc" style="margin:0 0 12px">Cada programa de afiliados aponta para um produto fiscal. Os outros programas (Amazon, Mercado Livre, Awin…) entram aqui quando tiverem um relatório para virar nota.</div>
-    <div id="ns2-programas" class="ns2-grid"></div>
+    <div class="ns2-desc" style="margin:0 0 12px">Todo programa de afiliados usa o produto fiscal padrão. Cadastre aqui só as exceções: programas que saem com outro produto fiscal. Se você trocar o padrão, todos os programas sem exceção passam a usar o novo. Hoje só a comissão extra da Shopee tem relatório para virar nota; os outros programas já ficam configurados para quando tiverem.</div>
+    <div class="ns2-grid" style="margin-bottom:12px"><div class="field ns2-largo"><label>Produto fiscal padrão</label><select id="ns2-padrao" onchange="NS2_PRODS_SUJO=true;ns2ProdutosLer();NS2_PADRAO=this.value;ns2ProdutosRender()"></select><div class="ns2-desc">Vale para todos os programas que não estão nas exceções.</div></div></div>
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Exceções</label>
+    <div id="ns2-programas"></div>
   </div>
 
   <button class="btn" style="width:100%;margin:0 0 6px" onclick="ns2SalvarConfig()">💾 Salvar configuração</button>
@@ -17374,7 +17376,7 @@ function ns2Pintar() {
     ? '<span style="color:#f59e0b">⏳ Salvo aqui, ainda não chegou ao Gestão CDV' + (sinc.erro ? ' (' + ns2Esc(sinc.erro) + ')' : '') + '. Tento de novo a cada 10 min.</span>'
     : (sinc.ok === false ? '<span style="color:#f59e0b">⚠️ Sem conferir com o Gestão CDV: ' + ns2Esc(sinc.erro || '') + '</span>'
       : (sinc.em ? '🔗 Conferido com o Gestão CDV às ' + ns2Hora(sinc.em) + (sinc.atualizada && sinc.atualizada.em ? ' · última mudança ' + ns2Hora(sinc.atualizada.em) + ' pelo ' + (sinc.atualizada.por === 'tica-promos' ? 'Tica Promos' : 'Gestão CDV') : '') : ''));
-  if (!NS2_PRODS_SUJO) { NS2_PRODS = (cfg.produtos || []).map(function (p) { return Object.assign({}, p); }); ns2ProdutosRender(); }
+  if (!NS2_PRODS_SUJO) { NS2_PRODS = (cfg.produtos || []).map(function (p) { return Object.assign({}, p); }); NS2_PADRAO = cfg.produtoPadrao || ''; NS2_EXC = Object.assign({}, cfg.programas || {}); ns2ProdutosRender(); }
   document.getElementById('ns2-serie').value = cfg.serie;
   document.getElementById('ns2-diaInicio').value = cfg.diaInicio;
   document.getElementById('ns2-minimo').value = cfg.minimo;
@@ -17423,7 +17425,7 @@ function ns2Pintar() {
 }
 /* Produtos fiscais (19/11/2026): cartões com a mesma ordem de campos do Gestão CDV;
    cada programa de afiliados aponta para um produto. */
-var NS2_PRODS = [], NS2_PRODS_SUJO = false;
+var NS2_PRODS = [], NS2_PRODS_SUJO = false, NS2_PADRAO = '', NS2_EXC = {};
 // [campo, rótulo, chave da explicação, é código?, classe, textarea?]
 var NS2_P_CAMPOS = [
   ['nome', 'Nome', '', false, 'ns2-cheio'],
@@ -17461,11 +17463,11 @@ function ns2DescCodigo(tipo, v) {
   return '';
 }
 function ns2ProdutosRender() {
-  var progs = (NS2 && NS2.config.programas) || {}, nomesProg = (NS2 && NS2.programasNota) || {};
+  var progs = NS2_EXC, nomesProg = (NS2 && NS2.programasNota) || {};
   var h = '';
   if (!NS2_PRODS.length) h = '<div style="color:var(--muted);font-size:12px">Nenhum produto fiscal. Crie um para a Shopee.</div>';
   NS2_PRODS.forEach(function (p, i) {
-    var usos = Object.keys(progs).filter(function (k) { return progs[k] === p.id; }).map(function (k) { return nomesProg[k] || k; });
+    var usos = (p.id && p.id === NS2_PADRAO ? ['padrão'] : []).concat(Object.keys(progs).filter(function (k) { return progs[k] === p.id; }).map(function (k) { return nomesProg[k] || k; }));
     var pre = 'ns2-p-' + i + '-';
     h += '<div class="ns2-prod"><div class="ns2-prod-topo"><span>' + ns2Esc(p.nome || 'Produto fiscal')
       + (usos.length ? ' <span style="font-weight:500;color:var(--muted)">· ' + ns2Esc(usos.join(', ')) + '</span>' : '') + '</span>'
@@ -17483,15 +17485,42 @@ function ns2ProdutosRender() {
     h += '</div><div class="ns2-checks"><label class="env-check"><input type="checkbox" id="' + pre + 'codigosConfirmados"' + (p.codigosConfirmados ? ' checked' : '') + ' onchange="NS2_PRODS_SUJO=true"/> <b>Códigos confirmados com o contador</b> (sem isso nada deste produto sai em produção; editar um código desmarca)</label></div></div>';
   });
   document.getElementById('ns2-produtos').innerHTML = h;
-  // Programas de afiliados → produto fiscal (opções em ordem alfabética)
-  var ord = NS2_PRODS.map(function (p) { return { id: p.id, nome: p.nome || 'Produto sem nome' }; })
-    .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
-  document.getElementById('ns2-programas').innerHTML = Object.keys(nomesProg).sort(function (a, b) { return String(nomesProg[a]).localeCompare(nomesProg[b], 'pt-BR'); }).map(function (k) {
-    return '<div class="field ns2-largo"><label>' + ns2Esc(nomesProg[k]) + '</label><select id="ns2-prog-' + k + '" onchange="NS2_PRODS_SUJO=true">'
-      + ord.map(function (o) { return '<option value="' + ns2Esc(o.id) + '"' + (o.id && o.id === progs[k] ? ' selected' : '') + '>' + ns2Esc(o.nome) + '</option>'; }).join('')
-      + '</select><div class="ns2-desc">Produto fiscal usado nas notas deste programa.</div></div>';
-  }).join('');
+  ns2ProgramasRender();
   ns2Descrever();
+}
+// Programas de afiliados (19/11/2026): produto padrão + exceções (NS2_EXC = programa → produto).
+// Opções sempre em ordem alfabética.
+function ns2ProgramasRender() {
+  var nomesProg = (NS2 && NS2.programasNota) || {};
+  var ord = NS2_PRODS.filter(function (p) { return p.id; }).map(function (p) { return { id: p.id, nome: p.nome || 'Produto sem nome' }; })
+    .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+  var sp = document.getElementById('ns2-padrao');
+  if (!ord.some(function (o) { return o.id === NS2_PADRAO; })) NS2_PADRAO = ord.length ? ord[0].id : '';
+  if (document.activeElement !== sp) sp.innerHTML = ord.map(function (o) { return '<option value="' + ns2Esc(o.id) + '"' + (o.id === NS2_PADRAO ? ' selected' : '') + '>' + ns2Esc(o.nome) + '</option>'; }).join('');
+  NS2_PADRAO = sp.value || NS2_PADRAO;
+  Object.keys(NS2_EXC).forEach(function (k) { if (NS2_EXC[k] === NS2_PADRAO) delete NS2_EXC[k]; });
+  var opts = function (sel) { return ord.map(function (o) { return '<option value="' + ns2Esc(o.id) + '"' + (o.id === sel ? ' selected' : '') + '>' + ns2Esc(o.nome) + '</option>'; }).join(''); };
+  var porNome = function (a, b) { return String(nomesProg[a] || a).localeCompare(String(nomesProg[b] || b), 'pt-BR'); };
+  var exc = Object.keys(NS2_EXC).sort(porNome);
+  var h = exc.length ? exc.map(function (k) {
+    return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);font-size:13px"><span>' + ns2Esc(nomesProg[k] || k) + '</span>'
+      + '<span style="display:flex;gap:8px;align-items:center"><select style="width:auto;min-width:200px" onchange="NS2_EXC[\'' + k + '\']=this.value;NS2_PRODS_SUJO=true;ns2ProdutosLer();ns2ProdutosRender()">' + opts(NS2_EXC[k]) + '</select>'
+      + '<button class="btn btn-sm" style="margin:0" onclick="delete NS2_EXC[\'' + k + '\'];NS2_PRODS_SUJO=true;ns2ProdutosLer();ns2ProdutosRender()">✕</button></span></div>';
+  }).join('') : '<div class="ns2-desc" style="margin-bottom:8px">Nenhuma exceção: todos os programas usam o produto padrão.</div>';
+  var livres = Object.keys(nomesProg).filter(function (k) { return !NS2_EXC[k]; }).sort(porNome);
+  h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">' + (livres.length
+    ? '<select id="ns2-exc-prog" style="width:auto;min-width:200px"><option value="">Escolha o programa…</option>' + livres.map(function (k) { return '<option value="' + k + '">' + ns2Esc(nomesProg[k]) + '</option>'; }).join('') + '</select>'
+      + '<select id="ns2-exc-prod" style="width:auto;min-width:200px">' + opts('') + '</select>'
+      + '<button class="btn btn-sm" style="margin:0" onclick="ns2AddExcecao()">➕ Adicionar exceção</button>'
+    : '<span class="ns2-desc">Todos os programas já têm exceção.</span>') + '</div>';
+  document.getElementById('ns2-programas').innerHTML = h;
+}
+function ns2AddExcecao() {
+  var k = document.getElementById('ns2-exc-prog').value, p = document.getElementById('ns2-exc-prod').value;
+  if (!k) return alert('Escolha o programa.');
+  if (!p) return alert('Escolha o produto fiscal.');
+  if (p === NS2_PADRAO) return alert('Esse já é o produto padrão: não precisa de exceção.');
+  ns2ProdutosLer(); NS2_EXC[k] = p; NS2_PRODS_SUJO = true; ns2ProdutosRender();
 }
 // Lê o que está na tela de volta para NS2_PRODS (mantém o id).
 function ns2ProdutosLer() {
@@ -17515,9 +17544,8 @@ function ns2NovoProduto() {
 function ns2RemoverProduto(i) {
   ns2ProdutosLer();
   var p = NS2_PRODS[i]; if (!p) return;
-  var progs = (NS2 && NS2.config.programas) || {};
-  var usado = Object.keys(progs).some(function (k) { return p.id && progs[k] === p.id; });
-  if (usado) return alert('"' + (p.nome || 'Produto') + '" está escolhido num programa de afiliados. Troque o produto do programa e salve antes de remover.');
+  var usado = p.id && (p.id === NS2_PADRAO || Object.keys(NS2_EXC).some(function (k) { return NS2_EXC[k] === p.id; }));
+  if (usado) return alert('"' + (p.nome || 'Produto') + '" é o produto padrão ou está numa exceção de programa. Troque antes de remover.');
   if (!confirm('Remover o produto fiscal "' + (p.nome || 'sem nome') + '"? Notas já emitidas não mudam. Vale depois de salvar.')) return;
   NS2_PRODS.splice(i, 1);
   NS2_PRODS_SUJO = true;
@@ -17559,7 +17587,8 @@ function ns2SalvarConfig() {
     agrupar: document.getElementById('ns2-agrupar').checked, ativo: document.getElementById('ns2-ativo').checked, programas: {} };
   ['razao', 'cnpj', 'im', 'fone', 'email', 'cLocEmi', 'opSimpNac', 'regApTribSN', 'regEspTrib'].forEach(function (k) { corpo.emitente[k] = v('ns2-e-' + k); });
   corpo.produtos = ns2ProdutosLer().map(function (p) { var x = Object.assign({}, p); delete x._aberto; return x; });
-  Object.keys((NS2 && NS2.programasNota) || {}).forEach(function (k) { var s = document.getElementById('ns2-prog-' + k); if (s) corpo.programas[k] = s.value; });
+  corpo.produtoPadrao = NS2_PADRAO;
+  Object.keys(NS2_EXC).forEach(function (k) { if (NS2_EXC[k] && NS2_EXC[k] !== NS2_PADRAO) corpo.programas[k] = NS2_EXC[k]; });
   var msg = function (t) { document.querySelectorAll('#panel-notas .ns2-cfg-ok').forEach(function (el) { el.textContent = t; }); };
   msg('Salvando…');
   ns2Api('/notas-shopee/config', corpo).then(function (d) {
