@@ -5930,7 +5930,7 @@ function renderContas() {
       + '</div>'
       + '<div class="mon-linha">'
         + (c.ultimoEnvio ? '<div class="mon-campo"><label>Último envio</label><span style="font-size:12px">' + esc(new Date(c.ultimoEnvio).toLocaleString('pt-BR')) + '</span></div>' : '')
-        + (c.ultimoErro ? '<div class="mon-campo"><label>Último erro</label><span style="font-size:12px;color:#f87171">' + esc(c.ultimoErro) + '</span></div>' : '')
+        + (c.ultimoErro && !(c.conectado && /^deslogad/i.test(c.ultimoErro)) ? '<div class="mon-campo"><label>Último erro</label><span style="font-size:12px;color:#f87171">' + esc(c.ultimoErro) + '</span></div>' : '')
         + motorEnvioCampo(c)
         + '<div class="mon-campo" style="justify-content:flex-end"><div style="display:flex;gap:8px;flex-wrap:wrap">'
           + '<a class="btn btn-copy btn-sm" style="margin-top:0;text-decoration:none;text-align:center" target="_blank" href="'
