@@ -895,7 +895,8 @@ a.av-titulo:hover{text-decoration:underline}
   .dv-seg-btn:hover{border-color:var(--accent);color:var(--text)}
   .dv-seg-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
   .dv-mes{background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;border-radius:8px;padding:5px 8px}
-  .dv-periodo{align-items:center}
+  .dv-periodo{align-items:center;flex-wrap:nowrap}
+  .dv-periodo input[type=date]{width:auto;flex:0 0 auto;margin:0;padding:5px 8px;font-size:12px}
   .dv-ate-rot{font-size:11px;color:var(--muted);font-weight:600}
   .dv-linha-seg{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
   .dv-linha-seg .dv-seg{margin-bottom:0}
@@ -1434,7 +1435,7 @@ body.travado > *:not(#login-screen){display:none !important}
     <div class="fila-acoes dv-periodo">
       <input type="date" id="dv-de" class="dv-mes" title="De" onchange="dvMudouDe()"/>
       <span class="dv-ate-rot">até</span>
-      <input type="date" id="dv-ate" class="dv-mes" title="Até" onchange="dvMudouAte()"/>
+      <input type="date" id="dv-ate" class="dv-mes" title="Até" data-data-de="dv-de" onchange="dvMudouAte()"/>
     </div>
   </div>
 
