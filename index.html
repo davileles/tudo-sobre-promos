@@ -895,6 +895,12 @@ a.av-titulo:hover{text-decoration:underline}
   .dv-seg-btn:hover{border-color:var(--accent);color:var(--text)}
   .dv-seg-btn.active{background:var(--accent);border-color:var(--accent);color:#000}
   .dv-mes{background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;border-radius:8px;padding:5px 8px}
+  .dv-periodo{align-items:center}
+  .dv-ate-rot{font-size:11px;color:var(--muted);font-weight:600}
+  .dv-linha-seg{display:flex;gap:10px 18px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  .dv-linha-seg .dv-seg{margin-bottom:0}
+  #dv-atalhos{margin-bottom:12px}
+  .dv-seg-rot{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);align-self:center;margin-right:2px}
   .dv-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
   .dv-title:first-of-type{margin-top:0}
   .dv-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
@@ -1421,39 +1427,62 @@ body.travado > *:not(#login-screen){display:none !important}
   <div id="env-lista"><div class="fila-loading"><div class="spinner"></div></div></div>
 </div>
 
-<!-- ════════ DIVULGACOES — quantos itens sairam por plataforma em cada dia ════════ -->
+<!-- ════════ DIVULGACOES — quantos itens sairam por plataforma/nicho no periodo ════════ -->
 <div class="panel" id="panel-divulg">
   <div class="fila-bar">
     <span id="dv-status">Carregando...</span>
-    <div class="fila-acoes">
-      <input type="month" id="dv-mes" class="dv-mes" onchange="carregarDivulgacoes(true)"/>
+    <div class="fila-acoes dv-periodo">
+      <input type="date" id="dv-de" class="dv-mes" title="De" onchange="dvMudouDe()"/>
+      <span class="dv-ate-rot">até</span>
+      <input type="date" id="dv-ate" class="dv-mes" title="Até" onchange="dvMudouAte()"/>
     </div>
   </div>
 
-  <div class="dv-seg" id="dv-seg">
-    <button class="dv-seg-btn active" data-tipo="produtos" onclick="dvSetTipo('produtos')">🛍️ Produtos</button>
-    <button class="dv-seg-btn" data-tipo="cupons" onclick="dvSetTipo('cupons')">🏷️ Cupons</button>
-    <button class="dv-seg-btn" data-tipo="tudo" onclick="dvSetTipo('tudo')">Σ Tudo</button>
+  <div class="dv-seg" id="dv-atalhos">
+    <button class="dv-seg-btn" data-at="hoje" onclick="dvAtalho('hoje')">Hoje</button>
+    <button class="dv-seg-btn" data-at="ontem" onclick="dvAtalho('ontem')">Ontem</button>
+    <button class="dv-seg-btn" data-at="d7" onclick="dvAtalho('d7')">7 dias</button>
+    <button class="dv-seg-btn" data-at="d30" onclick="dvAtalho('d30')">30 dias</button>
+    <button class="dv-seg-btn" data-at="mes" onclick="dvAtalho('mes')">Este mês</button>
+    <button class="dv-seg-btn" data-at="mesant" onclick="dvAtalho('mesant')">Mês passado</button>
   </div>
 
-  <div class="dv-title" id="dv-title-dia">Divulgações do dia</div>
+  <div class="dv-linha-seg">
+    <div class="dv-seg" id="dv-seg">
+      <button class="dv-seg-btn active" data-tipo="produtos" onclick="dvSetTipo('produtos')">🛍️ Produtos</button>
+      <button class="dv-seg-btn" data-tipo="cupons" onclick="dvSetTipo('cupons')">🏷️ Cupons</button>
+      <button class="dv-seg-btn" data-tipo="tudo" onclick="dvSetTipo('tudo')">Σ Tudo</button>
+    </div>
+    <div class="dv-seg" id="dv-agrup">
+      <span class="dv-seg-rot">Agrupar por</span>
+      <button class="dv-seg-btn" data-agrup="nicho" onclick="dvSetAgrup('nicho')">Nicho</button>
+      <button class="dv-seg-btn active" data-agrup="plataforma" onclick="dvSetAgrup('plataforma')">Plataforma</button>
+    </div>
+  </div>
+
+  <div class="dv-title" id="dv-title-dia">Divulgações no período</div>
   <div class="dv-cards" id="dv-cards"></div>
 
-  <div class="dv-title">Por dia no mês — empilhado por plataforma</div>
+  <div class="dv-title" id="dv-title-chart">Por dia no período</div>
   <div class="dv-chart-card">
     <div class="dv-chart-wrap"><canvas id="dv-chart-dia"></canvas></div>
-    <div class="dv-hint">Clique numa barra para ver a distribuição daquele dia nos cartões acima.</div>
+    <div class="dv-hint" id="dv-hint">Clique numa barra para abrir aquele dia hora a hora.</div>
   </div>
 
   <div class="dv-grid2">
     <div class="dv-chart-card">
-      <div class="dv-chart-label" id="dv-pizza-label">Distribuição do dia</div>
+      <div class="dv-chart-label" id="dv-pizza-label">Distribuição</div>
       <div class="dv-chart-wrap" style="height:230px"><canvas id="dv-chart-pizza"></canvas></div>
     </div>
     <div class="dv-chart-card">
-      <div class="dv-chart-label">Total do mês por loja</div>
+      <div class="dv-chart-label" id="dv-tabela-label">Total por loja</div>
       <div id="dv-tabela"></div>
     </div>
+  </div>
+
+  <div class="dv-title" id="dv-title-nichos">Por nicho</div>
+  <div class="dv-chart-card">
+    <div id="dv-nichos"><div class="dv-vazio">Carregando nichos...</div></div>
   </div>
 
   <div class="dv-title" id="dv-title-grupos">Por grupo</div>
@@ -4674,18 +4703,32 @@ function toggleSidebar(forcar) {
 }
 
 /* ══════ DIVULGACOES ══════
-   Quantos produtos/cupons de cada plataforma sairam em cada dia. A fonte e o
-   historico duravel de envios do baileys (/operacao/historico-envios, um shard
-   por mes) — o unico registro que sobrevive a limpeza da fila operacional. */
+   Quantos produtos/cupons sairam em cada dia, por plataforma ou por nicho, num
+   periodo escolhido (um dia ou um intervalo). A fonte e o historico duravel de
+   envios do baileys (/operacao/historico-envios, um shard por mes) — o unico
+   registro que sobrevive a limpeza da fila operacional. Periodo que cruza meses
+   busca um shard por mes e junta.
+
+   NICHO de um envio: os grupos de nicho que de fato receberam (gruposNicho do
+   historico, ou os grupos do rastreio de links quando o registro e antigo),
+   traduzidos para o nicho pelas trilhas (/mkt/config). Para o grafico empilhado
+   cada item cai num balde so — um nicho, "Vários nichos" (tipico de cupom, que
+   vai para todos) ou "Só gerais" —, entao a pilha soma o total. A tabela "Por
+   nicho" conta quantos itens chegaram a cada nicho (a soma pode passar do total). */
 var DV_CACHE    = {};          // 'YYYY-MM' -> registros ja buscados
-var DV_REGS     = [];
-var DV_MES      = '';
+var DV_REGS     = [];          // registros do periodo (todos os tipos)
+var DV_DE       = '';          // inicio do periodo (YYYY-MM-DD)
+var DV_ATE      = '';          // fim do periodo (YYYY-MM-DD)
 var DV_TIPO     = 'produtos';  // produtos | cupons | tudo
-var DV_DIA      = '';          // dia em foco nos cartoes/pizza (YYYY-MM-DD)
+var DV_AGRUP    = 'plataforma';// plataforma | nicho
 var DV_CH_DIA   = null;
 var DV_CH_PIZZA = null;
+var DV_REQ      = 0;           // descarta resposta de carga antiga
+var DV_MAX_DIAS = 93;
 var DV_GRP_CACHE = {};         // 'YYYY-MM' -> { grupos:[{jid,nome}], porEnvio:{id:[idx]} }
-var DV_GRP = null;
+var DV_GRP = null;             // meses do periodo mesclados
+var DV_GRP_ERRO = '';
+var DV_NICHO = null;           // { jidCat:{jid:[cat]}, nomes:{cat:nome}, ordem:[cat] }
 var DV_PLATS = [
   { nome:'Amazon',         cor:'#ff9900' },
   { nome:'Mercado Livre',  cor:'#f5c518' },
@@ -4693,6 +4736,10 @@ var DV_PLATS = [
   { nome:'Magazine Luiza', cor:'#0086ff' },
   { nome:'Outras',         cor:'#8b8b8b' }
 ];
+var DV_NICHO_CORES = ['#22c55e','#a855f7','#06b6d4','#ec4899','#f59e0b','#ef4444','#84cc16','#3b82f6'];
+var DV_B_GERAIS = { nome:'Só gerais',            cor:'#64748b' };
+var DV_B_VARIOS = { nome:'Vários nichos',        cor:'#eab308' };
+var DV_B_SEMREG = { nome:'Sem registro de grupo', cor:'#3f3f46' };
 var DV_MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho',
                    'agosto','setembro','outubro','novembro','dezembro'];
 
@@ -4706,10 +4753,47 @@ function dvDiaDe(iso){
       year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(iso));
   } catch(e){ return String(iso || '').slice(0,10); }
 }
+function dvHoraDe(iso){
+  try {
+    var h = new Intl.DateTimeFormat('en-GB', { timeZone:'America/Sao_Paulo',
+      hour:'2-digit', hourCycle:'h23' }).format(new Date(iso));
+    return Math.min(23, Math.max(0, parseInt(h, 10) || 0));
+  } catch(e){ return 0; }
+}
 function dvDataBR(d){ return d ? d.slice(8,10) + '/' + d.slice(5,7) + '/' + d.slice(0,4) : '—'; }
 function dvNomeMes(m){
   if (!m) return '—';
   return DV_MESES_PT[Number(m.slice(5,7)) - 1] + '/' + m.slice(0,4);
+}
+function dvUTC(d){ return Date.UTC(Number(d.slice(0,4)), Number(d.slice(5,7)) - 1, Number(d.slice(8,10))); }
+function dvSomaDias(d, n){ return new Date(dvUTC(d) + n * 86400000).toISOString().slice(0,10); }
+function dvDifDias(a, b){ return Math.round((dvUTC(b) - dvUTC(a)) / 86400000); }
+function dvUmDia(){ return DV_DE && DV_DE === DV_ATE; }
+
+function dvRotPeriodo(){
+  if (!DV_DE) return '—';
+  var hoje = dvHojeSP();
+  if (dvUmDia()) return dvDataBR(DV_DE) + (DV_DE === hoje ? ' (hoje)' : '');
+  if (DV_DE.slice(8) === '01' && DV_DE.slice(0,7) === DV_ATE.slice(0,7) &&
+      (DV_ATE === hoje || dvSomaDias(DV_ATE, 1).slice(8) === '01')) return dvNomeMes(DV_DE.slice(0,7));
+  return dvDataBR(DV_DE).slice(0,5) + ' a ' + dvDataBR(DV_ATE);
+}
+
+// Dias do periodo, sem projetar futuro.
+function dvDiasDoPeriodo(){
+  var out = [], fim = DV_ATE < dvHojeSP() ? DV_ATE : dvHojeSP();
+  for (var d = DV_DE; d <= fim && out.length <= DV_MAX_DIAS; d = dvSomaDias(d, 1)) out.push(d);
+  return out;
+}
+function dvMesesDoPeriodo(de, ate){
+  var out = [], m = de.slice(0,7), fim = ate.slice(0,7);
+  while (m <= fim && out.length < 6) {
+    out.push(m);
+    var y = Number(m.slice(0,4)), mm = Number(m.slice(5,7)) + 1;
+    if (mm > 12) { mm = 1; y++; }
+    m = y + '-' + (mm < 10 ? '0' : '') + mm;
+  }
+  return out;
 }
 
 // Plataforma: o tipoConteudo manda (e o que o radar capturou); cupom nao tem
@@ -4737,103 +4821,247 @@ function dvFiltrados(){
   var querProduto = (DV_TIPO === 'produtos');
   return DV_REGS.filter(function(r){ return dvEhProduto(r) === querProduto; });
 }
-function dvSetTipo(t){
-  DV_TIPO = t;
-  var bs = document.querySelectorAll('#dv-seg .dv-seg-btn');
+function dvMarcarSeg(id, attr, val){
+  var bs = document.querySelectorAll('#' + id + ' .dv-seg-btn');
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].getAttribute(attr) === val);
+}
+function dvSetTipo(t){ DV_TIPO = t; dvMarcarSeg('dv-seg', 'data-tipo', t); dvRender(); }
+function dvSetAgrup(a){ DV_AGRUP = a; dvMarcarSeg('dv-agrup', 'data-agrup', a); dvRender(); }
+
+/* ── PERIODO ── */
+function dvAtalhos(){
+  var h = dvHojeSP(), mes = h.slice(0,7) + '-01';
+  var mpAte = dvSomaDias(mes, -1), mpDe = mpAte.slice(0,7) + '-01';
+  return {
+    hoje:   [h, h],
+    ontem:  [dvSomaDias(h, -1), dvSomaDias(h, -1)],
+    d7:     [dvSomaDias(h, -6), h],
+    d30:    [dvSomaDias(h, -29), h],
+    mes:    [mes, h],
+    mesant: [mpDe, mpAte]
+  };
+}
+function dvAtalho(k){
+  var a = dvAtalhos()[k];
+  if (!a) return;
+  dvAplicarPeriodo(a[0], a[1]);
+}
+function dvMudouDe(){
+  var de = document.getElementById('dv-de').value, ate = document.getElementById('dv-ate').value;
+  if (!de) return;
+  // O "ate" abre no mes do "de" (regra dos dois campos de data em sequencia).
+  if (!ate || ate < de) ate = de;
+  dvAplicarPeriodo(de, ate);
+}
+function dvMudouAte(){
+  var de = document.getElementById('dv-de').value, ate = document.getElementById('dv-ate').value;
+  if (!ate) return;
+  if (!de || de > ate) de = ate;
+  dvAplicarPeriodo(de, ate);
+}
+function dvAplicarPeriodo(de, ate){
+  var hoje = dvHojeSP(), aviso = '';
+  if (ate > hoje) ate = hoje;
+  if (de > ate) de = ate;
+  if (dvDifDias(de, ate) >= DV_MAX_DIAS) {
+    de = dvSomaDias(ate, -(DV_MAX_DIAS - 1));
+    aviso = 'Período limitado a ' + DV_MAX_DIAS + ' dias.';
+  }
+  var elDe = document.getElementById('dv-de'), elAte = document.getElementById('dv-ate');
+  elDe.value = de; elAte.value = ate;
+  elDe.max = hoje; elAte.max = hoje; elAte.min = de;
+  DV_DE = de; DV_ATE = ate;
+  var at = dvAtalhos(), bs = document.querySelectorAll('#dv-atalhos .dv-seg-btn');
   for (var i = 0; i < bs.length; i++) {
-    bs[i].classList.toggle('active', bs[i].getAttribute('data-tipo') === t);
+    var p = at[bs[i].getAttribute('data-at')];
+    bs[i].classList.toggle('active', !!p && p[0] === de && p[1] === ate);
   }
-  dvRender();
+  carregarDivulgacoes(false, aviso);
 }
 
-// Dias do eixo: mes inteiro, mas sem projetar futuro no mes corrente.
-function dvDiasDoMes(mes){
-  var y = Number(mes.slice(0,4)), m = Number(mes.slice(5,7));
-  var ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  var hoje = dvHojeSP();
-  if (hoje.slice(0,7) === mes) ultimo = Math.min(ultimo, Number(hoje.slice(8,10)));
-  var out = [];
-  for (var d = 1; d <= ultimo; d++) out.push(mes + '-' + (d < 10 ? '0' : '') + d);
-  return out;
-}
-
-async function carregarDivulgacoes(forcar){
-  var elMes = document.getElementById('dv-mes');
-  if (!elMes) return;
-  if (!elMes.value) elMes.value = dvHojeSP().slice(0,7);
-  var mes = elMes.value;
-  var st  = document.getElementById('dv-status');
-  dvCarregarGrupos(mes, forcar);
-  if (!forcar && DV_CACHE[mes]) { DV_MES = mes; DV_REGS = DV_CACHE[mes]; dvRender(); return; }
-  st.textContent = 'Carregando histórico...';
+async function carregarDivulgacoes(forcar, aviso){
+  var elDe = document.getElementById('dv-de');
+  if (!elDe) return;
+  if (!DV_DE) { var m = dvAtalhos().mes; dvAplicarPeriodo(m[0], m[1]); return; }
+  var st = document.getElementById('dv-status');
+  var meses = dvMesesDoPeriodo(DV_DE, DV_ATE);
+  var req = ++DV_REQ;
+  dvCarregarNichos(forcar);
+  dvCarregarGrupos(meses, forcar, req);
+  var faltam = meses.filter(function(m){ return forcar || !DV_CACHE[m]; });
+  if (faltam.length) st.textContent = 'Carregando histórico...';
   try {
-    var r = await fetch(SERVER + '/operacao/historico-envios?mes=' + encodeURIComponent(mes) +
-                        '&t=' + Date.now(), { cache:'no-cache' });
-    var d = await r.json();
-    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
-    DV_REGS = Array.isArray(d.registros) ? d.registros : [];
-    DV_MES  = mes;
-    DV_CACHE[mes] = DV_REGS;
-    DV_DIA  = '';
-    dvRender();
+    await Promise.all(faltam.map(async function(mes){
+      var r = await fetch(SERVER + '/operacao/historico-envios?mes=' + encodeURIComponent(mes) +
+                          '&t=' + Date.now(), { cache:'no-cache' });
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+      DV_CACHE[mes] = Array.isArray(d.registros) ? d.registros : [];
+    }));
+    if (req !== DV_REQ) return;
+    var de = DV_DE, ate = DV_ATE, regs = [];
+    meses.forEach(function(m){
+      (DV_CACHE[m] || []).forEach(function(r){
+        var dia = dvDiaDe(r.enviadoEm);
+        if (dia >= de && dia <= ate) regs.push(r);
+      });
+    });
+    DV_REGS = regs;
+    dvRender(aviso);
   } catch(e){
-    st.textContent = 'Erro ao carregar o histórico: ' + e.message;
+    if (req === DV_REQ) st.textContent = 'Erro ao carregar o histórico: ' + e.message;
   }
 }
 
-function dvRender(){
-  if (!DV_MES) return;
+/* ── NICHOS (trilhas com categoria) ── */
+async function dvCarregarNichos(forcar){
+  if (DV_NICHO && !forcar) return;
+  try {
+    var trs = (typeof TRILHAS !== 'undefined' && TRILHAS && TRILHAS.length && !forcar) ? TRILHAS : null;
+    if (!trs) {
+      var r = await fetch(SERVER + '/mkt/config?t=' + Date.now(), { cache:'no-cache', signal: AbortSignal.timeout(6000) });
+      var d = await r.json();
+      trs = (d && d.trilhas) || [];
+    }
+    try { if (typeof catTaxoCarregar === 'function') await catTaxoCarregar(); } catch(e) {}
+    var jidCat = {}, nomes = {};
+    trs.forEach(function(t){
+      if (!t || !t.categoria) return;
+      var cat = String(t.categoria);
+      if (!nomes[cat]) {
+        var n = (typeof catNomeDe === 'function') ? catNomeDe(cat) : cat;
+        if (!n || n === cat) n = String(t.nome || cat).replace(/^Tica Promos\s*-\s*/i, '').replace(/\s*#\d+$/, '').trim() || cat;
+        nomes[cat] = n;
+      }
+      (t.destinos || []).forEach(function(j){
+        var l = jidCat[j] || (jidCat[j] = []);
+        if (l.indexOf(cat) < 0) l.push(cat);
+      });
+    });
+    var ordem = Object.keys(nomes).sort(function(a, b){ return nomes[a].localeCompare(nomes[b], 'pt-BR'); });
+    DV_NICHO = { jidCat: jidCat, nomes: nomes, ordem: ordem };
+  } catch(e) {
+    DV_NICHO = { jidCat: {}, nomes: {}, ordem: [], erro: e.message };
+  }
+  if (DV_DE) dvRender();
+}
+
+// Nichos que receberam o item: [] = so gerais; null = sem registro de grupo;
+// undefined = trilhas ainda carregando.
+function dvNichosDoReg(r){
+  if (!DV_NICHO) return undefined;
+  var jids = Array.isArray(r.gruposNicho) ? r.gruposNicho : null;
+  if (!jids) {
+    var gs = dvGruposDoReg(r);
+    if (gs && gs.length) jids = gs.map(function(i){ return (DV_GRP.grupos[i] || {}).jid; });
+  }
+  if (!jids) return null;
+  var set = [];
+  jids.forEach(function(j){
+    (DV_NICHO.jidCat[j] || []).forEach(function(c){ if (set.indexOf(c) < 0) set.push(c); });
+  });
+  return set;
+}
+function dvCorNicho(cat){
+  var i = DV_NICHO ? DV_NICHO.ordem.indexOf(cat) : -1;
+  return DV_NICHO_CORES[(i < 0 ? 0 : i) % DV_NICHO_CORES.length];
+}
+
+// Balde unico do item no agrupamento atual: { nome, cor }.
+function dvBalde(r){
+  if (DV_AGRUP !== 'nicho') {
+    var p = dvPlataforma(r);
+    for (var i = 0; i < DV_PLATS.length; i++) if (DV_PLATS[i].nome === p) return DV_PLATS[i];
+    return DV_PLATS[DV_PLATS.length - 1];
+  }
+  var ns = dvNichosDoReg(r);
+  if (!ns) return DV_B_SEMREG;
+  if (!ns.length) return DV_B_GERAIS;
+  if (ns.length > 1) return DV_B_VARIOS;
+  return { nome: DV_NICHO.nomes[ns[0]] || ns[0], cor: dvCorNicho(ns[0]) };
+}
+// Ordem fixa das series: plataformas na ordem do DV_PLATS; nichos em ordem
+// alfabetica e depois os baldes especiais.
+function dvSeries(){
+  if (DV_AGRUP !== 'nicho') return DV_PLATS;
+  var out = (DV_NICHO ? DV_NICHO.ordem : []).map(function(c){
+    return { nome: DV_NICHO.nomes[c] || c, cor: dvCorNicho(c) };
+  });
+  return out.concat([DV_B_VARIOS, DV_B_GERAIS, DV_B_SEMREG]);
+}
+
+function dvRender(aviso){
+  if (!DV_DE) return;
   var regs = dvFiltrados();
   var rotulo = DV_TIPO === 'produtos' ? 'produto(s)'
              : DV_TIPO === 'cupons'   ? 'cupom(ns)' : 'item(ns)';
   document.getElementById('dv-status').textContent =
-    regs.length + ' ' + rotulo + ' divulgado(s) em ' + dvNomeMes(DV_MES);
+    regs.length + ' ' + rotulo + ' divulgado(s) em ' + dvRotPeriodo() + (aviso ? ' · ' + aviso : '');
 
-  var dias = dvDiasDoMes(DV_MES);
-  var porDia = {};
-  dias.forEach(function(d){ porDia[d] = {}; });
-  regs.forEach(function(r){
-    var d = dvDiaDe(r.enviadoEm);
-    if (!porDia[d]) porDia[d] = {};
-    var p = dvPlataforma(r);
-    porDia[d][p] = (porDia[d][p] || 0) + 1;
+  var nichoCarregando = (DV_AGRUP === 'nicho' && !DV_NICHO);
+  var hora = dvUmDia();
+  var eixo = hora ? Array.apply(null, Array(24)).map(function(_, i){ return i; }) : dvDiasDoPeriodo();
+  var porEixo = {}, totais = {};
+  eixo.forEach(function(k){ porEixo[k] = {}; });
+  if (!nichoCarregando) regs.forEach(function(r){
+    var k = hora ? dvHoraDe(r.enviadoEm) : dvDiaDe(r.enviadoEm);
+    if (!porEixo[k]) porEixo[k] = {};
+    var b = dvBalde(r).nome;
+    porEixo[k][b] = (porEixo[k][b] || 0) + 1;
+    totais[b] = (totais[b] || 0) + 1;
   });
 
-  // Dia em foco: o escolhido no clique, senao hoje, senao o ultimo do eixo.
-  if (!DV_DIA || !porDia[DV_DIA]) {
-    var hoje = dvHojeSP();
-    DV_DIA = porDia[hoje] ? hoje : (dias[dias.length - 1] || hoje);
-  }
+  document.getElementById('dv-title-dia').textContent = 'Divulgações em ' + dvRotPeriodo();
+  document.getElementById('dv-title-chart').textContent = hora
+    ? 'Por hora em ' + dvDataBR(DV_DE) + ' — empilhado por ' + (DV_AGRUP === 'nicho' ? 'nicho' : 'plataforma')
+    : 'Por dia no período — empilhado por ' + (DV_AGRUP === 'nicho' ? 'nicho' : 'plataforma');
+  document.getElementById('dv-hint').textContent = hora
+    ? 'Escolha um intervalo de datas (ou um atalho) para ver dia a dia.'
+    : 'Clique numa barra para abrir aquele dia hora a hora.';
 
-  dvCards(porDia[DV_DIA] || {});
-  dvGraficoDias(dias, porDia);
-  dvGraficoPizza(porDia[DV_DIA] || {});
+  dvCards(totais, regs.length, nichoCarregando);
+  dvGraficoEixo(eixo, porEixo, hora, nichoCarregando);
+  dvGraficoPizza(totais);
+  dvTabelaNichos(regs);
   dvTabelaLojas(regs);
   dvTabelaGrupos(regs);
 }
 
 // Para quais grupos cada envio foi: o baileys cruza o historico com o rastreio
 // de links (/operacao/divulgacoes-grupos). Carrega a parte, sem segurar o resto.
-async function dvCarregarGrupos(mes, forcar){
-  if (!forcar && DV_GRP_CACHE[mes]) { DV_GRP = DV_GRP_CACHE[mes]; return; }
-  DV_GRP = null;
-  var el = document.getElementById('dv-grupos');
-  if (el) el.innerHTML = '<div class="dv-vazio">Carregando grupos...</div>';
+async function dvCarregarGrupos(meses, forcar, req){
+  DV_GRP = null; DV_GRP_ERRO = '';
+  var faltam = meses.filter(function(m){ return forcar || !DV_GRP_CACHE[m]; });
   try {
-    var r = await fetch(SERVER + '/operacao/divulgacoes-grupos?mes=' + encodeURIComponent(mes) +
-                        '&t=' + Date.now(), { cache:'no-cache' });
-    if (r.status === 404) {
-      if (el) el.innerHTML = '<div class="dv-vazio">O servidor ainda não tem a leitura por grupo — ela entra na próxima atualização do baileys-server.</div>';
-      return;
-    }
-    var d = await r.json();
-    if (!d.ok) throw new Error(d.erro || 'resposta inválida');
-    DV_GRP_CACHE[mes] = { grupos: d.grupos || [], porEnvio: d.porEnvio || {} };
-    var elMes = document.getElementById('dv-mes');
-    if (!elMes || elMes.value === mes) { DV_GRP = DV_GRP_CACHE[mes]; if (DV_MES === mes) dvRender(); }
+    await Promise.all(faltam.map(async function(mes){
+      var r = await fetch(SERVER + '/operacao/divulgacoes-grupos?mes=' + encodeURIComponent(mes) +
+                          '&t=' + Date.now(), { cache:'no-cache' });
+      if (r.status === 404) throw new Error('404');
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.erro || 'resposta inválida');
+      DV_GRP_CACHE[mes] = { grupos: d.grupos || [], porEnvio: d.porEnvio || {} };
+    }));
   } catch(e){
-    if (el) el.innerHTML = '<div class="dv-vazio">Erro ao carregar os grupos: ' + esc(e.message) + '</div>';
+    DV_GRP_ERRO = e.message === '404'
+      ? 'O servidor ainda não tem a leitura por grupo — ela entra na próxima atualização do baileys-server.'
+      : 'Erro ao carregar os grupos: ' + e.message;
   }
+  if (req !== DV_REQ) return;
+  // Junta os meses: cada resposta tem o proprio indice de grupos.
+  var grupos = [], idx = {}, porEnvio = {};
+  meses.forEach(function(m){
+    var c = DV_GRP_CACHE[m];
+    if (!c) return;
+    var mapa = c.grupos.map(function(g){
+      if (idx[g.jid] === undefined) { idx[g.jid] = grupos.length; grupos.push(g); }
+      return idx[g.jid];
+    });
+    Object.keys(c.porEnvio).forEach(function(k){
+      porEnvio[k] = (c.porEnvio[k] || []).map(function(i){ return mapa[i]; });
+    });
+  });
+  DV_GRP = { grupos: grupos, porEnvio: porEnvio, parcial: !!DV_GRP_ERRO };
+  if (DV_DE) dvRender();
 }
 
 function dvGruposDoReg(r){
@@ -4844,71 +5072,96 @@ function dvGruposDoReg(r){
 function dvTabelaGrupos(regs){
   var el = document.getElementById('dv-grupos');
   if (!el) return;
-  document.getElementById('dv-title-grupos').textContent = 'Por grupo — ' + dvDataBR(DV_DIA) + ' e mês';
+  document.getElementById('dv-title-grupos').textContent = 'Por grupo — ' + dvRotPeriodo();
   if (!DV_GRP) { el.innerHTML = '<div class="dv-vazio">Carregando grupos...</div>'; return; }
-  var porGrupo = {}, totalDia = 0, semDia = 0, semMes = 0;
+  if (DV_GRP_ERRO && !DV_GRP.grupos.length) { el.innerHTML = '<div class="dv-vazio">' + esc(DV_GRP_ERRO) + '</div>'; return; }
+  var porGrupo = {}, total = regs.length, sem = 0;
   regs.forEach(function(r){
-    var ehDia = dvDiaDe(r.enviadoEm) === DV_DIA;
-    if (ehDia) totalDia++;
     var gs = dvGruposDoReg(r);
-    if (!gs || !gs.length) { semMes++; if (ehDia) semDia++; return; }
-    gs.forEach(function(i){
-      var g = porGrupo[i] || (porGrupo[i] = { dia: 0, mes: 0 });
-      g.mes++;
-      if (ehDia) g.dia++;
-    });
+    if (!gs || !gs.length) { sem++; return; }
+    gs.forEach(function(i){ porGrupo[i] = (porGrupo[i] || 0) + 1; });
   });
   var lista = Object.keys(porGrupo).map(function(i){
     var g = DV_GRP.grupos[i] || {};
-    return { nome: g.nome || g.jid || '?', dia: porGrupo[i].dia, mes: porGrupo[i].mes };
-  }).sort(function(a,b){ return (b.dia - a.dia) || (b.mes - a.mes) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+    return { nome: g.nome || g.jid || '?', n: porGrupo[i] };
+  }).sort(function(a,b){ return (b.n - a.n) || a.nome.localeCompare(b.nome, 'pt-BR'); });
   if (!lista.length) {
-    el.innerHTML = '<div class="dv-vazio">Nenhum grupo registrado no mês para o filtro atual.</div>';
+    el.innerHTML = '<div class="dv-vazio">Nenhum grupo registrado no período para o filtro atual.</div>';
     return;
   }
-  var html = '<table class="dv-tab dv-grp"><tr><th>Grupo</th><th>' + dvDataBR(DV_DIA).slice(0,5) +
-             '</th><th>% do dia</th><th>No mês</th></tr>';
+  var html = '<table class="dv-tab dv-grp"><tr><th>Grupo</th><th>Itens</th><th>% do período</th></tr>';
   lista.forEach(function(g){
-    var pct = totalDia ? Math.round(g.dia * 100 / totalDia) : 0;
+    var pct = total ? Math.round(g.n * 100 / total) : 0;
     html += '<tr><td><div class="dv-grp-nome">' + esc(g.nome) + '</div>' +
             '<div class="dv-grp-barra"><span style="width:' + pct + '%"></span></div></td>' +
-            '<td class="dv-td-n">' + g.dia + '</td><td class="dv-td-pct">' + pct + '%</td>' +
-            '<td class="dv-td-n">' + g.mes + '</td></tr>';
+            '<td class="dv-td-n">' + g.n + '</td><td class="dv-td-pct">' + pct + '%</td></tr>';
   });
   html += '</table>';
   html += '<div class="dv-grp-nota">Cada item vai para vários grupos, então a soma passa do total. ' +
-          '"% do dia" = quantos dos ' + totalDia + ' itens do dia chegaram ao grupo.';
-  if (semDia || semMes) html += ' Sem grupo registrado (mensagem sem link rastreado): ' + semDia +
-          ' no dia, ' + semMes + ' no mês.';
+          '"% do período" = quantos dos ' + total + ' itens chegaram ao grupo.';
+  if (sem) html += ' Sem grupo registrado (mensagem sem link rastreado): ' + sem + '.';
+  if (DV_GRP_ERRO) html += ' ' + esc(DV_GRP_ERRO);
   html += '</div>';
   el.innerHTML = html;
 }
 
-function dvCards(mapaDia){
-  var total = 0;
-  for (var k in mapaDia) total += mapaDia[k];
-  var ehHoje = (DV_DIA === dvHojeSP());
-  document.getElementById('dv-title-dia').textContent =
-    'Divulgações em ' + dvDataBR(DV_DIA) + (ehHoje ? ' (hoje)' : '');
+// Quantos itens chegaram a cada nicho (nao exclusivo) + os que ficaram so nos
+// gerais e os sem registro de grupo.
+function dvTabelaNichos(regs){
+  var el = document.getElementById('dv-nichos');
+  if (!el) return;
+  document.getElementById('dv-title-nichos').textContent = 'Por nicho — ' + dvRotPeriodo();
+  if (!DV_NICHO) { el.innerHTML = '<div class="dv-vazio">Carregando nichos...</div>'; return; }
+  if (DV_NICHO.erro && !DV_NICHO.ordem.length) {
+    el.innerHTML = '<div class="dv-vazio">Não foi possível ler as trilhas: ' + esc(DV_NICHO.erro) + '</div>'; return;
+  }
+  var total = regs.length, porCat = {}, gerais = 0, semReg = 0, varios = 0;
+  regs.forEach(function(r){
+    var ns = dvNichosDoReg(r);
+    if (!ns) { semReg++; return; }
+    if (!ns.length) { gerais++; return; }
+    if (ns.length > 1) varios++;
+    ns.forEach(function(c){ porCat[c] = (porCat[c] || 0) + 1; });
+  });
+  var linhas = DV_NICHO.ordem.map(function(c){
+    return { nome: DV_NICHO.nomes[c] || c, cor: dvCorNicho(c), n: porCat[c] || 0 };
+  }).sort(function(a, b){ return (b.n - a.n) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+  linhas.push({ nome: DV_B_GERAIS.nome, cor: DV_B_GERAIS.cor, n: gerais, especial: true });
+  if (semReg) linhas.push({ nome: DV_B_SEMREG.nome, cor: DV_B_SEMREG.cor, n: semReg, especial: true });
+  var html = '<table class="dv-tab dv-grp"><tr><th>Nicho</th><th>Itens</th><th>% do período</th></tr>';
+  linhas.forEach(function(l){
+    var pct = total ? Math.round(l.n * 100 / total) : 0;
+    html += '<tr><td><div class="dv-grp-nome"><span class="dv-dot" style="background:' + l.cor + '"></span>' +
+            esc(l.nome) + '</div><div class="dv-grp-barra"><span style="width:' + pct + '%;background:' + l.cor + '"></span></div></td>' +
+            '<td class="dv-td-n">' + l.n + '</td><td class="dv-td-pct">' + pct + '%</td></tr>';
+  });
+  html += '</table><div class="dv-grp-nota">Itens que chegaram ao grupo de cada nicho. Um item pode ir a mais de um nicho' +
+          (varios ? ' (' + varios + ' foram a vários, quase sempre cupons)' : '') +
+          ', então a soma pode passar de ' + total + '. "Só gerais" = não foi a nenhum grupo de nicho.' +
+          (semReg ? ' "Sem registro de grupo" = envio sem lista de grupos gravada.' : '') + '</div>';
+  el.innerHTML = html;
+}
 
-  var html = '<div class="dv-card"><div class="dv-card-nome">Total no dia</div>' +
+function dvCards(totais, total, carregando){
+  var html = '<div class="dv-card"><div class="dv-card-nome">Total' + (dvUmDia() ? ' no dia' : ' no período') + '</div>' +
              '<div class="dv-card-val">' + total + '</div>' +
              '<div class="dv-card-sub">' + (DV_TIPO === 'cupons' ? 'cupons' :
                DV_TIPO === 'produtos' ? 'produtos' : 'itens') + ' enviados</div></div>';
-
-  var lista = DV_PLATS.map(function(p){
-    return { nome:p.nome, cor:p.cor, n: mapaDia[p.nome] || 0 };
-  }).filter(function(p){ return p.n > 0; })
-    .sort(function(a,b){ return b.n - a.n; });
-
-  lista.forEach(function(p){
-    var pct = total ? Math.round(p.n * 100 / total) : 0;
-    html += '<div class="dv-card" style="--cor:' + p.cor + '">' +
-              '<div class="dv-card-nome">' + esc(p.nome) + '</div>' +
-              '<div class="dv-card-val" style="color:' + p.cor + '">' + p.n + '</div>' +
-              '<div class="dv-card-sub">' + pct + '% do dia</div></div>';
-  });
-  if (!lista.length) html += '<div class="dv-vazio">Nada registrado neste dia para o filtro atual.</div>';
+  if (carregando) {
+    html += '<div class="dv-vazio">Carregando nichos...</div>';
+  } else {
+    var lista = dvSeries().map(function(s){ return { nome:s.nome, cor:s.cor, n: totais[s.nome] || 0 }; })
+      .filter(function(s){ return s.n > 0; })
+      .sort(function(a,b){ return b.n - a.n; });
+    lista.forEach(function(s){
+      var pct = total ? Math.round(s.n * 100 / total) : 0;
+      html += '<div class="dv-card" style="--cor:' + s.cor + '">' +
+                '<div class="dv-card-nome">' + esc(s.nome) + '</div>' +
+                '<div class="dv-card-val" style="color:' + s.cor + '">' + s.n + '</div>' +
+                '<div class="dv-card-sub">' + pct + '% do ' + (dvUmDia() ? 'dia' : 'período') + '</div></div>';
+    });
+    if (!lista.length) html += '<div class="dv-vazio">Nada registrado no período para o filtro atual.</div>';
+  }
   document.getElementById('dv-cards').innerHTML = html;
 }
 
@@ -4918,38 +5171,40 @@ function dvCoresTema(){
            texto: escuro ? '#9aa0aa' : '#6b7280' };
 }
 
-function dvGraficoDias(dias, porDia){
+function dvGraficoEixo(eixo, porEixo, hora, carregando){
   var ctx = document.getElementById('dv-chart-dia');
   if (!ctx || typeof Chart === 'undefined') return;
   var t = dvCoresTema();
-  var labels = dias.map(function(d){ return d.slice(8,10) + '/' + d.slice(5,7); });
-  var ds = DV_PLATS.map(function(p){
-    return { label: p.nome, backgroundColor: p.cor, borderWidth: 0, borderRadius: 3,
-             data: dias.map(function(d){ return (porDia[d] && porDia[d][p.nome]) || 0; }) };
+  var labels = eixo.map(function(k){
+    return hora ? ((k < 10 ? '0' : '') + k + 'h') : (k.slice(8,10) + '/' + k.slice(5,7));
+  });
+  var ds = carregando ? [] : dvSeries().map(function(s){
+    return { label: s.nome, backgroundColor: s.cor, borderWidth: 0, borderRadius: 3,
+             data: eixo.map(function(k){ return (porEixo[k] && porEixo[k][s.nome]) || 0; }) };
   }).filter(function(s){ return s.data.some(function(v){ return v > 0; }); });
 
   if (DV_CH_DIA) DV_CH_DIA.destroy();
   DV_CH_DIA = new Chart(ctx, {
     type: 'bar',
-    data: { labels: labels, datasets: ds.length ? ds : [{ label:'Sem dados', data: dias.map(function(){ return 0; }), backgroundColor:'#8b8b8b' }] },
+    data: { labels: labels, datasets: ds.length ? ds : [{ label:'Sem dados', data: eixo.map(function(){ return 0; }), backgroundColor:'#8b8b8b' }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       onClick: function(ev, els){
-        if (els && els.length) { DV_DIA = dias[els[0].index]; dvRender(); }
+        if (!hora && els && els.length) { var d = eixo[els[0].index]; dvAplicarPeriodo(d, d); }
       },
       plugins: {
         legend: { labels: { color: t.texto, boxWidth: 10, font: { size: 10 } } },
         tooltip: { callbacks: {
           footer: function(items){
             var soma = items.reduce(function(s, i){ return s + (i.parsed.y || 0); }, 0);
-            return 'Total do dia: ' + soma;
+            return (hora ? 'Total na hora: ' : 'Total do dia: ') + soma;
           }
         } }
       },
       scales: {
         x: { stacked: true, grid: { display: false },
-             ticks: { color: t.texto, font: { size: 10 }, maxTicksLimit: 16 } },
+             ticks: { color: t.texto, font: { size: 10 }, maxTicksLimit: hora ? 24 : 16 } },
         y: { stacked: true, beginAtZero: true, grid: { color: t.grade },
              ticks: { color: t.texto, font: { size: 10 }, precision: 0 } }
       }
@@ -4957,14 +5212,15 @@ function dvGraficoDias(dias, porDia){
   });
 }
 
-function dvGraficoPizza(mapaDia){
+function dvGraficoPizza(totais){
   var ctx = document.getElementById('dv-chart-pizza');
   if (!ctx || typeof Chart === 'undefined') return;
   var t = dvCoresTema();
-  document.getElementById('dv-pizza-label').textContent = 'Distribuição em ' + dvDataBR(DV_DIA);
-  var lista = DV_PLATS.map(function(p){ return { nome:p.nome, cor:p.cor, n: mapaDia[p.nome] || 0 }; })
-                      .filter(function(p){ return p.n > 0; });
-  if (DV_CH_PIZZA) DV_CH_PIZZA.destroy();
+  document.getElementById('dv-pizza-label').textContent =
+    'Distribuição por ' + (DV_AGRUP === 'nicho' ? 'nicho' : 'plataforma') + ' — ' + dvRotPeriodo();
+  var lista = dvSeries().map(function(s){ return { nome:s.nome, cor:s.cor, n: totais[s.nome] || 0 }; })
+                        .filter(function(s){ return s.n > 0; });
+  if (DV_CH_PIZZA) { DV_CH_PIZZA.destroy(); DV_CH_PIZZA = null; }
   if (!lista.length) {
     var cv = ctx.getContext('2d');
     cv.clearRect(0, 0, ctx.width, ctx.height);
@@ -4993,6 +5249,7 @@ function dvGraficoPizza(mapaDia){
 }
 
 function dvTabelaLojas(regs){
+  document.getElementById('dv-tabela-label').textContent = 'Total por loja — ' + dvRotPeriodo();
   var por = {};
   regs.forEach(function(r){
     var l = dvLoja(r);
@@ -5007,7 +5264,7 @@ function dvTabelaLojas(regs){
                     .sort(function(a,b){ return b.n - a.n; });
   var total = lista.reduce(function(s, i){ return s + i.n; }, 0);
   var el = document.getElementById('dv-tabela');
-  if (!lista.length) { el.innerHTML = '<div class="dv-vazio">Nenhum registro no mês para o filtro atual.</div>'; return; }
+  if (!lista.length) { el.innerHTML = '<div class="dv-vazio">Nenhum registro no período para o filtro atual.</div>'; return; }
   var html = '<table class="dv-tab">';
   lista.forEach(function(i){
     var pct = total ? Math.round(i.n * 100 / total) : 0;
