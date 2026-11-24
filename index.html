@@ -7886,6 +7886,9 @@ function _renderLstSel(){
 // Para cada produto da lista: ultimo envio (historico) x preco atual (monitor).
 // Busca so o que ainda nao esta em cache; o render nao espera a resposta.
 var LST_COMP = {}, LST_COMP_PEND = {}, LST_COMP_TTL = 10 * 60000;
+// Historico de fora (Keepa/Descontinho) que nao chegou no prazo da 1a carga:
+// uma nova leitura desses itens ~25 s depois (uma vez por item).
+var LST_COMP_HIST_REFEITO = {};
 
 // O comparativo e calculado com o cupom que o disparo vai aplicar: trocar o
 // modo/codigo (ou o vinculo de um produto) torna o cache velho.
@@ -7915,7 +7918,9 @@ function lstCarregarComparativo(){
   faltam.forEach(function(a){ LST_COMP_PEND[a] = true; });
   fetch(SERVER + '/vitrine/comparativo', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ asins: faltam, cupomModo: cup.modo, cupomCodigo: cup.codigo || null, cuponsItem: lstCuponsItem() })
+    // historico:true = o servidor consulta Keepa (Amazon) / Descontinho (Shopee)
+    // dos produtos sem historico antes de dar o veredito das linhas de preco.
+    body: JSON.stringify({ asins: faltam, cupomModo: cup.modo, cupomCodigo: cup.codigo || null, cuponsItem: lstCuponsItem(), historico: true })
   })
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -7924,6 +7929,16 @@ function lstCarregarComparativo(){
         var c = (d.itens || {})[a] || { veredito:'erro' };
         c._em = Date.now(); c._cupom = lstCompChaveItem(a, cup); LST_COMP[a] = c;
       });
+      var h = d.historico || {};
+      var pend = ((h.amazon || {}).pendentes || 0) + ((h.shopee || {}).pendentes || 0);
+      var refazer = pend ? faltam.filter(function(a){ return !LST_COMP_HIST_REFEITO[a]; }) : [];
+      if (refazer.length){
+        refazer.forEach(function(a){ LST_COMP_HIST_REFEITO[a] = true; });
+        setTimeout(function(){
+          refazer.forEach(function(a){ lstCompInvalidar(a); });
+          if (document.getElementById('lst-form').style.display === 'block') lstCarregarComparativo();
+        }, 25000);
+      }
     })
     .catch(function(e){
       faltam.forEach(function(a){ LST_COMP[a] = { veredito:'erro', erro:e.message, _cupom: lstCompChaveItem(a, cup), _em: Date.now() - LST_COMP_TTL + 60000 }; });
@@ -8000,7 +8015,7 @@ function lstLinhaComparativo(asin){
       medTxt = ' · <b style="color:' + corM + '">' + (dm > 0 ? '-' : dm < 0 ? '+' : '') + String(Math.abs(dm)).replace('.', ',')
         + '% vs mediana 30d</b> (R$ ' + fmtBRL(c.mediana30) + ')';
     }
-    return '<div style="' + st + 'color:var(--muted2)">🆕 inédito · ' + agoraTxt + medTxt + extraTxt + '</div>';
+    return '<div style="' + st + 'color:var(--muted2)">🆕 inédito · ' + agoraTxt + medTxt + extraTxt + '</div>' + lstSeloLinhas(c);
   }
 
   var cor = { melhor:'#22c55e', igual:'#eab308', pior:'#f87171' }[c.veredito] || 'var(--muted2)';
@@ -8014,18 +8029,75 @@ function lstLinhaComparativo(asin){
         : ' · R$ ' + fmtBRL(u.preco))
     + ' → ' + agoraTxt + var_
     + (c.envios90d > 1 ? ' · ' + c.envios90d + '× em 90d' : '')
-    + extraTxt + '</div>';
+    + extraTxt + '</div>' + lstSeloLinhas(c);
+}
+
+// Linhas de preco (24/11/2026): o mesmo veredito do filtro de disparo e do
+// selo da mensagem — serie nossa + Keepa (Amazon) / Descontinho (Shopee),
+// sobre o preco com cupom. Aqui so informa; quem tira da lista e o operador.
+var LST_LINHAS_ROTULO = {
+  'imperdivel': { ico:'🔥', txt:'Imperdível', cor:'#22c55e' },
+  'boa':        { ico:'✅', txt:'Boa oferta', cor:'#4ade80' },
+  'comum':      { ico:'➖', txt:'Preço comum', cor:'#eab308' },
+  'falsa':      { ico:'❌', txt:'Falso desconto', cor:'#f87171' },
+  'sem base':   { ico:'⚪', txt:'Sem histórico suficiente', cor:'var(--muted2)' }
+};
+var LST_LINHAS_BASE = { '30d':'últimos 30 dias', '90d':'90 dias', '12m':'12 meses (Keepa)', 'tabela':'preço de tabela' };
+function lstSeloLinhas(c){
+  var L = c && c.linhas;
+  if (!L) return '';
+  var r = LST_LINHAS_ROTULO[L.classe] || LST_LINHAS_ROTULO['sem base'];
+  var partes = [];
+  if (L.descontoRealPct != null && L.cheio){
+    var d = L.descontoRealPct;
+    partes.push(d > 0 ? String(d).replace('.', ',') + '% abaixo do preço normal'
+               : d < 0 ? String(-d).replace('.', ',') + '% acima do preço normal' : 'no preço normal');
+    partes.push('normal R$ ' + fmtBRL(L.cheio) + (L.baseCheio ? ' (' + (LST_LINHAS_BASE[L.baseCheio] || L.baseCheio) + ')' : ''));
+  } else if (L.motivo) partes.push(esc(L.motivo));
+  if (L.patamarPromo) partes.push('promoção costuma ser R$ ' + fmtBRL(L.patamarPromo));
+  var fonte = L.fonteExterna === 'keepa' ? ' · histórico Keepa' : L.fonteExterna === 'descontinho' ? ' · histórico Descontinho' : '';
+  return '<div style="font-size:10.5px;margin-top:2px;line-height:1.45;color:var(--muted2)" title="' + esc(L.motivo || '') + '">'
+    + r.ico + ' <b style="color:' + r.cor + '">' + r.txt + '</b>'
+    + (partes.length ? ' · ' + partes.join(' · ') : '') + fonte + '</div>';
+}
+function lstCompFracoNasLinhas(c){
+  return !!(c && !lstCompIndisponivel(c) && c.linhas && (c.linhas.classe === 'comum' || c.linhas.classe === 'falsa'));
+}
+function lstRemoverFracosLinhas(){
+  var fora = {}, qtd = 0;
+  LST_SEL.forEach(function(p){ if (lstCompFracoNasLinhas(LST_COMP[p.asin])) { fora[p.asin] = true; qtd++; } });
+  if (!qtd) return;
+  if (!confirm('Remover ' + qtd + ' produto(s) com preço comum ou falso desconto (contra o histórico de preço)?')) return;
+  LST_SEL = LST_SEL.filter(function(p){ return !fora[p.asin]; });
+  renderLstSel();
 }
 
 function lstResumoComparativo(){
   var n = { melhor:0, igual:0, pior:0, inedito:0, indisponivel:0, semLeitura:0 };
+  var nl = { imperdivel:0, boa:0, comum:0, falsa:0, semBase:0 };
   LST_SEL.forEach(function(p){
     var c = LST_COMP[p.asin];
     if (!c) return;
     if (c.atual && c.atual.semLeitura && c.atual.disponivel !== false) { n.semLeitura++; return; }
     if (lstCompIndisponivel(c)) { n.indisponivel++; return; }
     if (n[c.veredito] != null) n[c.veredito]++;
+    var cl = c.linhas && c.linhas.classe;
+    if (cl === 'imperdivel' || cl === 'boa' || cl === 'comum' || cl === 'falsa') nl[cl]++;
+    else if (c.linhas) nl.semBase++;
   });
+  var pl = [];
+  if (nl.imperdivel) pl.push('🔥 ' + nl.imperdivel + ' imperdível(is)');
+  if (nl.boa)        pl.push('✅ ' + nl.boa + ' boa(s)');
+  if (nl.comum)      pl.push('➖ ' + nl.comum + ' comum(ns)');
+  if (nl.falsa)      pl.push('❌ ' + nl.falsa + ' falso desconto');
+  if (nl.semBase)    pl.push('⚪ ' + nl.semBase + ' sem histórico');
+  var fracos = nl.comum + nl.falsa;
+  var linhasHtml = pl.length
+    ? '<div style="font-size:11px;margin-top:6px;color:var(--muted2);display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+      + '<span>Contra o histórico de preço: ' + pl.join(' · ') + '</span>'
+      + (fracos ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverFracosLinhas()">Remover comuns e falsas (' + fracos + ')</button>' : '')
+      + '</div>'
+    : '';
   var partes = [];
   if (n.melhor)  partes.push('🟢 ' + n.melhor + ' mais barato(s)');
   if (n.igual)   partes.push('🟡 ' + n.igual + ' igual(is)');
@@ -8033,12 +8105,12 @@ function lstResumoComparativo(){
   if (n.inedito) partes.push('🆕 ' + n.inedito + ' inédito(s)');
   if (n.indisponivel) partes.push('⛔ ' + n.indisponivel + ' indisponível(is)');
   if (n.semLeitura) partes.push('⚠️ ' + n.semLeitura + ' sem leitura confirmada');
-  if (!partes.length) return '';
+  if (!partes.length) return linhasHtml;
   return '<div style="font-size:11px;margin-top:6px;color:var(--muted2);display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
     + '<span>Contra o último envio: ' + partes.join(' · ') + '</span>'
     + (n.pior ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverPiores()">Remover os 🔴 (' + n.pior + ')</button>' : '')
     + ((n.indisponivel + n.semLeitura) ? '<button class="btn btn-rej btn-sm" style="margin-top:0" onclick="lstRemoverIndisponiveis()">Remover os ⛔' + (n.semLeitura ? '/⚠️' : '') + ' (' + (n.indisponivel + n.semLeitura) + ')</button>' : '')
-    + '</div>';
+    + '</div>' + linhasHtml;
 }
 
 // Produto que a loja nao esta vendendo agora (monitor leu a pagina sem preco)
