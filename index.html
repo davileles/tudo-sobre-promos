@@ -17139,7 +17139,7 @@ function avLinhaLoja(pr, o, ehPedida, melhorChave){
     if (o.ativo === false) h += '<div>Removido' + (o.removidoEm ? ' ' + avQuando(o.removidoEm) : '') + ' — não conta mais no menor preço</div>';
   }
   var cup = avCupomTxt(o); if (cup) h += '<div>' + cup + '</div>';
-  if (o.falha) h += '<div class="av-erro">⚠️ Última leitura falhou: ' + esc(o.falha) + '</div>';
+  if (o.falha) h += '<div class="av-erro">⚠️ Última leitura: ' + esc(o.falha) + '</div>';
   h += '</div><div class="av-loja-acoes">';
   if (o.url) h += '<a class="av-b leve" href="' + esc(o.url) + '" target="_blank" rel="noopener">↗ Abrir</a>';
   if (o.loja === 'Mercado Livre' && o.ativo !== false) h += '<button class="av-b leve" onclick="avEquiv(\'' + k + '\',\'cupom\',' + (ehPedida ? 'null' : '\'' + c + '\'') + ',this)">🎟️ Conferir cupom</button>';
@@ -17345,7 +17345,7 @@ function avCartao(p){
         + (melhor ? 'na ' + esc(melhor.loja || '') + (melhor.cupom ? ' com ' + esc(melhor.cupom) : '') : '') + (p.lidoEm ? ' · lido ' + avQuando(p.lidoEm) : '') + '</small></div>'
       + '<div class="av-pc ' + sitCls + '"><span>Situação</span>' + sit + '</div>'
       + '</div>';
-    if (p.falhaMotivo) h += '<div class="av-erro">⚠️ Leitura da loja pedida falhou: ' + esc(p.falhaMotivo) + '</div>';
+    if (p.falhaMotivo) h += '<div class="av-erro">⚠️ Última leitura da loja pedida: ' + esc(p.falhaMotivo) + '</div>';
   }
   // Histórico de avisos
   h += '<div class="av-hist">' + (p.avisos
